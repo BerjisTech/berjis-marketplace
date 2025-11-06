@@ -1,0 +1,5 @@
+<button type="button" (click)="toggleTheme()"
+    class="rounded-full p-3 backdrop-blur shadow-brand bg-white/80 text-blue-900 hover:bg-white dark:bg-slate-800/80 dark:text-gold"
+    aria-label="Toggle theme">
+    <span class="material-symbols-outlined align-middle">{{ isDark() ? 'light_mode' : 'dark_mode' }}</span>
+</button>

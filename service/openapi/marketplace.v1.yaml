@@ -1,0 +1,61 @@
+openapi: 3.0.3
+info:
+  title: Berjis Marketplace API
+  version: 0.1.0
+servers:
+  - url: /
+paths:
+  /v1/health:
+    get:
+      summary: Health
+      responses:
+        '200': { description: ok }
+  /v1/products:
+    get:
+      summary: List published products across shops
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+  /v1/products/{id}:
+    get:
+      summary: Get product by UUID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+  /v1/shops:
+    get:
+      summary: List shops
+      responses:
+        '200': { description: ok }
+    post:
+      summary: Create shop (auth required)
+      responses:
+        '200': { description: ok }
+  /v1/shops/{slug}:
+    get:
+      summary: Get shop by slug
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+  /v1/shops/{slug}/products:
+    get:
+      summary: List products for a shop
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+

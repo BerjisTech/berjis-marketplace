@@ -1,0 +1,3 @@
+/* Component-level tweaks; use light-first styles */
+:host { display: contents; }
+

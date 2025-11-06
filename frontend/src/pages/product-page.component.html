@@ -1,0 +1,27 @@
+<div class="min-h-screen px-[clamp(1rem,6vw,3rem)] py-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
+  <ng-container *ngIf="!loading(); else loadingTpl">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div>
+        <div class="aspect-[4/3] rounded-xl bg-blue-100 dark:bg-slate-900 overflow-hidden shadow-brand">
+          <img *ngIf="product()?.imageUrl" [src]="product()?.imageUrl" alt="" class="w-full h-full object-cover"/>
+        </div>
+        <div class="mt-3 flex gap-2" *ngIf="product()?.images?.length">
+          <img *ngFor="let i of product()?.images" [src]="i" alt="" class="w-16 h-16 rounded-lg object-cover border border-blue-900/20 dark:border-slate-700"/>
+        </div>
+      </div>
+      <div>
+        <div class="text-sm text-slate-600 dark:text-slate-400 mb-2">
+          <a [routerLink]="['/shop', product()?.shopSlug]" class="rounded-full px-2 py-0.5 border border-blue-900/25 dark:border-slate-700 bg-blue-50 dark:bg-slate-900/60">{{ product()?.shopName }}</a>
+        </div>
+        <h1 class="text-2xl font-bold text-blue-900 dark:text-white">{{ product()?.title }}</h1>
+        <p class="mt-2 text-slate-700 dark:text-slate-200">{{ product()?.summary }}</p>
+        <div class="mt-4 text-xl font-semibold text-blue-900 dark:text-white">{{ (product()?.priceCents/100) | number:'1.2-2' }} {{ product()?.currency }}</div>
+        <button class="btn btn-primary mt-6">Add to cart</button>
+      </div>
+    </div>
+  </ng-container>
+  <ng-template #loadingTpl>
+    <div class="text-slate-600 dark:text-slate-400">Loading product…</div>
+  </ng-template>
+</div>
+

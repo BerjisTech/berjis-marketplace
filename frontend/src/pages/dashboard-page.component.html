@@ -1,0 +1,232 @@
+<div
+  class="fixed text-(--color-text-primary) dark:text-(--color-text-dark) h-screen! w-screen! m-0! p-0! overflow-hidden">
+
+  <!-- Internal toolbar under global header -->
+  <div class="h-12 bg-white/70 dark:bg-slate-950/70 border-b border-blue-900/20 dark:border-slate-800 backdrop-blur">
+    <div class="h-full px-[clamp(1rem,6vw,3rem)] flex items-center gap-3">
+      <ng-container *ngIf="shops().length > 1">
+        <select
+          class="h-9 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-sm"
+          (change)="onShopChange($event)">
+          <option *ngFor="let s of shops()" [selected]="s.slug===selectedShopSlug()" [value]="s.slug">{{ s.name }}
+          </option>
+        </select>
+      </ng-container>
+      <div class="relative flex-1">
+        <input
+          class="w-full h-9 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-sm"
+          placeholder="Search orders, products, customers, marketing, discounts, content, markets, analytics"
+          [ngModel]="searchQ()" (ngModelChange)="onSearchChange($event)" />
+        <div
+          class="absolute z-20 mt-2 w-full rounded-xl border border-blue-900/20 dark:border-slate-700 bg-white dark:bg-slate-950 shadow-brand p-3"
+          *ngIf="searchResults()">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Products</div>
+              <a *ngFor="let p of (searchResults()?.products||[])" [routerLink]="['/product', p.uuid]"
+                class="block px-2 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+                <div class="text-sm text-blue-900 dark:text-white">{{ p.title }}</div>
+                <div class="text-xs text-slate-500">{{ p.shopName }}</div>
+              </a>
+              <div *ngIf="(searchResults()?.products||[]).length===0" class="text-xs text-slate-500">No products</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase tracking-wider text-slate-500 mb-1">Orders</div>
+              <div *ngFor="let o of (searchResults()?.orders||[])" class="px-2 py-1 rounded">#{{ o.uuid | slice:0:8 }} ·
+                {{ o.status }} · {{ (o.totalCents/100) | number:'1.2-2' }} {{ o.currency }}</div>
+              <div *ngIf="(searchResults()?.orders||[]).length===0" class="text-xs text-slate-500">No orders</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="rounded-full h-9 w-9 grid place-items-center border border-blue-900/20 dark:border-slate-700"><span
+          class="material-symbols-outlined text-[18px]">notifications</span></button>
+      <button class="rounded-full h-9 w-9 grid place-items-center border border-blue-900/20 dark:border-slate-700"
+        (click)="openAI()"><span class="material-symbols-outlined text-[18px]">smart_toy</span></button>
+      <div class="relative">
+        <button
+          class="rounded-full h-9 w-9 grid place-items-center border border-blue-900/20 dark:border-slate-700 overflow-hidden"
+          (click)="userMenuOpen.set(!userMenuOpen())">
+          <span class="material-symbols-outlined text-[18px]">account_circle</span>
+        </button>
+        <div
+          class="absolute right-0 mt-2 w-44 rounded-xl border border-blue-900/20 dark:border-slate-700 bg-white dark:bg-slate-950 shadow-brand p-2"
+          *ngIf="userMenuOpen()">
+          <a routerLink="/account"
+            class="block px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover=bgs-slate-900/60">Account</a>
+          <a routerLink="/auth/logout"
+            class="block px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover=bgs-slate-900/60">Sign out</a>
+        </div>
+      </div>
+      <app-dark-mode-toggle></app-dark-mode-toggle>
+    </div>
+  </div>
+  <!-- Main Content -->
+  <div class="grid h-[calc(100vh-48px)] overflow-hidden" [style.gridTemplateColumns]="navW + 'px 1fr ' + toolsW + 'px'">
+    <!-- Left Sidebar -->
+    <aside
+      class="h-full border-r border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 backdrop-blur flex flex-col  overflow-x-hidden overflow-y-auto">
+      <div class="p-3 flex items-center justify-between" [class.hidden]="navCollapsed()">
+        <div class="text-sm font-semibold text-blue-900 dark:text-white">Dashboard</div>
+        <button class="rounded-full border border-blue-900/20 dark:border-slate-700 h-8 w-8 grid place-items-center"
+          (click)="navCollapsed.set(true)"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
+      </div>
+      <nav class="flex-1 p-2 flex flex-col gap-1">
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">home</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Home</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">inventory_2</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Products</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">sell</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Discounts</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">receipt_long</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Orders</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">group</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Customers</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">campaign</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Marketing</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">article</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Content</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">public</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Markets</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">monitoring</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Analytics</span>
+        </a>
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">extension</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Apps / Plugins</span>
+        </a>
+      </nav>
+      <div class="p-2 mt-auto">
+        <a routerLink="/dashboard/settings"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">settings</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Settings</span>
+        </a>
+        <div *ngIf="navCollapsed()" class="w-full grid place-items-center">
+          <button class="rounded-full border border-blue-900/20 dark:border-slate-700 h-8 w-8 grid place-items-center"
+            (click)="navCollapsed.set(false)"><span
+              class="material-symbols-outlined text-sm">chevron_right</span></button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Dashboard Content (scrollable) -->
+    <main class="min-w-0 h-full relative overflow-x-hidden overflow-y-auto">
+      <!-- Scrollable area -->
+      <div class="absolute left-0 right-0 top-12 bottom-0 overflow-y-auto px-[clamp(1rem,6vw,3rem)] py-6">
+        <h1 class="text-2xl font-bold text-blue-900 dark:text-white mb-6">Merchant Dashboard</h1>
+
+        <section
+          class="mb-10 rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+          <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Your Shops</h2>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <button *ngFor="let s of shops()" (click)="selectedShopSlug.set(s.slug); loadProducts()"
+              class="rounded-full border border-blue-900/25 dark:border-slate-700 px-3 py-1"
+              [class.bg-blue-50]="selectedShopSlug()===s.slug">{{ s.name }} <span class="text-xs text-slate-600">{{ '@'
+                + s.slug }}</span></button>
+          </div>
+          <div class="mt-6">
+            <a routerLink="/dashboard/shops/new" class="btn btn-primary rounded-full h-10 px-5">Create shop</a>
+          </div>
+        </section>
+
+        <section
+          class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+          <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Products for {{ '@' + (selectedShopSlug() ||
+            '-') }}</h2>
+          <form class="mt-4 grid gap-3 md:grid-cols-3" (submit)="$event.preventDefault(); createProduct()">
+            <input [(ngModel)]="newProduct.title" name="title" placeholder="Title"
+              class="rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2" />
+            <input [(ngModel)]="newProduct.slug" name="slug" placeholder="slug"
+              class="rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2" />
+            <input [(ngModel)]="newProduct.category" name="category" placeholder="category"
+              class="rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2" />
+            <input [(ngModel)]="newProduct.summary" name="summary" placeholder="summary"
+              class="rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2 md:col-span-3" />
+            <input [(ngModel)]="newProduct.priceCents" name="priceCents" type="number" placeholder="price (cents)"
+              class="rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2" />
+            <input [(ngModel)]="newProduct.currency" name="currency" placeholder="USD"
+              class="rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2" />
+            <input [(ngModel)]="newProduct.stock" name="stock" type="number" placeholder="stock"
+              class="rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2" />
+            <div class="md:col-span-3 flex items-center gap-3">
+              <input type="file" (change)="onFile($event)" />
+              <span *ngIf="uploadBusy()" class="text-sm text-slate-600 dark:text-slate-400">Uploading…</span>
+              <span *ngIf="newProduct.imageUrl" class="text-sm text-emerald-600">Image set</span>
+            </div>
+            <button class="btn btn-primary md:col-span-3">Create product</button>
+          </form>
+
+          <div class="mt-6 grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
+            <article *ngFor="let p of products()"
+              class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
+              <div class="aspect-4/3 rounded-lg bg-blue-100 dark:bg-slate-900 mb-3 overflow-hidden">
+                <img *ngIf="p.imageUrl" [src]="p.imageUrl" alt="" class="w-full h-full object-cover" />
+              </div>
+              <h3 class="text-base font-semibold text-blue-900 dark:text-white">{{ p.title }}</h3>
+              <div class="mt-2 text-sm text-slate-700 dark:text-slate-200">{{ (p.priceCents/100) | number:'1.2-2' }} {{
+                p.currency }}</div>
+              <div class="mt-2 flex gap-2 text-sm">
+                <button class="rounded-full border border-blue-900/25 dark:border-slate-700 px-3 py-1"
+                  (click)="togglePublish(p)">{{ p.published ? 'Unpublish' : 'Publish' }}</button>
+                <button class="rounded-full border border-red-400 text-red-600 px-3 py-1"
+                  (click)="deleteProduct(p)">Delete</button>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <!-- Right Sidebar (Tools) -->
+    <aside
+      class="h-full border-l border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 backdrop-blur  overflow-x-hidden overflow-y-auto">
+      <div class="p-3 flex items-center justify-between">
+        <div class="text-sm font-semibold text-blue-900 dark:text-white">Tools</div>
+        <button class="rounded-full border border-blue-900/20 dark:border-slate-700 h-8 w-8 grid place-items-center"
+          (click)="toolsOpen.set(false)"><span class="material-symbols-outlined text-sm">close</span></button>
+      </div>
+      <div class="px-3 text-sm text-slate-600 dark:text-slate-400">
+        <div class="mb-3 font-semibold text-blue-900 dark:text-white">AI Assistant</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400 mb-2">Ask anything about your shop.</div>
+        <textarea
+          class="w-full h-24 rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 p-2 text-sm"
+          placeholder="Ask a question..."></textarea>
+        <button class="btn btn-primary rounded-full h-10 px-5 mt-2">Send</button>
+      </div>
+    </aside>
+  </div>
+
+  <button
+    class="fixed bottom-5 right-5 rounded-full h-12 w-12 grid place-items-center shadow-brand bg-blue-900 text-white hover:bg-blue-950"
+    (click)="toolsOpen.set(!toolsOpen())">
+    <span class="material-symbols-outlined">tune</span>
+  </button>
+</div>

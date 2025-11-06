@@ -1,0 +1,127 @@
+<div class="max-w-[1200px] mx-auto">
+  <!-- 1: Where would you like to sell? -->
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-3">1. Where would you like to sell?</h2>
+    <p class="text-slate-600 dark:text-slate-400 mb-3">We'll make sure you're set up to sell in these places</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <button type="button" (click)="toggle(salesChannels,'online-store')" class="group rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 text-left" [class.ring-2]="salesChannels().includes('online-store')" [class.ring-blue-400]="salesChannels().includes('online-store')">
+        <div class="text-blue-900 dark:text-white font-semibold">An online store</div>
+        <div class="text-sm text-slate-600 dark:text-slate-400">Create a fully customizable website</div>
+      </button>
+      <button type="button" (click)="toggle(salesChannels,'retail-store')" class="group rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 text-left" [class.ring-2]="salesChannels().includes('retail-store')" [class.ring-blue-400]="salesChannels().includes('retail-store')">
+        <div class="text-blue-900 dark:text-white font-semibold">In person at a retail store</div>
+        <div class="text-sm text-slate-600 dark:text-slate-400">Brick-and-mortar stores</div>
+      </button>
+      <button type="button" (click)="toggle(salesChannels,'events')" class="group rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 text-left" [class.ring-2]="salesChannels().includes('events')" [class.ring-blue-400]="salesChannels().includes('events')">
+        <div class="text-blue-900 dark:text-white font-semibold">In person at events</div>
+        <div class="text-sm text-slate-600 dark:text-slate-400">Markets, fairs, and pop-ups</div>
+      </button>
+      <button type="button" (click)="toggle(salesChannels,'buy-button')" class="group rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 text-left" [class.ring-2]="salesChannels().includes('buy-button')" [class.ring-blue-400]="salesChannels().includes('buy-button')">
+        <div class="text-blue-900 dark:text-white font-semibold">An existing website or blog</div>
+        <div class="text-sm text-slate-600 dark:text-slate-400">Add a Buy Button to your website</div>
+      </button>
+      <button type="button" (click)="toggle(salesChannels,'social')" class="group rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 text-left" [class.ring-2]="salesChannels().includes('social')" [class.ring-blue-400]="salesChannels().includes('social')">
+        <div class="text-blue-900 dark:text-white font-semibold">Social media</div>
+        <div class="text-sm text-slate-600 dark:text-slate-400">Reach customers on Facebook, Instagram, TikTok, and more</div>
+      </button>
+      <button type="button" (click)="toggle(salesChannels,'marketplaces')" class="group rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 text-left" [class.ring-2]="salesChannels().includes('marketplaces')" [class.ring-blue-400]="salesChannels().includes('marketplaces')">
+        <div class="text-blue-900 dark:text-white font-semibold">Online marketplaces</div>
+        <div class="text-sm text-slate-600 dark:text-slate-400">List products on Etsy, Amazon, and more</div>
+      </button>
+    </div>
+  </section>
+
+  <!-- 2: New or existing business -->
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-3">2. Is this shop for a new or existing business?</h2>
+    <p class="text-slate-600 dark:text-slate-400 mb-3">This helps us suggest the right onboarding</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-center gap-3 cursor-pointer">
+        <input type="radio" name="biz" class="h-4 w-4" (change)="businessType.set('new')" [checked]="businessType()==='new'" />
+        <div class="text-blue-900 dark:text-white font-semibold">New business or idea</div>
+      </label>
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-center gap-3 cursor-pointer">
+        <input type="radio" name="biz" class="h-4 w-4" (change)="businessType.set('existing')" [checked]="businessType()==='existing'" />
+        <div class="text-blue-900 dark:text-white font-semibold">Existing business</div>
+      </label>
+    </div>
+  </section>
+
+  <!-- 3: Other platforms -->
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-3">3. Do you currently sell on other platforms?</h2>
+    <p class="text-slate-600 dark:text-slate-400 mb-3">We make it easy to migrate</p>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+      <ng-container *ngFor="let p of ['none','amazon','instagram','facebook-marketplace','etsy','tiktok','ebay','wix','square','wordpress','woocommerce','cash-register','squarespace','godaddy','big-cartel','prestashop','bigcommerce','clover','opencart','lightspeed','magento','shopify','other']">
+        <label class="rounded-full border border-blue-900/20 dark:border-slate-800 bg-white/70 dark:bg-slate-950/70 px-3 py-2 flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" [checked]="otherPlatforms().includes(p)" (change)="toggle(otherPlatforms,p)" />
+          <span class="text-sm text-slate-800 dark:text-slate-200">{{ p.replace('-', ' ') }}</span>
+        </label>
+      </ng-container>
+    </div>
+  </section>
+
+  <!-- 4: What to sell -->
+  <section class="mb-8">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-3">4. What do you plan to sell?</h2>
+    <p class="text-slate-600 dark:text-slate-400 mb-3">We'll get you the right features and tools</p>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-start gap-3 cursor-pointer">
+        <input type="radio" name="sell" class="mt-1" (change)="planToSell.set('own-products')" [checked]="planToSell()==='own-products'" />
+        <div>
+          <div class="text-blue-900 dark:text-white font-semibold">Products I buy or make myself</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">Shipped by me</div>
+        </div>
+      </label>
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-start gap-3 cursor-pointer">
+        <input type="radio" name="sell" class="mt-1" (change)="planToSell.set('digital')" [checked]="planToSell()==='digital'" />
+        <div>
+          <div class="text-blue-900 dark:text-white font-semibold">Digital products</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">Music, digital art, NFTs</div>
+        </div>
+      </label>
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-start gap-3 cursor-pointer">
+        <input type="radio" name="sell" class="mt-1" (change)="planToSell.set('dropshipping')" [checked]="planToSell()==='dropshipping'" />
+        <div>
+          <div class="text-blue-900 dark:text-white font-semibold">Dropshipping products</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">Sourced and shipped by a third party</div>
+        </div>
+      </label>
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-start gap-3 cursor-pointer">
+        <input type="radio" name="sell" class="mt-1" (change)="planToSell.set('services')" [checked]="planToSell()==='services'" />
+        <div>
+          <div class="text-blue-900 dark:text-white font-semibold">Services</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">Coaching, housekeeping, consulting</div>
+        </div>
+      </label>
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-start gap-3 cursor-pointer">
+        <input type="radio" name="sell" class="mt-1" (change)="planToSell.set('print-on-demand')" [checked]="planToSell()==='print-on-demand'" />
+        <div>
+          <div class="text-blue-900 dark:text-white font-semibold">Print-on-demand products</div>
+          <div class="text-sm text-slate-600 dark:text-slate-400">My designs, printed and shipped by a third party</div>
+        </div>
+      </label>
+      <label class="rounded-2xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 flex items-start gap-3 cursor-pointer">
+        <input type="radio" name="sell" class="mt-1" (change)="planToSell.set('later')" [checked]="planToSell()==='later'" />
+        <div>
+          <div class="text-blue-900 dark:text-white font-semibold">I'll decide later</div>
+        </div>
+      </label>
+    </div>
+  </section>
+
+  <!-- 5: Store name -->
+  <section class="mb-10">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-3">5. Almost done! What should we call your store?</h2>
+    <p class="text-slate-600 dark:text-slate-400 mb-3">You can change your store name anytime</p>
+    <div class="grid gap-2">
+      <input class="h-12 rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 px-4 text-slate-900 dark:text-slate-100" [ngModel]="name()" (ngModelChange)="onNameChange($event)" name="name" placeholder="Awesome Store" />
+      <div class="text-xs text-slate-500 dark:text-slate-400">URL handle will be: <span class="font-mono">{{ slug() || slugify(name()) }}</span></div>
+    </div>
+  </section>
+
+  <div class="flex items-center gap-3">
+    <button class="btn btn-primary rounded-full h-12 px-6" [disabled]="submitting()" (click)="submit()">Create shop</button>
+    <a routerLink="/dashboard" class="rounded-full h-12 px-5 border border-blue-900/20 dark:border-slate-700 grid place-items-center">Cancel</a>
+  </div>
+</div>
