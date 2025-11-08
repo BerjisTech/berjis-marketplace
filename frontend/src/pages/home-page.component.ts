@@ -2,6 +2,7 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { ProductCardComponent } from '../app/shared/components/product-card/product-card.component';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 
@@ -11,7 +12,7 @@ type Shop = { uuid: string; name: string; slug: string; description: string };
 @Component({
   standalone: true,
   selector: 'home-page',
-  imports: [CommonModule, RouterLink, FormsModule],
+  imports: [CommonModule, RouterLink, FormsModule, ProductCardComponent],
   templateUrl: './home-page.component.html',
   styleUrls: ['./home-page.component.css']
 })
@@ -19,6 +20,9 @@ export class HomePageComponent implements OnInit {
   products = signal<Product[]>([]);
   shops = signal<Shop[]>([]);
   loading = signal(true);
+  page = signal<number>(1);
+  perPage = signal<number>(24);
+  sort = signal<string>('');
   categories = signal<string[]>([]);
   selectedCategory = signal<string>('');
   minPrice = signal<string>('');
@@ -29,6 +33,8 @@ export class HomePageComponent implements OnInit {
   api = environment.apiBase;
   constructor(private http: HttpClient) {}
   ngOnInit(): void { this.fetchAll(); this.fetchCategories(); }
+  prevPage(){ this.page.set(Math.max(1, this.page()-1)); this.fetchAll(); }
+  nextPage(){ this.page.set(this.page()+1); this.fetchAll(); }
   fetchAll(){
     this.loading.set(true);
     const params: any = {};
@@ -36,6 +42,9 @@ export class HomePageComponent implements OnInit {
     if (this.minPrice()) params.minPrice = this.minPrice();
     if (this.maxPrice()) params.maxPrice = this.maxPrice();
     if (this.q()) params.q = this.q();
+    if (this.page()) params.page = this.page();
+    if (this.perPage()) params.limit = this.perPage();
+    if (this.sort()) params.sort = this.sort();
     const qs = new URLSearchParams(params).toString();
     Promise.all([
       this.http.get<any>(`${this.api}/v1/products${qs ? '?' + qs : ''}`).toPromise(),

@@ -1,7 +1,13 @@
 <div class="py-4">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Products Overview</h1>
-    <a routerLink="/dashboard/products/new" class="btn btn-primary rounded-full h-10 px-5">Add product</a>
+  <div class="flex items-center justify-between gap-3">
+    <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Products</h1>
+    <div class="flex items-center gap-2">
+      <select class="h-10 rounded-full border px-3" [ngModel]="shopSlug()" (ngModelChange)="shopSlug.set($event); load()">
+        <option *ngFor="let s of shops()" [value]="s.slug">{{ s.name }}</option>
+      </select>
+      <input class="h-10 rounded-full border px-3" placeholder="Search products" [ngModel]="q()" (ngModelChange)="q.set($event); load()" />
+      <a routerLink="/dashboard/products/new" class="btn btn-primary rounded-full h-10 px-5">Add product</a>
+    </div>
   </div>
   <div class="mt-4 flex flex-wrap gap-2">
     <a routerLink="/dashboard/products/collections" class="rounded-full border px-3 py-1">Collections</a>
@@ -10,8 +16,30 @@
     <a routerLink="/dashboard/products/transfers" class="rounded-full border px-3 py-1">Transfers</a>
     <a routerLink="/dashboard/products/gift-cards" class="rounded-full border px-3 py-1">Gift cards</a>
   </div>
-  <div class="mt-6 text-sm text-slate-600 dark:text-slate-300">
-    <p>Placeholder for product KPIs and recent items.</p>
+
+  <div class="mt-6 overflow-auto rounded-xl border border-blue-900/20 dark:border-slate-800">
+    <table class="min-w-[720px] w-full text-sm">
+      <thead class="bg-blue-50/60 dark:bg-slate-900/60">
+        <tr class="text-left">
+          <th class="px-3 py-2">Title</th>
+          <th class="px-3 py-2">Price</th>
+          <th class="px-3 py-2">Stock</th>
+          <th class="px-3 py-2">Published</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of items()" class="border-t border-blue-900/10 dark:border-slate-800">
+          <td class="px-3 py-2">
+            <div class="font-medium text-blue-900 dark:text-white">{{ p.title }}</div>
+            <div class="text-xs text-slate-500">{{ p.uuid | slice:0:8 }}</div>
+          </td>
+          <td class="px-3 py-2">{{ (p.priceCents/100) | number:'1.2-2' }} {{ p.currency }}</td>
+          <td class="px-3 py-2">{{ p.stock ?? 0 }}</td>
+          <td class="px-3 py-2">{{ p.published ? 'Yes' : 'No' }}</td>
+        </tr>
+        <tr *ngIf="!loading() && items().length===0"><td class="px-3 py-4 text-slate-500" colspan="4">No products found</td></tr>
+        <tr *ngIf="loading()"><td class="px-3 py-4 text-slate-500" colspan="4">Loading…</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
-

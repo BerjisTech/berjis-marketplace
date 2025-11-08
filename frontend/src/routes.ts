@@ -10,6 +10,7 @@ import { OrdersAbandonedCheckoutsPageComponent } from './pages/orders-abandoned-
 import { OrdersReturnsPageComponent } from './pages/orders-returns-page.component';
 
 import { ProductsOverviewPageComponent } from './pages/products-overview-page.component';
+import { DashboardOverviewPageComponent } from './pages/dashboard-overview-page.component';
 import { ProductsCollectionsPageComponent } from './pages/products-collections-page.component';
 import { ProductsInventoryPageComponent } from './pages/products-inventory-page.component';
 import { ProductsPurchaseOrdersPageComponent } from './pages/products-purchase-orders-page.component';
@@ -40,10 +41,29 @@ import { AnalyticsReportsPageComponent } from './pages/analytics-reports-page.co
 import { AnalyticsLiveViewPageComponent } from './pages/analytics-live-view-page.component';
 
 import { SettingsPageComponent } from './pages/settings-page.component';
+import { SettingsGeneralPageComponent } from './pages/settings-general-page.component';
+import { SettingsPlanPageComponent } from './pages/settings-plan-page.component';
+import { SettingsBillingPageComponent } from './pages/settings-billing-page.component';
+import { SettingsUsersPageComponent } from './pages/settings-users-page.component';
+import { SettingsPaymentsPageComponent } from './pages/settings-payments-page.component';
+import { SettingsCheckoutPageComponent } from './pages/settings-checkout-page.component';
+import { SettingsCustomerAccountsPageComponent } from './pages/settings-customer-accounts-page.component';
+import { SettingsShippingAndDeliveryPageComponent } from './pages/settings-shipping-and-delivery-page.component';
+import { SettingsTaxesAndDutiesPageComponent } from './pages/settings-taxes-and-duties-page.component';
+import { SettingsLocationsPageComponent } from './pages/settings-locations-page.component';
+import { SettingsAppsAndSalesChannelsPageComponent } from './pages/settings-apps-and-sales-channels-page.component';
+import { SettingsDomainsPageComponent } from './pages/settings-domains-page.component';
+import { SettingsCustomerEventsPageComponent } from './pages/settings-customer-events-page.component';
+import { SettingsNotificationsPageComponent } from './pages/settings-notifications-page.component';
+import { SettingsMetafieldsAndMetaobjectsPageComponent } from './pages/settings-metafields-and-metaobjects-page.component';
+import { SettingsLanguagesPageComponent } from './pages/settings-languages-page.component';
+import { SettingsCustomerPrivacyPageComponent } from './pages/settings-customer-privacy-page.component';
+import { SettingsPoliciesPageComponent } from './pages/settings-policies-page.component';
 import { CategoryPageComponent } from './pages/category-page.component';
 import { NewShopPageComponent } from './pages/new-shop-page.component';
 import { GetStartedPageComponent } from './pages/get-started-page.component';
 import { UserFacingPagesComponent } from './app/components/user-facing-pages/user-facing-pages.component';
+import { authGuard } from './app/core/guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -55,8 +75,8 @@ export const routes: Routes = [
       { path: 'category/:id', component: CategoryPageComponent },
     ]
   },
-  { path: 'dashboard', component: DashboardPageComponent, children: [
-    { path: '', pathMatch: 'full', component: ProductsOverviewPageComponent },
+  { path: 'dashboard', component: DashboardPageComponent, canActivate: [authGuard], canActivateChild: [authGuard], children: [
+    { path: '', pathMatch: 'full', component: DashboardOverviewPageComponent },
     // Orders
     { path: 'orders', component: OrdersOverviewPageComponent },
     { path: 'orders/draft', component: OrdersDraftPageComponent },
@@ -92,8 +112,26 @@ export const routes: Routes = [
     { path: 'analytics', component: AnalyticsOverviewPageComponent },
     { path: 'analytics/reports', component: AnalyticsReportsPageComponent },
     { path: 'analytics/live-view', component: AnalyticsLiveViewPageComponent },
-    // Settings
+    // Settings overview + specific pages
     { path: 'settings', component: SettingsPageComponent },
+    { path: 'settings/general', component: SettingsGeneralPageComponent },
+    { path: 'settings/plan', component: SettingsPlanPageComponent },
+    { path: 'settings/billing', component: SettingsBillingPageComponent },
+    { path: 'settings/users', component: SettingsUsersPageComponent },
+    { path: 'settings/payments', component: SettingsPaymentsPageComponent },
+    { path: 'settings/checkout', component: SettingsCheckoutPageComponent },
+    { path: 'settings/customer-accounts', component: SettingsCustomerAccountsPageComponent },
+    { path: 'settings/shipping-and-delivery', component: SettingsShippingAndDeliveryPageComponent },
+    { path: 'settings/taxes-and-duties', component: SettingsTaxesAndDutiesPageComponent },
+    { path: 'settings/locations', component: SettingsLocationsPageComponent },
+    { path: 'settings/apps-and-sales-channels', component: SettingsAppsAndSalesChannelsPageComponent },
+    { path: 'settings/domains', component: SettingsDomainsPageComponent },
+    { path: 'settings/customer-events', component: SettingsCustomerEventsPageComponent },
+    { path: 'settings/notifications', component: SettingsNotificationsPageComponent },
+    { path: 'settings/metafields-and-metaobjects', component: SettingsMetafieldsAndMetaobjectsPageComponent },
+    { path: 'settings/languages', component: SettingsLanguagesPageComponent },
+    { path: 'settings/customer-privacy', component: SettingsCustomerPrivacyPageComponent },
+    { path: 'settings/policies', component: SettingsPoliciesPageComponent },
   ] },
   { path: 'dashboard/shops/new', component: NewShopPageComponent },
   { path: '**', redirectTo: '' }

@@ -27,9 +27,9 @@
           <div class="flex items-center gap-3">
             <label class="rounded-lg border px-3 py-2 cursor-pointer">
               Upload files
-              <input type="file" multiple class="hidden" />
+              <input type="file" multiple class="hidden" (change)="onFile($event)" />
             </label>
-            <span class="text-sm text-slate-500">No file chosen</span>
+            <span class="text-sm text-slate-500">{{ chosenFileName() }}</span>
             <button class="rounded-lg border px-3 py-2">Select existing</button>
           </div>
           <div class="text-xs text-slate-500">Accepts images, videos, or 3D models</div>
@@ -47,9 +47,13 @@
 
     <!-- Right column -->
     <section class="space-y-6">
-      <!-- Category -->
+      <!-- Shop + Category -->
       <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
         <h2 class="text-base font-semibold mb-2">Category</h2>
+        <label class="block text-sm font-medium mb-1">Shop</label>
+        <select [ngModel]="shopSlug()" (ngModelChange)="shopSlug.set($event)" name="shop" class="w-full rounded-lg border px-3 py-2 mb-3">
+          <option *ngFor="let s of shops()" [value]="s.slug">{{ s.name }}</option>
+        </select>
         <label class="block text-sm font-medium mb-1">Category</label>
         <select [(ngModel)]="model.category" name="category" class="w-full rounded-lg border px-3 py-2">
           <option value="">Choose a product category</option>
@@ -177,4 +181,3 @@
     </section>
   </div>
 </div>
-

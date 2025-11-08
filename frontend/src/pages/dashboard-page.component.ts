@@ -22,6 +22,8 @@ export class DashboardPageComponent implements OnInit {
   navCollapsed = signal<boolean>(false);
   toolsOpen = signal<boolean>(false);
   userMenuOpen = signal<boolean>(false);
+  // nav accordion: only one group open at a time
+  openGroup = signal<null | 'orders' | 'products' | 'customers' | 'marketing' | 'discounts' | 'content' | 'markets' | 'analytics'>(null);
   // search
   searchQ = signal<string>('');
   searching = signal<boolean>(false);
@@ -47,6 +49,9 @@ export class DashboardPageComponent implements OnInit {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     if (!v || v.trim().length < 2) { this.searchResults.set(null); return; }
     this.searchTimer = setTimeout(() => this.runSearch(), 300);
+  }
+  open(group: 'orders' | 'products' | 'customers' | 'marketing' | 'discounts' | 'content' | 'markets' | 'analytics'){
+    this.openGroup.set(this.openGroup() === group ? null : group);
   }
   private runSearch(){
     const q = this.searchQ().trim(); if (!q) { this.searchResults.set(null); return; }

@@ -1,0 +1,76 @@
+<div class="space-y-6">
+  <!-- Promo / Plan -->
+  <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div>
+        <div class="text-lg font-semibold text-blue-900 dark:text-white">Select a plan to get 3 months for $1/month</div>
+        <div class="text-sm text-slate-600 dark:text-slate-300">Upgrade any time to unlock all features.</div>
+      </div>
+      <a routerLink="/dashboard/settings/plan" class="btn btn-primary rounded-full h-10 px-5">Choose plan</a>
+    </div>
+  </div>
+
+  <!-- Empty states / setup tasks -->
+  <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+    <!-- No shop or generic name -->
+    <div *ngIf="(shops().length===0) || isGenericShopName(selectedShop?.name)" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+      <div class="text-lg font-semibold text-blue-900 dark:text-white mb-2">{{ shops().length===0 ? 'Create your first shop' : 'Name your shop' }}</div>
+      <div class="text-sm text-slate-600 dark:text-slate-300 mb-4">Shop names must be unique.</div>
+      <div class="flex gap-2">
+        <a *ngIf="shops().length===0" routerLink="/dashboard/shops/new" class="btn btn-primary rounded-full h-10 px-5">Create shop</a>
+        <a *ngIf="shops().length>0" routerLink="/dashboard/settings/general" class="btn rounded-full h-10 px-5 border">Edit shop name</a>
+      </div>
+    </div>
+
+    <!-- No products -->
+    <div *ngIf="shops().length>0 && products().length===0" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+      <div class="flex items-start gap-3">
+        <div class="shrink-0 text-blue-600 dark:text-blue-300">
+          <!-- simple product vector -->
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/></svg>
+        </div>
+        <div class="min-w-0">
+          <div class="text-lg font-semibold text-blue-900 dark:text-white">Add your first product</div>
+          <div class="text-sm text-slate-600 dark:text-slate-300">Start by adding a product and a few key details. Not ready? Start with a sample product.</div>
+          <div class="mt-3 flex gap-2">
+            <a routerLink="/dashboard/products/new" class="btn btn-primary rounded-full h-10 px-5">Add product</a>
+            <a routerLink="/dashboard/products/new" class="btn rounded-full h-10 px-5 border">Add sample</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Theme prompt -->
+    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+      <div class="text-lg font-semibold text-blue-900 dark:text-white">Design your store</div>
+      <div class="text-sm text-slate-600 dark:text-slate-300">Describe your business to generate custom themes or browse pre-designed themes</div>
+      <div class="mt-3">
+        <a routerLink="/dashboard/settings/apps-and-sales-channels" class="btn btn-primary rounded-full h-10 px-5">Submit</a>
+      </div>
+      <div class="mt-2 text-sm text-slate-500">Example: “Modern handmade jewelry”</div>
+    </div>
+
+    <!-- Payments -->
+    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+      <div class="text-lg font-semibold text-blue-900 dark:text-white">Set up a payment provider</div>
+      <div class="mt-2 flex gap-2 text-slate-700 dark:text-slate-200 text-sm">
+        <span class="rounded-full border px-3 py-1">PayPal Express</span>
+        <span class="rounded-full border px-3 py-1">Visa</span>
+        <span class="rounded-full border px-3 py-1">Mastercard</span>
+      </div>
+      <div class="mt-3">
+        <a routerLink="/dashboard/settings/payments" class="btn rounded-full h-10 px-5 border">Choose provider</a>
+      </div>
+    </div>
+
+    <!-- Shipping -->
+    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
+      <div class="text-lg font-semibold text-blue-900 dark:text-white">Review your shipping rates</div>
+      <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">Domestic</div>
+      <div class="mt-3">
+        <a routerLink="/dashboard/settings/shipping-and-delivery" class="btn rounded-full h-10 px-5 border">Edit rates</a>
+      </div>
+    </div>
+  </div>
+</div>
+

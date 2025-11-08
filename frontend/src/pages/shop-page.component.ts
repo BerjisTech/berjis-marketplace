@@ -1,13 +1,14 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ProductCardComponent } from '../app/shared/components/product-card/product-card.component';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 
 @Component({
   standalone: true,
   selector: 'shop-page',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, ProductCardComponent],
   templateUrl: './shop-page.component.html',
   styleUrls: ['./shop-page.component.css']
 })

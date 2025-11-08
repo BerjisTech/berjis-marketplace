@@ -1,14 +1,4 @@
-<header class="fixed top-0 left-0 right-0 z-40 w-full h-16 bg-white/70 dark:bg-slate-950/70 backdrop-blur border-b border-blue-900/20 dark:border-slate-800">
-  <div class="h-full px-[clamp(1rem,6vw,3rem)] flex items-center gap-3">
-    <div class="text-xl font-bold text-blue-900 dark:text-white">Berjis Marketplace</div>
-    <form class="flex-1 flex items-center gap-2" (submit)="$event.preventDefault(); fetchAll()">
-      <input class="flex-1 h-10 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-amber-400" placeholder="Search products, shops…" [ngModel]="q()" (ngModelChange)="q.set($event)" name="q" />
-      <button class="btn btn-primary rounded-full h-10 px-5">Search</button>
-    </form>
-    <button type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="showFilters.set(!showFilters())" [attr.aria-expanded]="showFilters()" aria-controls="filters-rail">{{ showFilters() ? 'Hide Filters' : 'Filters' }}</button>
-    <button type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="clearFilters()">Clear</button>
-  </div>
-</header>
+
 
 <!-- Mobile scrim -->
 <div class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-300" [class.opacity-0]="!showFilters()" [class.pointer-events-none]="!showFilters()" (click)="showFilters.set(false)"></div>
@@ -71,21 +61,18 @@
     <h2 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">All Products</h2>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
       <ng-container *ngIf="!loading(); else loadingTpl">
-        <article *ngFor="let p of products()" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
-          <div class="aspect-4/3 rounded-lg bg-blue-100 dark:bg-slate-900 mb-3 overflow-hidden">
-            <img *ngIf="p.imageUrl" [src]="p.imageUrl" alt="" class="w-full h-full object-cover"/>
-          </div>
-          <div class="text-sm text-slate-600 dark:text-slate-400 mb-1">
-            <a [routerLink]="['/shop', p.shopSlug]" class="rounded-full px-2 py-0.5 border border-blue-900/25 dark:border-slate-700 bg-blue-50 dark:bg-slate-900/60">{{ p.shopName }}</a>
-          </div>
-          <h3 class="text-base font-semibold text-blue-900 dark:text-white"><a [routerLink]="['/product', p.uuid]">{{ p.title }}</a></h3>
-          <div class="mt-2 text-sm text-slate-700 dark:text-slate-200">{{ (p.priceCents/100) | number:'1.2-2' }} {{ p.currency }}</div>
-        </article>
+        <app-product-card *ngFor="let p of products()" [product]="p" [showShop]="true"></app-product-card>
       </ng-container>
     </div>
     <ng-template #loadingTpl>
       <div class="text-slate-600 dark:text-slate-400">Loading catalog…</div>
     </ng-template>
+  </section>
+
+  <section class="mt-6 flex items-center justify-center gap-3">
+    <button class="rounded-full border px-4 h-10" [disabled]="page()<=1" (click)="prevPage()">Previous</button>
+    <div class="text-sm">Page {{ page() }}</div>
+    <button class="rounded-full border px-4 h-10" (click)="nextPage()">Next</button>
   </section>
 
   <section>
