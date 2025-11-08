@@ -426,7 +426,7 @@ CREATE TABLE order_items (
 
 ### Phase 6: Admin Dashboard
 - [ ] Create admin route guard
-- [ ] Build admin layout
+- [x] Build admin layout
 - [ ] Create dashboard component with metrics
 - [ ] Implement sales chart (custom built)
 - [ ] Build product management table

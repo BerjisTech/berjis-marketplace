@@ -1,0 +1,180 @@
+<div class="py-4">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Add product</h1>
+    <button (click)="submit()" class="btn btn-primary rounded-full h-10 px-5" [disabled]="submitting()">
+      {{ submitting() ? 'Submitting…' : 'Submit' }}
+    </button>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-3">
+    <!-- Left column -->
+    <section class="lg:col-span-2 space-y-6">
+      <!-- Title + Description -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <label class="block text-sm font-medium mb-1">Title</label>
+        <input [(ngModel)]="model.title" name="title" class="w-full rounded-lg border px-3 py-2" placeholder="Short sleeve t-shirt" />
+        <div class="mt-4">
+          <label class="block text-sm font-medium mb-1">Description</label>
+          <textarea [(ngModel)]="model.description" name="description" rows="6" class="w-full rounded-lg border px-3 py-2"
+            placeholder="Rich text editor"></textarea>
+        </div>
+      </div>
+
+      <!-- Media -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <h2 class="text-base font-semibold mb-2">Media</h2>
+        <div class="flex flex-col gap-3">
+          <div class="flex items-center gap-3">
+            <label class="rounded-lg border px-3 py-2 cursor-pointer">
+              Upload files
+              <input type="file" multiple class="hidden" />
+            </label>
+            <span class="text-sm text-slate-500">No file chosen</span>
+            <button class="rounded-lg border px-3 py-2">Select existing</button>
+          </div>
+          <div class="text-xs text-slate-500">Accepts images, videos, or 3D models</div>
+        </div>
+      </div>
+
+      <!-- SEO -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <h2 class="text-base font-semibold mb-2">Search engine listing</h2>
+        <p class="text-sm text-slate-600 dark:text-slate-300 mb-3">Add a title and description to see how this product might appear in a search engine listing</p>
+        <input [(ngModel)]="model.seoTitle" name="seoTitle" class="w-full rounded-lg border px-3 py-2 mb-2" placeholder="SEO title" />
+        <textarea [(ngModel)]="model.seoDescription" name="seoDescription" rows="3" class="w-full rounded-lg border px-3 py-2" placeholder="SEO description"></textarea>
+      </div>
+    </section>
+
+    <!-- Right column -->
+    <section class="space-y-6">
+      <!-- Category -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+        <h2 class="text-base font-semibold mb-2">Category</h2>
+        <label class="block text-sm font-medium mb-1">Category</label>
+        <select [(ngModel)]="model.category" name="category" class="w-full rounded-lg border px-3 py-2">
+          <option value="">Choose a product category</option>
+          <option value="apparel">Apparel</option>
+          <option value="accessories">Accessories</option>
+          <option value="home">Home</option>
+        </select>
+        <p class="text-xs text-slate-600 dark:text-slate-300 mt-2">Determines tax rates and adds metafields to improve search, filters, and cross-channel sales</p>
+      </div>
+
+      <!-- Pricing -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 space-y-3">
+        <h2 class="text-base font-semibold">Price</h2>
+        <label class="block text-sm font-medium">Price</label>
+        <input [(ngModel)]="model.price" name="price" type="number" step="0.01" class="w-full rounded-lg border px-3 py-2" placeholder="0.00" />
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-sm font-medium">Compare at</label>
+            <input [(ngModel)]="model.compareAt" name="compareAt" type="number" step="0.01" class="w-full rounded-lg border px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Unit price</label>
+            <input [(ngModel)]="model.unitPrice" name="unitPrice" type="number" step="0.01" class="w-full rounded-lg border px-3 py-2" />
+          </div>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" [(ngModel)]="model.chargeTax" name="chargeTax" />
+          Charge tax
+        </label>
+        <label class="block text-sm font-medium">Cost per item</label>
+        <input [(ngModel)]="model.costPerItem" name="costPerItem" type="number" step="0.01" class="w-full rounded-lg border px-3 py-2" />
+      </div>
+
+      <!-- Inventory -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 space-y-3">
+        <h2 class="text-base font-semibold">Inventory</h2>
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" [(ngModel)]="model.inventoryTracked" name="inventoryTracked" />
+          Inventory tracked
+        </label>
+        <label class="block text-sm font-medium">Quantity</label>
+        <input [(ngModel)]="model.quantity" name="quantity" type="number" class="w-full rounded-lg border px-3 py-2" />
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-sm font-medium">SKU</label>
+            <input [(ngModel)]="model.sku" name="sku" class="w-full rounded-lg border px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Barcode</label>
+            <input [(ngModel)]="model.barcode" name="barcode" class="w-full rounded-lg border px-3 py-2" />
+          </div>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" [(ngModel)]="model.allowOversell" name="allowOversell" />
+          Sell when out of stock
+        </label>
+      </div>
+
+      <!-- Shipping -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 space-y-3">
+        <h2 class="text-base font-semibold">Shipping</h2>
+        <label class="inline-flex items-center gap-2 text-sm">
+          <input type="checkbox" [(ngModel)]="model.physicalProduct" name="physicalProduct" />
+          Physical product
+        </label>
+        <div>
+          <label class="block text-sm font-medium">Package</label>
+          <select [(ngModel)]="model.packagePreset" name="packagePreset" class="w-full rounded-lg border px-3 py-2">
+            <option value="default">Store default</option>
+            <option value="sample">Sample box - 22 × 13.7 × 4.2 cm, 0 kg</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="block text-sm font-medium">Product weight</label>
+            <input [(ngModel)]="model.weight" name="weight" type="number" step="0.01" class="w-full rounded-lg border px-3 py-2" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Weight unit</label>
+            <select [(ngModel)]="model.weightUnit" name="weightUnit" class="w-full rounded-lg border px-3 py-2">
+              <option>kg</option>
+              <option>g</option>
+              <option>lb</option>
+              <option>oz</option>
+            </select>
+          </div>
+        </div>
+        <label class="block text-sm font-medium">Country of origin</label>
+        <input [(ngModel)]="model.countryOfOrigin" name="countryOfOrigin" class="w-full rounded-lg border px-3 py-2" />
+        <label class="block text-sm font-medium">HS Code</label>
+        <input [(ngModel)]="model.hsCode" name="hsCode" class="w-full rounded-lg border px-3 py-2" />
+      </div>
+
+      <!-- Status / Publishing -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 space-y-3">
+        <h2 class="text-base font-semibold">Status</h2>
+        <div class="grid grid-cols-2 gap-2">
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" [(ngModel)]="model.publishOnlineStore" name="publishOnlineStore" />
+            Online Store
+          </label>
+          <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" [(ngModel)]="model.publishPOS" name="publishPOS" />
+            Point of Sale
+          </label>
+        </div>
+      </div>
+
+      <!-- Organization -->
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white dark:bg-slate-950 p-4 space-y-3">
+        <h2 class="text-base font-semibold">Product organization</h2>
+        <label class="block text-sm font-medium">Type</label>
+        <input [(ngModel)]="model.type" name="type" class="w-full rounded-lg border px-3 py-2" />
+        <label class="block text-sm font-medium">Vendor</label>
+        <input [(ngModel)]="model.vendor" name="vendor" class="w-full rounded-lg border px-3 py-2" />
+        <label class="block text-sm font-medium">Collections</label>
+        <input [(ngModel)]="model.collections" name="collections" class="w-full rounded-lg border px-3 py-2" />
+        <label class="block text-sm font-medium">Tags</label>
+        <input [(ngModel)]="model.tags" name="tags" class="w-full rounded-lg border px-3 py-2" />
+        <label class="block text-sm font-medium">Theme template</label>
+        <select [(ngModel)]="model.themeTemplate" name="themeTemplate" class="w-full rounded-lg border px-3 py-2">
+          <option value="default">Default product</option>
+        </select>
+      </div>
+    </section>
+  </div>
+</div>
+

@@ -2,14 +2,14 @@ import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { environment } from '../environments/environment';
 import { DarkModeToggleComponent } from "src/app/components/dark-mode-toggle/dark-mode-toggle.component";
 
 @Component({
   standalone: true,
   selector: 'dashboard-page',
-  imports: [CommonModule, FormsModule, RouterLink, DarkModeToggleComponent],
+  imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, DarkModeToggleComponent],
   templateUrl: './dashboard-page.component.html',
   styleUrls: ['./dashboard-page.component.css']
 })

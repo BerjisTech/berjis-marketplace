@@ -72,56 +72,84 @@
           (click)="navCollapsed.set(true)"><span class="material-symbols-outlined text-sm">chevron_left</span></button>
       </div>
       <nav class="flex-1 p-2 flex flex-col gap-1">
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <!-- Home -->
+        <a routerLink="/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">home</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Home</span>
         </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
-          <span class="material-symbols-outlined text-[20px]">inventory_2</span>
-          <span [class.hidden]="navCollapsed()" class="text-sm">Products</span>
-        </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
-          <span class="material-symbols-outlined text-[20px]">sell</span>
-          <span [class.hidden]="navCollapsed()" class="text-sm">Discounts</span>
-        </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <!-- Orders -->
+        <a routerLink="/dashboard/orders" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">receipt_long</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Orders</span>
         </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <div [class.hidden]="navCollapsed()" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/orders/draft" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Draft</a>
+          <a routerLink="/dashboard/orders/abandoned-checkouts" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Abandoned checkouts</a>
+          <a routerLink="/dashboard/orders/returns" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Returns</a>
+        </div>
+        <!-- Products -->
+        <a routerLink="/dashboard/products" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">inventory_2</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Products</span>
+        </a>
+        <div [class.hidden]="navCollapsed()" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/products/collections" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Collections</a>
+          <a routerLink="/dashboard/products/inventory" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Inventory</a>
+          <a routerLink="/dashboard/products/purchase-orders" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Purchase orders</a>
+          <a routerLink="/dashboard/products/transfers" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Transfers</a>
+          <a routerLink="/dashboard/products/gift-cards" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Gift cards</a>
+          <a routerLink="/dashboard/products/new" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Add product</a>
+        </div>
+        <!-- Customers -->
+        <a routerLink="/dashboard/customers" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">group</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Customers</span>
         </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <div [class.hidden]="navCollapsed()" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/customers/segments" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Segments</a>
+        </div>
+        <!-- Marketing -->
+        <a routerLink="/dashboard/marketing" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">campaign</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Marketing</span>
         </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <div [class.hidden]="navCollapsed()" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/marketing/campaigns" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Campaigns</a>
+          <a routerLink="/dashboard/marketing/attributions" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Attributions</a>
+          <a routerLink="/dashboard/marketing/automations" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Automations</a>
+        </div>
+        <!-- Discounts -->
+        <a routerLink="/dashboard/discounts" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+          <span class="material-symbols-outlined text-[20px]">sell</span>
+          <span [class.hidden]="navCollapsed()" class="text-sm">Discounts</span>
+        </a>
+        <!-- Content -->
+        <a routerLink="/dashboard/content" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">article</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Content</span>
         </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <div [class.hidden]="navCollapsed()" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/content/files" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Files</a>
+          <a routerLink="/dashboard/content/menus" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Menus</a>
+          <a routerLink="/dashboard/content/blog-posts" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Blog posts</a>
+        </div>
+        <!-- Markets -->
+        <a routerLink="/dashboard/markets" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">public</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Markets</span>
         </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <div [class.hidden]="navCollapsed()" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/markets/catalogs" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Catalogs</a>
+        </div>
+        <!-- Analytics -->
+        <a routerLink="/dashboard/analytics" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">monitoring</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Analytics</span>
         </a>
-        <a routerLink="/dashboard"
-          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
-          <span class="material-symbols-outlined text-[20px]">extension</span>
-          <span [class.hidden]="navCollapsed()" class="text-sm">Apps / Plugins</span>
-        </a>
+        <div [class.hidden]="navCollapsed()" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/analytics/reports" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Reports</a>
+          <a routerLink="/dashboard/analytics/live-view" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Live view</a>
+        </div>
       </nav>
       <div class="p-2 mt-auto">
         <a routerLink="/dashboard/settings"
@@ -141,7 +169,9 @@
     <main class="min-w-0 h-full relative overflow-x-hidden overflow-y-auto">
       <!-- Scrollable area -->
       <div class="absolute left-0 right-0 top-12 bottom-0 overflow-y-auto px-[clamp(1rem,6vw,3rem)] py-6">
-        <h1 class="text-2xl font-bold text-blue-900 dark:text-white mb-6">Merchant Dashboard</h1>
+        
+        <router-outlet></router-outlet>
+<h1 class="text-2xl font-bold text-blue-900 dark:text-white mb-6">Merchant Dashboard</h1>
 
         <section
           class="mb-10 rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
@@ -230,3 +260,4 @@
     <span class="material-symbols-outlined">tune</span>
   </button>
 </div>
+
