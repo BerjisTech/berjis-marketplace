@@ -1,0 +1,44 @@
+<!-- Mobile scrim -->
+<div class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-300"
+     [class.opacity-0]="!open" [class.pointer-events-none]="!open" (click)="openChange.emit(false)"></div>
+
+<!-- Fixed left filter rail with slide-in -->
+<aside id="filters-rail" class="fixed left-0 top-16 z-40 w-72 h-[calc(100vh-64px)] border-r border-blue-900/20 dark:border-slate-800 bg-white/90 dark:bg-slate-950/80 backdrop-blur overflow-y-auto transform transition-transform duration-300 ease-out"
+       [class.-translate-x-full]="!open" [class.translate-x-0]="open">
+  <div class="p-4">
+    <h3 class="text-sm font-semibold text-blue-900 dark:text-white mb-3">{{ title }}</h3>
+    <form class="flex flex-col gap-3 text-sm" (submit)="$event.preventDefault(); apply.emit()">
+      <label class="text-slate-600 dark:text-slate-400">Search {{ shopName ? 'within ' + shopName : '' }}</label>
+      <input class="h-10 rounded-full border px-4" [ngModel]="q" (ngModelChange)="qChange.emit($event)" name="q" placeholder="Search" />
+
+      <ng-container *ngIf="showCategory">
+        <label class="text-slate-600 dark:text-slate-400">Category</label>
+        <select class="h-10 rounded-full border px-3" [ngModel]="selectedCategory" (ngModelChange)="selectedCategoryChange.emit($event)" name="category">
+          <option value="">All categories</option>
+          <option *ngFor="let c of categories" [value]="c">{{ c }}</option>
+        </select>
+      </ng-container>
+
+      <label class="text-slate-600 dark:text-slate-400">Price</label>
+      <div class="flex items-center gap-2">
+        <input aria-label="Min price" class="w-[120px] h-10 rounded-full border px-4" [ngModel]="minPrice" (ngModelChange)="minPriceChange.emit($event)" name="minPrice" placeholder="Min" />
+        <span class="text-slate-500">—</span>
+        <input aria-label="Max price" class="w-[120px] h-10 rounded-full border px-4" [ngModel]="maxPrice" (ngModelChange)="maxPriceChange.emit($event)" name="maxPrice" placeholder="Max" />
+      </div>
+
+      <label class="text-slate-600 dark:text-slate-400">Sort</label>
+      <select class="h-10 rounded-full border px-3" [ngModel]="sort" (ngModelChange)="sortChange.emit($event)" name="sort">
+        <option value="">Default</option>
+        <option value="price_asc">Price: Low to High</option>
+        <option value="price_desc">Price: High to Low</option>
+        <option value="newest">Newest</option>
+      </select>
+
+      <div class="flex gap-2 pt-2">
+        <button class="btn btn-primary rounded-full h-10 px-5 flex-1">Apply</button>
+        <button type="button" class="rounded-full h-10 px-4 border" (click)="clear.emit()">Clear</button>
+      </div>
+    </form>
+  </div>
+</aside>
+

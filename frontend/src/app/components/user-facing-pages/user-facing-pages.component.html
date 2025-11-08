@@ -1,13 +1,13 @@
 <header class="sticky top-0 left-0 right-0 z-40 w-full h-16 bg-white/70 dark:bg-slate-950/70 backdrop-blur border-b border-blue-900/20 dark:border-slate-800">
   <div class="h-full px-[clamp(1rem,6vw,3rem)] flex items-center gap-3">
     <a href="/" class="text-xl font-bold text-blue-900 dark:text-white">Berjis Marketplace</a>
-    <button type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="showFilters.set(!showFilters())" [attr.aria-expanded]="showFilters()" aria-controls="filters-rail">{{ showFilters() ? 'Hide Filters' : 'Filters' }}</button>
-    <button type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="clearFilters()">Clear</button>
-    <form class="flex-1 flex items-center gap-2" (submit)="$event.preventDefault(); fetchAll()">
+    <button *ngIf="showFilterControls()" type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="toggleFilters()" [attr.aria-expanded]="showFilters()" aria-controls="filters-rail">{{ showFilters() ? 'Hide Filters' : 'Filters' }}</button>
+    <button *ngIf="showFilterControls()" type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="clearFilters()">Clear</button>
+    <form class="flex-1 flex items-center gap-2" (submit)="$event.preventDefault(); applyQuery()">
       <input class="flex-1 h-10 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-amber-400" placeholder="Search products, shops…" [ngModel]="q()" (ngModelChange)="q.set($event)" name="q" />
       <button class="btn btn-primary rounded-full h-10 px-5">Search</button>
     </form>
-    <select class="rounded-full border border-blue-900/20 dark:border-slate-700 h-10 px-3 text-sm" [ngModel]="sort()" (ngModelChange)="sort.set($event); fetchAll()" aria-label="Sort">
+    <select *ngIf="showFilterControls()" class="rounded-full border border-blue-900/20 dark:border-slate-700 h-10 px-3 text-sm" [ngModel]="sort()" (ngModelChange)="sort.set($event); applyQuery()" aria-label="Sort">
       <option value="">Sort</option>
       <option value="price_asc">Price: Low to High</option>
       <option value="price_desc">Price: High to Low</option>

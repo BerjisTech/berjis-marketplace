@@ -1,9 +1,11 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ProductCardComponent } from '../app/shared/components/product-card/product-card.component';
+import { PaginationComponent } from '../app/shared/components/pagination/pagination.component';
 import { HttpClient } from '@angular/common/http';
+import { FiltersRailComponent } from '../app/shared/components/filters-rail/filters-rail.component';
 import { environment } from '../environments/environment';
 
 type Product = { uuid: string; title: string; priceCents: number; currency: string; imageUrl?: string; shopName: string; shopSlug: string };
@@ -12,7 +14,7 @@ type Shop = { uuid: string; name: string; slug: string; description: string };
 @Component({
   standalone: true,
   selector: 'home-page',
-  imports: [CommonModule, RouterLink, FormsModule, ProductCardComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ProductCardComponent, FiltersRailComponent, PaginationComponent],
   templateUrl: './home-page.component.html',
   styleUrls: ['./home-page.component.css']
 })
@@ -31,10 +33,47 @@ export class HomePageComponent implements OnInit {
   showFilters = signal<boolean>(false);
   categorySamples = signal<Record<string, Product[]>>({});
   api = environment.apiBase;
-  constructor(private http: HttpClient) {}
-  ngOnInit(): void { this.fetchAll(); this.fetchCategories(); }
+  constructor(private http: HttpClient, public route: ActivatedRoute, public router: Router) {}
+  ngOnInit(): void {
+    this.route.queryParamMap.subscribe(qp => {
+      this.q.set(qp.get('q') || '');
+      this.selectedCategory.set(qp.get('category') || '');
+      this.minPrice.set(qp.get('minPrice') || '');
+      this.maxPrice.set(qp.get('maxPrice') || '');
+      this.sort.set(qp.get('sort') || '');
+      this.page.set(parseInt(qp.get('page') || '1', 10));
+      this.perPage.set(parseInt(qp.get('limit') || '24', 10));
+      this.showFilters.set((qp.get('filters') || '') === '1');
+      this.fetchAll();
+    });
+    this.fetchCategories();
+  }
   prevPage(){ this.page.set(Math.max(1, this.page()-1)); this.fetchAll(); }
   nextPage(){ this.page.set(this.page()+1); this.fetchAll(); }
+  applyFilters(){
+    this.router.navigate([], { relativeTo: this.route, queryParams: {
+      q: this.q() || null,
+      category: this.selectedCategory() || null,
+      minPrice: this.minPrice() || null,
+      maxPrice: this.maxPrice() || null,
+      sort: this.sort() || null,
+      page: 1,
+      limit: this.perPage() || null,
+      filters: null
+    }, queryParamsHandling: 'merge' });
+    this.showFilters.set(false);
+  }
+  clearAllFilters(){
+    this.router.navigate([], { relativeTo: this.route, queryParams: { q: null, minPrice: null, maxPrice: null, category: null, page: 1, filters: null }, queryParamsHandling: 'merge' });
+  }
+  closeFilters(){
+    this.showFilters.set(false);
+    this.router.navigate([], { relativeTo: this.route, queryParams: { filters: null }, queryParamsHandling: 'merge' });
+  }
+  onOpenChange(v: boolean){
+    this.showFilters.set(v);
+    this.router.navigate([], { relativeTo: this.route, queryParams: { filters: v ? '1' : null }, queryParamsHandling: 'merge' });
+  }
   fetchAll(){
     this.loading.set(true);
     const params: any = {};

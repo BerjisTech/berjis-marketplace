@@ -1,32 +1,19 @@
 
 
-<!-- Mobile scrim -->
-<div class="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden transition-opacity duration-300" [class.opacity-0]="!showFilters()" [class.pointer-events-none]="!showFilters()" (click)="showFilters.set(false)"></div>
-
-<!-- Fixed left filter rail with slide-in -->
-<aside id="filters-rail" class="fixed left-0 top-16 z-40 w-72 h-[calc(100vh-64px)] border-r border-blue-900/20 dark:border-slate-800 bg-white/90 dark:bg-slate-950/80 backdrop-blur overflow-y-auto transform transition-transform duration-300 ease-out"
-       [class.-translate-x-full]="!showFilters()" [class.translate-x-0]="showFilters()">
-  <div class="p-4">
-    <h3 class="text-sm font-semibold text-blue-900 dark:text-white mb-3">Filters</h3>
-    <form class="flex flex-col gap-3 text-sm" (submit)="$event.preventDefault(); fetchAll()">
-      <label class="text-slate-600 dark:text-slate-400">Category</label>
-      <select aria-label="Category" class="h-10 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-amber-400" [ngModel]="selectedCategory()" (ngModelChange)="selectedCategory.set($event)" name="category">
-        <option value="">All categories</option>
-        <option *ngFor="let c of categories()" [value]="c">{{ c }}</option>
-      </select>
-      <label class="text-slate-600 dark:text-slate-400">Price</label>
-      <div class="flex items-center gap-2">
-        <input aria-label="Min price" class="w-[120px] h-10 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-amber-400" [ngModel]="minPrice()" (ngModelChange)="minPrice.set($event)" name="minPrice" placeholder="Min" />
-        <span class="text-slate-500">—</span>
-        <input aria-label="Max price" class="w-[120px] h-10 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-amber-400" [ngModel]="maxPrice()" (ngModelChange)="maxPrice.set($event)" name="maxPrice" placeholder="Max" />
-      </div>
-      <div class="flex gap-2 pt-2">
-        <button class="btn btn-primary rounded-full h-10 px-5 flex-1">Apply</button>
-        <button type="button" class="rounded-full h-10 px-4 border border-blue-900/20 dark:border-slate-700" (click)="clearFilters()">Clear</button>
-      </div>
-    </form>
-  </div>
-</aside>
+<app-filters-rail
+  [open]="showFilters()" (openChange)="onOpenChange($event)"
+  title="Filters"
+  [shopName]="null"
+  [q]="q()" (qChange)="q.set($event)"
+  [minPrice]="minPrice()" (minPriceChange)="minPrice.set($event)"
+  [maxPrice]="maxPrice()" (maxPriceChange)="maxPrice.set($event)"
+  [sort]="sort()" (sortChange)="sort.set($event)"
+  [showCategory]="true"
+  [categories]="categories()"
+  [selectedCategory]="selectedCategory()" (selectedCategoryChange)="selectedCategory.set($event)"
+  (apply)="applyFilters()"
+  (clear)="clearAllFilters()"
+></app-filters-rail>
 
   <main class="pt-16 px-[clamp(1rem,6vw,3rem)] pb-16 transition-[margin] duration-300" [class.ml-72]="showFilters()">
   <section>
@@ -69,11 +56,7 @@
     </ng-template>
   </section>
 
-  <section class="mt-6 flex items-center justify-center gap-3">
-    <button class="rounded-full border px-4 h-10" [disabled]="page()<=1" (click)="prevPage()">Previous</button>
-    <div class="text-sm">Page {{ page() }}</div>
-    <button class="rounded-full border px-4 h-10" (click)="nextPage()">Next</button>
-  </section>
+  <app-pagination [page]="page()" [hasNext]="products().length===perPage()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
 
   <section>
     <h2 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Featured Shops</h2>

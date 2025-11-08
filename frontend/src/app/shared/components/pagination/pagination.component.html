@@ -1,0 +1,6 @@
+<section class="mt-6 flex items-center justify-center gap-3">
+  <button class="rounded-full border px-4 h-10" [class.opacity-50]="page<=1" [disabled]="page<=1" (click)="prev.emit()">Previous</button>
+  <div class="text-sm">Page {{ page }}</div>
+  <button class="rounded-full border px-4 h-10" [class.opacity-50]="!hasNext" [disabled]="!hasNext" (click)="next.emit()">Next</button>
+</section>
+

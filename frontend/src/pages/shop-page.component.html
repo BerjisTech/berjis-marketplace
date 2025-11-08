@@ -1,8 +1,21 @@
-<div class="min-h-screen px-[clamp(1rem,6vw,3rem)] py-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
+<div class="min-h-screen pt-16 px-[clamp(1rem,6vw,3rem)] pb-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
+  <app-filters-rail
+    [open]="showFilters()" (openChange)="router.navigate([], {relativeTo: route, queryParams: {filters: $event ? '1' : null}, queryParamsHandling: 'merge'}); showFilters.set($event)"
+    [title]="'Filters'"
+    [shopName]="shop()?.name || null"
+    [q]="q()" (qChange)="q.set($event)"
+    [minPrice]="minPrice()" (minPriceChange)="minPrice.set($event)"
+    [maxPrice]="maxPrice()" (maxPriceChange)="maxPrice.set($event)"
+    [sort]="sort()" (sortChange)="sort.set($event)"
+    [showCategory]="false"
+    (apply)="applyFilters()"
+    (clear)="clearAllFilters()"
+  ></app-filters-rail>
   <a routerLink="/" class="text-sm">← Back to marketplace</a>
   <h1 class="mt-4 text-2xl font-bold text-blue-900 dark:text-white">{{ shop()?.name }}</h1>
   <p class="text-slate-600 dark:text-slate-300 mb-6">{{ '@' + (shop()?.slug || '') }}</p>
   <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
     <app-product-card *ngFor="let p of products()" [product]="p"></app-product-card>
   </div>
+  <app-pagination [page]="page()" [hasNext]="products().length===perPage()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
 </div>
