@@ -45,7 +45,10 @@
         </div>
       </div>
     </div>
-    <h2 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">All Products</h2>
+    <div class="mb-2 flex items-end justify-between">
+      <h2 class="text-xl font-semibold text-blue-900 dark:text-white">All Products</h2>
+      <div class="text-xs text-slate-600 dark:text-slate-400" *ngIf="total()!=null">Showing {{ ((page()-1)*perPage())+1 }}–{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}</div>
+    </div>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
       <ng-container *ngIf="!loading(); else loadingTpl">
         <app-product-card *ngFor="let p of products()" [product]="p" [showShop]="true"></app-product-card>
@@ -56,7 +59,7 @@
     </ng-template>
   </section>
 
-  <app-pagination [page]="page()" [hasNext]="products().length===perPage()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
+  <app-pagination [page]="page()" [hasNext]="hasNext()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
 
   <section>
     <h2 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Featured Shops</h2>

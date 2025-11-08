@@ -1,0 +1,67 @@
+<div class="min-h-screen pt-16 px-[clamp(1rem,6vw,3rem)] pb-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
+  <h1 class="text-2xl font-bold text-blue-900 dark:text-white mb-4">Checkout</h1>
+  <div class="mb-4 text-sm">
+    <span [class.font-semibold]="step()==='shipping'">1. Shipping</span>
+    <span class="mx-2">→</span>
+    <span [class.font-semibold]="step()==='payment'">2. Payment</span>
+    <span class="mx-2">→</span>
+    <span [class.font-semibold]="step()==='review'">3. Review</span>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+      <form *ngIf="step()==='shipping'" class="rounded-xl border p-4" (submit)="$event.preventDefault(); next()">
+        <div class="text-lg font-semibold mb-3">Shipping address</div>
+        <div class="grid md:grid-cols-2 gap-3">
+          <input class="rounded border px-3 py-2" placeholder="Full name" [(ngModel)]="shipping.name" name="name" required />
+          <input class="rounded border px-3 py-2" placeholder="Email" [(ngModel)]="shipping.email" name="email" required email />
+          <input class="md:col-span-2 rounded border px-3 py-2" placeholder="Address" [(ngModel)]="shipping.address" name="address" required />
+          <input class="rounded border px-3 py-2" placeholder="City" [(ngModel)]="shipping.city" name="city" required />
+          <input class="rounded border px-3 py-2" placeholder="Country" [(ngModel)]="shipping.country" name="country" required />
+          <input class="rounded border px-3 py-2" placeholder="ZIP" [(ngModel)]="shipping.zip" name="zip" required pattern="^[A-Za-z0-9\-\s]{3,10}$" />
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <button class="btn btn-primary">Continue to payment</button>
+        </div>
+      </form>
+
+      <form *ngIf="step()==='payment'" class="rounded-xl border p-4" (submit)="$event.preventDefault(); next()">
+        <div class="text-lg font-semibold mb-3">Payment</div>
+        <div class="grid md:grid-cols-2 gap-3">
+          <input class="md:col-span-2 rounded border px-3 py-2" placeholder="Name on card" [(ngModel)]="payment.cardName" name="cardName" required />
+          <input class="md:col-span-2 rounded border px-3 py-2" placeholder="Card number" [(ngModel)]="payment.cardNumber" name="cardNumber" required inputmode="numeric" pattern="^[0-9\s]{12,23}$" />
+          <input class="rounded border px-3 py-2" placeholder="MM/YY" [(ngModel)]="payment.exp" name="exp" required pattern="^(0[1-9]|1[0-2])\/[0-9]{2}$" />
+          <input class="rounded border px-3 py-2" placeholder="CVC" [(ngModel)]="payment.cvc" name="cvc" required pattern="^[0-9]{3,4}$" />
+        </div>
+        <div class="mt-4 flex items-center gap-2">
+          <button type="button" class="rounded-full border px-4 h-10" (click)="back()">Back</button>
+          <button class="btn btn-primary">Review order</button>
+        </div>
+      </form>
+
+      <div *ngIf="step()==='review'" class="rounded-xl border p-4">
+        <div class="text-lg font-semibold mb-3">Review</div>
+        <div class="text-sm mb-3">Shipping to {{ shipping.name }}, {{ shipping.address }}, {{ shipping.city }}, {{ shipping.country }} {{ shipping.zip }}</div>
+        <div class="text-sm mb-3">Payment method: Mock card ending in {{ payment.cardNumber.slice(-4) || '0000' }}</div>
+        <div class="mt-3 flex items-center gap-2">
+          <button type="button" class="rounded-full border px-4 h-10" (click)="back()">Back</button>
+          <button class="btn btn-primary" [disabled]="placing()" (click)="placeOrder()">{{ placing() ? 'Placing…' : 'Place order' }}</button>
+        </div>
+      </div>
+    </div>
+    <aside class="rounded-xl border p-4">
+      <div class="text-lg font-semibold mb-3">Order Summary</div>
+      <div class="space-y-2 max-h-64 overflow-y-auto">
+        <div *ngFor="let it of items()" class="flex items-center justify-between text-sm">
+          <div>{{ it.title }} <span class="text-xs text-slate-500">× {{ it.quantity }}</span></div>
+          <div>{{ ((it.priceCents*it.quantity)/100) | number:'1.2-2' }} {{ it.currency }}</div>
+        </div>
+      </div>
+      <div class="mt-3 flex items-center justify-between text-sm">
+        <div>Subtotal</div>
+        <div>{{ (subtotalCents()/100) | number:'1.2-2' }} {{ items()[0]?.currency }}</div>
+      </div>
+      <div class="mt-1 text-xs text-slate-500">Taxes and shipping calculated at review.</div>
+    </aside>
+  </div>
+</div>

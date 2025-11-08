@@ -13,11 +13,19 @@
       <option value="price_desc">Price: High to Low</option>
       <option value="newest">Newest</option>
     </select>
+    <div class="relative">
+      <button type="button" (click)="toggleMiniCart()" class="relative rounded-full border border-blue-900/20 dark:border-slate-700 px-3 h-10 grid place-items-center text-sm">
+        <span class="material-symbols-outlined text-[18px] align-middle">shopping_cart</span>
+        <span class="absolute -top-1 -right-1 text-[10px] rounded-full bg-amber-500 text-black px-1.5 py-0.5" *ngIf="cartCount()>0">{{ cartCount() }}</span>
+      </button>
+      <app-mini-cart [open]="miniCartOpen()" (openChange)="miniCartOpen.set($event)"></app-mini-cart>
+    </div>
     <app-dark-mode-toggle></app-dark-mode-toggle>
   </div>
 </header>
 
 <router-outlet></router-outlet>
+<app-toast-container></app-toast-container>
 <footer
     class="mt-auto border-t border-slate-200/50 dark:border-blue-900/40 bg-white/70 dark:bg-slate-950/80 backdrop-blur py-6 text-center text-sm text-slate-700 dark:text-slate-300">
     &copy; {{ copyRightYear }} Berjis Tech

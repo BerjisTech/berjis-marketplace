@@ -5,6 +5,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FiltersRailComponent } from '../app/shared/components/filters-rail/filters-rail.component';
 import { PaginationComponent } from '../app/shared/components/pagination/pagination.component';
+import { QueryParamsService } from '../app/core/services/query-params.service';
 import { environment } from '../environments/environment';
 
 @Component({
@@ -21,14 +22,16 @@ export class CategoryPageComponent implements OnInit {
   loading = signal(true);
   page = signal<number>(1);
   perPage = signal<number>(24);
+  total = signal<number|null>(null);
   // filters
   showFilters = signal<boolean>(false);
   q = signal<string>('');
   minPrice = signal<string>('');
   maxPrice = signal<string>('');
   sort = signal<string>('');
-  constructor(public route: ActivatedRoute, public router: Router, private http: HttpClient) {}
+  constructor(public route: ActivatedRoute, public router: Router, private http: HttpClient, private qps: QueryParamsService) {}
   ngOnInit(): void {
+    this.qps.normalizeListing(this.router, this.route);
     const id = this.route.snapshot.paramMap.get('id') || '';
     this.category.set(id);
     this.route.queryParamMap.subscribe(qp => {
@@ -54,29 +57,14 @@ export class CategoryPageComponent implements OnInit {
     const qs = new URLSearchParams(params).toString();
     this.http.get<any>(`${this.api}/v1/products?${qs}`).subscribe(r => {
       this.products.set(r.data||[]);
+      this.total.set(typeof r?.total === 'number' ? r.total : null);
       this.loading.set(false);
     }, _ => this.loading.set(false));
   }
-  applyFilters(){
-    this.router.navigate([], { relativeTo: this.route, queryParams: {
-      q: this.q() || null,
-      minPrice: this.minPrice() || null,
-      maxPrice: this.maxPrice() || null,
-      sort: this.sort() || null,
-      page: 1,
-      limit: this.perPage() || null,
-      filters: null
-    }, queryParamsHandling: 'merge' });
-    this.showFilters.set(false);
-  }
-  clearAllFilters(){
-    this.router.navigate([], { relativeTo: this.route, queryParams: { q: null, minPrice: null, maxPrice: null, sort: null, filters: null }, queryParamsHandling: 'merge' });
-    this.showFilters.set(false);
-  }
+  applyFilters(){ this.qps.merge(this.router, this.route, { q: this.q() || null, minPrice: this.minPrice() || null, maxPrice: this.maxPrice() || null, sort: this.sort() || null, page: 1, limit: this.perPage() || null, filters: null }); this.showFilters.set(false); }
+  clearAllFilters(){ this.qps.merge(this.router, this.route, { q: null, minPrice: null, maxPrice: null, sort: null, filters: null }); this.showFilters.set(false); }
   prevPage(){ this.router.navigate([], { relativeTo: this.route, queryParams: { page: Math.max(1, this.page()-1) }, queryParamsHandling: 'merge' }); }
   nextPage(){ this.router.navigate([], { relativeTo: this.route, queryParams: { page: this.page()+1, limit: this.perPage() || null }, queryParamsHandling: 'merge' }); }
-  onOpenChange(v: boolean){
-    this.showFilters.set(v);
-    this.router.navigate([], { relativeTo: this.route, queryParams: { filters: v ? '1' : null }, queryParamsHandling: 'merge' });
-  }
+  onOpenChange(v: boolean){ this.showFilters.set(v); this.qps.toggleFilters(this.router, this.route, v); }
+  hasNext(){ const t = this.total(); return t!=null ? (this.page()*this.perPage() < t) : (this.products().length===this.perPage()); }
 }

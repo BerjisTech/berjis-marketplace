@@ -1,0 +1,9 @@
+<div class="fixed z-50 right-4 top-16 flex flex-col gap-2 w-[min(360px,calc(100vw-2rem))]">
+  <div *ngFor="let t of toasts.toasts()" class="rounded-lg border p-3 shadow-brand"
+       [class.bg-white]="true" [class.border-emerald-300]="t.type==='success'" [class.border-red-300]="t.type==='error'" [class.border-blue-300]="t.type==='info'">
+    <div class="text-sm">{{ t.message }}</div>
+  </div>
+  <div *ngIf="toasts.toasts().length===0" class="hidden"></div>
+  
+</div>
+

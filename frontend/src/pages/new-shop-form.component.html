@@ -117,6 +117,12 @@
     <div class="grid gap-2">
       <input class="h-12 rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 px-4 text-slate-900 dark:text-slate-100" [ngModel]="name()" (ngModelChange)="onNameChange($event)" name="name" placeholder="Awesome Store" />
       <div class="text-xs text-slate-500 dark:text-slate-400">URL handle will be: <span class="font-mono">{{ slug() || slugify(name()) }}</span></div>
+      <div class="flex items-center gap-2 mt-1">
+        <input class="h-10 rounded-lg border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 px-3 text-sm flex-1" [ngModel]="slug()" (ngModelChange)="onSlugChange($event)" name="slug" placeholder="custom-handle" />
+        <span class="text-xs" [class.text-emerald-600]="slugStatus()==='available'" [class.text-amber-600]="slugStatus()==='checking'" [class.text-red-600]="slugStatus()==='taken'" [class.text-slate-500]="slugStatus()==='idle' || slugStatus()==='error'">
+          {{ slugStatus()==='checking' ? 'Checking…' : slugStatus()==='available' ? 'Available' : slugStatus()==='taken' ? 'Taken' : '' }}
+        </span>
+      </div>
     </div>
   </section>
 
@@ -124,4 +130,5 @@
     <button class="btn btn-primary rounded-full h-12 px-6" [disabled]="submitting()" (click)="submit()">Create shop</button>
     <a routerLink="/dashboard" class="rounded-full h-12 px-5 border border-blue-900/20 dark:border-slate-700 grid place-items-center">Cancel</a>
   </div>
+  <div class="mt-3 text-sm" *ngIf="errorMsg()" [class.text-red-600]="true">{{ errorMsg() }}</div>
 </div>

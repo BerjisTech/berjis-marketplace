@@ -14,8 +14,9 @@
   <a routerLink="/" class="text-sm">← Back to marketplace</a>
   <h1 class="mt-4 text-2xl font-bold text-blue-900 dark:text-white">{{ shop()?.name }}</h1>
   <p class="text-slate-600 dark:text-slate-300 mb-6">{{ '@' + (shop()?.slug || '') }}</p>
+  <div class="text-xs text-slate-600 dark:text-slate-400 mb-3" *ngIf="total()!=null">Showing {{ ((page()-1)*perPage())+1 }}–{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}</div>
   <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
     <app-product-card *ngFor="let p of products()" [product]="p"></app-product-card>
   </div>
-  <app-pagination [page]="page()" [hasNext]="products().length===perPage()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
+  <app-pagination [page]="page()" [hasNext]="hasNext()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
 </div>

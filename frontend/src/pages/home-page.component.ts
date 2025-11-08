@@ -6,6 +6,7 @@ import { ProductCardComponent } from '../app/shared/components/product-card/prod
 import { PaginationComponent } from '../app/shared/components/pagination/pagination.component';
 import { HttpClient } from '@angular/common/http';
 import { FiltersRailComponent } from '../app/shared/components/filters-rail/filters-rail.component';
+import { QueryParamsService } from '../app/core/services/query-params.service';
 import { environment } from '../environments/environment';
 
 type Product = { uuid: string; title: string; priceCents: number; currency: string; imageUrl?: string; shopName: string; shopSlug: string };
@@ -32,9 +33,11 @@ export class HomePageComponent implements OnInit {
   q = signal<string>('');
   showFilters = signal<boolean>(false);
   categorySamples = signal<Record<string, Product[]>>({});
+  total = signal<number|null>(null);
   api = environment.apiBase;
-  constructor(private http: HttpClient, public route: ActivatedRoute, public router: Router) {}
+  constructor(private http: HttpClient, public route: ActivatedRoute, public router: Router, private qps: QueryParamsService) {}
   ngOnInit(): void {
+    this.qps.normalizeListing(this.router, this.route);
     this.route.queryParamMap.subscribe(qp => {
       this.q.set(qp.get('q') || '');
       this.selectedCategory.set(qp.get('category') || '');
@@ -50,19 +53,7 @@ export class HomePageComponent implements OnInit {
   }
   prevPage(){ this.page.set(Math.max(1, this.page()-1)); this.fetchAll(); }
   nextPage(){ this.page.set(this.page()+1); this.fetchAll(); }
-  applyFilters(){
-    this.router.navigate([], { relativeTo: this.route, queryParams: {
-      q: this.q() || null,
-      category: this.selectedCategory() || null,
-      minPrice: this.minPrice() || null,
-      maxPrice: this.maxPrice() || null,
-      sort: this.sort() || null,
-      page: 1,
-      limit: this.perPage() || null,
-      filters: null
-    }, queryParamsHandling: 'merge' });
-    this.showFilters.set(false);
-  }
+  applyFilters(){ this.qps.merge(this.router, this.route, { q: this.q() || null, category: this.selectedCategory() || null, minPrice: this.minPrice() || null, maxPrice: this.maxPrice() || null, sort: this.sort() || null, page: 1, limit: this.perPage() || null, filters: null }); this.showFilters.set(false); }
   clearAllFilters(){
     this.router.navigate([], { relativeTo: this.route, queryParams: { q: null, minPrice: null, maxPrice: null, category: null, page: 1, filters: null }, queryParamsHandling: 'merge' });
   }
@@ -70,10 +61,7 @@ export class HomePageComponent implements OnInit {
     this.showFilters.set(false);
     this.router.navigate([], { relativeTo: this.route, queryParams: { filters: null }, queryParamsHandling: 'merge' });
   }
-  onOpenChange(v: boolean){
-    this.showFilters.set(v);
-    this.router.navigate([], { relativeTo: this.route, queryParams: { filters: v ? '1' : null }, queryParamsHandling: 'merge' });
-  }
+  onOpenChange(v: boolean){ this.showFilters.set(v); this.qps.toggleFilters(this.router, this.route, v); }
   fetchAll(){
     this.loading.set(true);
     const params: any = {};
@@ -88,9 +76,10 @@ export class HomePageComponent implements OnInit {
     Promise.all([
       this.http.get<any>(`${this.api}/v1/products${qs ? '?' + qs : ''}`).toPromise(),
       this.http.get<any>(`${this.api}/v1/shops`).toPromise(),
-    ]).then(([p,s])=>{ this.products.set(p?.data||[]); this.shops.set(s?.data||[]); })
+    ]).then(([p,s])=>{ this.products.set(p?.data||[]); this.total.set(typeof p?.total === 'number' ? p.total : null); this.shops.set(s?.data||[]); })
       .finally(()=>this.loading.set(false));
   }
+  hasNext(){ const t = this.total(); return t!=null ? (this.page()*this.perPage() < t) : (this.products().length===this.perPage()); }
   fetchCategories(){
     this.http.get<any>(`${this.api}/v1/categories`).subscribe(async r => {
       const cats: string[] = r.data||[];

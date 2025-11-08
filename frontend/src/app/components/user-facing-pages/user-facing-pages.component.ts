@@ -4,11 +4,15 @@ import { ActivatedRoute, RouterLink, RouterOutlet, Router, NavigationEnd } from 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
+import { QueryParamsService } from '../../core/services/query-params.service';
+import { CartService } from '../../core/services/cart.service';
+import { MiniCartComponent } from '../../shared/components/mini-cart/mini-cart.component';
+import { ToastContainerComponent } from '../../shared/components/toast/toast-container.component';
 
 @Component({
   selector: 'app-user-facing-pages',
   standalone: true,
-  imports: [RouterOutlet, DarkModeToggleComponent, CommonModule, FormsModule],
+  imports: [RouterOutlet, DarkModeToggleComponent, CommonModule, FormsModule, MiniCartComponent, ToastContainerComponent],
   templateUrl: './user-facing-pages.component.html',
   styleUrl: './user-facing-pages.component.css'
 })
@@ -19,7 +23,8 @@ export class UserFacingPagesComponent {
   q = signal<string>('');
   showFilters = signal<boolean>(false);
   showFilterControls = signal<boolean>(true);
-  constructor(private router: Router, private route: ActivatedRoute, private _http: HttpClient) {}
+  miniCartOpen = signal<boolean>(false);
+  constructor(private router: Router, private route: ActivatedRoute, private _http: HttpClient, private qps: QueryParamsService, private cart: CartService) {}
   ngOnInit(): void {
     this.route.queryParamMap.subscribe(qp => {
       this.q.set(qp.get('q') || '');
@@ -35,16 +40,15 @@ export class UserFacingPagesComponent {
     updateControls();
     this.router.events.subscribe(ev => { if (ev instanceof NavigationEnd) updateControls(); });
   }
-  applyQuery(){
-    this.router.navigate([], { relativeTo: this.route, queryParams: { q: this.q() || null, sort: this.sort() || null }, queryParamsHandling: 'merge' });
-  }
+  applyQuery(){ this.qps.merge(this.router, this.route, { q: this.q() || null, sort: this.sort() || null }); }
   toggleFilters(){
-    const next = !this.showFilters();
-    this.showFilters.set(next);
-    this.router.navigate([], { relativeTo: this.route, queryParams: { filters: next ? '1' : null }, queryParamsHandling: 'merge' });
+    const next = !this.showFilters(); this.showFilters.set(next);
+    this.qps.toggleFilters(this.router, this.route, next);
   }
   clearFilters(){
-    this.router.navigate([], { relativeTo: this.route, queryParams: { q: null, sort: null, minPrice: null, maxPrice: null, category: null, page: null, limit: null, filters: null }, queryParamsHandling: 'merge' });
+    this.qps.clear(this.router, this.route);
   }
+  cartCount(){ return this.cart.count(); }
+  toggleMiniCart(){ this.miniCartOpen.set(!this.miniCartOpen()); }
 
 }

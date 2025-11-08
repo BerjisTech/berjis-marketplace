@@ -12,10 +12,11 @@
     (clear)="clearAllFilters()"
   ></app-filters-rail>
 
-  <div class="flex items-center justify-between mb-4">
+  <div class="flex items-center justify-between mb-1">
     <h1 class="text-2xl font-bold text-blue-900 dark:text-white">Category: {{ category() }}</h1>
     <a routerLink="/" class="text-sm">← Back to marketplace</a>
   </div>
+  <div class="text-xs text-slate-600 dark:text-slate-400 mb-3" *ngIf="total()!=null">Showing {{ ((page()-1)*perPage())+1 }}–{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}</div>
   <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
     <article *ngFor="let p of products()" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
       <div class="aspect-[4/3] rounded-lg bg-blue-100 dark:bg-slate-900 mb-3 overflow-hidden">
@@ -28,5 +29,5 @@
       <div class="mt-2 text-sm text-slate-700 dark:text-slate-200">{{ (p.priceCents/100) | number:'1.2-2' }} {{ p.currency }}</div>
     </article>
   </div>
-  <app-pagination [page]="page()" [hasNext]="products().length===perPage()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
+  <app-pagination [page]="page()" [hasNext]="hasNext()" (prev)="prevPage()" (next)="nextPage()"></app-pagination>
 </div>
