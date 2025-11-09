@@ -69,7 +69,7 @@ export const routes: Routes = [
   {
     path: '', component: UserFacingPagesComponent, children: [
       { path: '', component: HomePageComponent },
-      { path: 'get-started', component: GetStartedPageComponent },
+      { path: 'get-started', component: GetStartedPageComponent, canActivate: [authGuard] },
       { path: 'cart', loadComponent: () => import('./pages/cart-page.component').then(m => m.CartPageComponent) },
       { path: 'checkout', loadComponent: () => import('./pages/checkout-page.component').then(m => m.CheckoutPageComponent) },
       { path: 'checkout/confirmation/:id', loadComponent: () => import('./pages/order-confirmation-page.component').then(m => m.OrderConfirmationPageComponent) },
