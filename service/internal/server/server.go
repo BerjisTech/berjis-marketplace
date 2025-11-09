@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -16,9 +18,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	pq "github.com/lib/pq"
-	"log"
 
 	srvAuth "github.com/berjistech/berjis-ecosystem/marketplace/service/internal/auth"
+	coreauth "github.com/berjistech/berjis-ecosystem/shared/coreauth"
 )
 
 type Options struct {
@@ -238,7 +240,23 @@ func New(opts Options) *fiber.App {
 	})
 
 	// Auth-required: onboarding and product CRUD (simplified)
-	requireAuth := srvAuth.Middleware(srvAuth.Options{CoreAPIBase: opts.CoreAPIBase})
+	httpClientAuth := &http.Client{Timeout: 8 * time.Second}
+	var authVerifier *coreauth.Verifier
+	if base := strings.TrimSpace(opts.CoreAPIBase); base != "" {
+		if v, err := coreauth.NewVerifier(coreauth.Config{
+			CoreAPIBase: base,
+			HTTPClient:  httpClientAuth,
+		}); err != nil {
+			log.Printf("warn: coreauth verifier init failed: %v", err)
+		} else {
+			authVerifier = v
+		}
+	}
+	requireAuth := srvAuth.Middleware(srvAuth.Options{
+		CoreAPIBase: opts.CoreAPIBase,
+		HTTPClient:  httpClientAuth,
+		Verifier:    authVerifier,
+	})
 	app.Post("/v1/shops", requireAuth, func(c *fiber.Ctx) error {
 		owner := srvAuth.UserID(c)
 		var body struct {
