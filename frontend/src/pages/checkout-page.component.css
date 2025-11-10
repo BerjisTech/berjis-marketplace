@@ -1,2 +1,9 @@
 /* checkout styles rely on utilities */
-
+.form-error {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  color: #dc2626;
+}
+.dark .form-error {
+  color: #f87171;
+}

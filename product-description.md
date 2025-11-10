@@ -153,6 +153,11 @@ src/
 - User management
 - Revenue reports
 
+**Team Management**
+- Invite managers/staff to individual shops with role assignments
+- Pending invitation tokens with expiry and acceptance flow
+- Manage active team members (update roles, remove access)
+
 **7. User Profile**
 - Profile information editing
 - Address management
@@ -363,38 +368,51 @@ CREATE TABLE order_items (
 - PUT `/api/users/profile` - Update user profile
 - GET `/api/users` - List all users (admin only)
 
+**Teams:**
+- GET `/v1/shops/{slug}/team` - list team members and pending invitations
+- POST `/v1/shops/{slug}/team` - add a team member by Core user UUID
+- PATCH `/v1/shops/{slug}/team/{id}` - update role for an existing team member
+- DELETE `/v1/shops/{slug}/team/{id}` - remove a team member
+- POST `/v1/shops/{slug}/invitations` - create a tokenized invitation for email/role
+- GET `/v1/invitations/{token}` - view invitation metadata prior to acceptance
+- POST `/v1/invitations/{token}/accept` - accept invitation (requires authenticated user)
+
 ---
 
 ## Implementation Checklist
 
 ### Phase 1: Foundation
-- [ ] Set up Angular project with routing
-- [ ] Set up Go project with basic HTTP server
-- [ ] Implement database connection (PostgreSQL)
-- [ ] Create database migrations
-- [ ] Set up CORS middleware
-- [ ] Implement theme service (light/dark mode)
-- [ ] Create base styles with color system
-- [ ] Build responsive layout structure
+- [x] Set up Angular project with routing
+- [x] Set up Go project with basic HTTP server
+- [x] Implement database connection (PostgreSQL)
+- [x] Create database migrations
+- [x] Set up CORS middleware
+- [x] Implement theme service (light/dark mode)
+- [x] Create base styles with color system
+- [x] Build responsive layout structure
 
 ### Phase 2: Authentication
-- [ ] Implement JWT generation and validation (Go)
-- [ ] Create password hashing utilities (Go)
-- [ ] Build auth API endpoints (Go)
-- [ ] Create auth service (Angular)
-- [ ] Build login component with validation
-- [ ] Build register component with validation
-- [ ] Implement auth guard
-- [ ] Create auth interceptor for JWT
-- [ ] Add persistent login (localStorage)
+- [x] Implement JWT generation and validation (Go) *(handled by Core API)*
+- [x] Create password hashing utilities (Go) *(handled by Core API)*
+- [x] Build auth API endpoints (Go) *(Core API `/v1/auth/*`)*
+- [x] Create auth service (Angular)
+- [x] Build login component with validation *(shared landing auth UI)*
+- [x] Build register component with validation *(shared landing auth UI)*
+- [x] Implement auth guard
+- [x] Create auth interceptor for JWT *(via `@berjis/angular-auth`)*
+- [x] Add persistent login (localStorage) *(via shared Angular auth client)*
+
+**Marketplace role model**
+- [x] Define `marketplace.owner`, `marketplace.manager`, `marketplace.staff` app roles
+- [x] Consume Core API `platform.*` roles for elevated dashboard access
+- [x] Expose role helpers in Go middleware for downstream handlers
 
 ### Phase 3: Product System
-- [ ] Create product models and repository (Go)
-- [ ] Implement product CRUD endpoints (Go)
+- [x] Create product models and repository (Go)
+- [x] Implement product CRUD endpoints (Go)
 - [x] Build product service (Angular)
 - [x] Create product list component with grid layout
 - [x] Implement product card component
- - [x] Build product detail page
 - [x] Add image upload functionality
 - [x] Implement search functionality
 - [x] Build filter sidebar
@@ -403,8 +421,8 @@ CREATE TABLE order_items (
 - [x] Build product detail page
 
 ### Phase 4: Shopping Cart
-- [ ] Create cart models and repository (Go)
-- [ ] Implement cart API endpoints (Go)
+- [x] Create cart models and repository (Go)
+- [x] Implement cart API endpoints (Go)
 - [x] Build cart service (Angular)
 - [x] Create cart component/page
 - [x] Implement add to cart functionality
@@ -414,8 +432,8 @@ CREATE TABLE order_items (
 - [x] Add persistent cart (localStorage)
 
 ### Phase 5: Checkout & Orders
-- [ ] Create order models and repository (Go)
-- [ ] Implement order API endpoints (Go)
+- [x] Create order models and repository (Go)
+- [x] Implement order API endpoints (Go)
 - [x] Build order service (Angular)
 - [x] Create multi-step checkout form
 - [x] Implement form validation
@@ -428,6 +446,7 @@ CREATE TABLE order_items (
 ### Phase 6: Admin Dashboard
 - [x] Create admin route guard
 - [x] Build admin layout
+- [x] Implement team invitation & membership endpoints (Go)
 - [ ] Create dashboard component with metrics
 - [ ] Implement sales chart (custom built)
 - [x] Build product management table
@@ -442,7 +461,7 @@ CREATE TABLE order_items (
 - [ ] Implement address management
 - [x] Add wishlist functionality
 - [ ] Build modal system
-- [ ] Create toast notification system
+- [x] Create toast notification system
 - [ ] Implement loading states
 - [ ] Add error handling
 - [ ] Build 404 page
@@ -453,7 +472,7 @@ CREATE TABLE order_items (
 - [ ] Add transition animations
 - [ ] Optimize images
 - [x] Add meta tags for SEO
-- [ ] Implement form validation messages
+- [x] Implement form validation messages
 - [x] Add accessibility attributes
 - [ ] Test responsive design
 - [x] Add hover effects and micro-interactions

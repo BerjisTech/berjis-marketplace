@@ -1,4 +1,5 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { ThemeService } from '../../core/services/theme.service';
 
 @Component({
   selector: 'app-dark-mode-toggle',
@@ -7,15 +8,11 @@ import { Component, OnInit, signal } from '@angular/core';
   templateUrl: './dark-mode-toggle.component.html',
   styleUrl: './dark-mode-toggle.component.css'
 })
-export class DarkModeToggleComponent implements OnInit {
-  isDark = signal(false);
-  copyRightYear = new Date().getFullYear();
+export class DarkModeToggleComponent {
+  private readonly theme = inject(ThemeService);
+  readonly isDark = this.theme.isDark;
 
-  ngOnInit(): void {
-    const persisted = (localStorage.getItem('theme') || '').toLowerCase();
-    this.setTheme(persisted === 'dark' ? 'dark' : 'light');
+  toggleTheme(): void {
+    this.theme.toggle();
   }
-
-  toggleTheme() { this.setTheme(this.isDark() ? 'light' : 'dark'); }
-  private setTheme(mode: 'light' | 'dark') { this.isDark.set(mode === 'dark'); document.documentElement.classList.toggle('dark', mode === 'dark'); localStorage.setItem('theme', mode); }
 }

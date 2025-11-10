@@ -3,32 +3,32 @@
 ## 1. Core Infrastructure
 
 ### Authentication & Authorization
-- [ ] User registration and login system
-- [ ] JWT token generation and validation
-- [ ] Password reset functionality
-- [ ] Email verification
-- [ ] Session management
-- [ ] Role-based access control (Admin, Store Owner, Team Member, Customer)
-- [ ] Permission system for team members
+- [x] User registration and login system (Core API + landing shared auth)
+- [x] JWT token generation and validation (Core API)
+- [x] Password reset functionality (Core API)
+- [x] Email verification (Core API)
+- [x] Session management (Core API session service)
+- [x] Role-based access control (platform + `marketplace.*` roles from Core API)
+- [x] Permission system for team members
 
 ### Multi-Store & Team Management
-- [ ] Store creation and setup
-- [ ] Store switching interface
-- [ ] Team invitation system
-- [ ] Team member roles and permissions
+- [x] Store creation and setup
+- [x] Store switching interface
+- [x] Team invitation system
+- [x] Team member roles and permissions
 - [ ] Store ownership transfer
-- [ ] Team member management (add/remove/update roles)
-- [ ] User-store relationship mapping
-- [ ] Store isolation (data segregation per store)
+- [x] Team member management (add/remove/update roles)
+- [x] User-store relationship mapping
+- [x] Store isolation (data segregation per store)
 
 ### Database Schema
-- [ ] Users table
-- [ ] Stores table
-- [ ] Store_users (team membership) table
-- [ ] Products table (with store_id)
+- [x] Users table (Core API shared users)
+- [x] Stores table
+- [x] Store_users (team membership) table
+- [x] Products table (with store_id)
 - [ ] Categories table
-- [ ] Orders table
-- [ ] Order_items table
+- [x] Orders table
+- [x] Order_items table
 - [ ] Customers table
 - [ ] Inventory table
 - [ ] Collections table
@@ -49,18 +49,18 @@
 ## 2. Product Management
 
 ### Product CRUD
-- [ ] Create product form (title, description, pricing, images)
+- [x] Create product form (title, description, pricing, images)
 - [ ] Product variants (size, color, etc.)
 - [ ] SKU generation and management
-- [ ] Product image upload and management
+- [x] Product image upload and management
 - [ ] Product editing
-- [ ] Product deletion (soft delete)
+- [x] Product deletion (soft delete)
 - [ ] Bulk product import (CSV)
 - [ ] Bulk product export
-- [ ] Product search and filtering
+- [x] Product search and filtering
 
 ### Inventory Management
-- [ ] Stock tracking
+- [x] Stock tracking
 - [ ] Low stock alerts
 - [ ] Inventory adjustments
 - [ ] Inventory history/audit log
@@ -141,13 +141,13 @@
 - [ ] Gift card application
 
 ### Checkout Flow
-- [ ] Multi-step checkout
+- [x] Multi-step checkout
 - [ ] Guest checkout
-- [ ] Shipping address collection
+- [x] Shipping address collection
 - [ ] Billing address collection
 - [ ] Shipping method selection
-- [ ] Order review page
-- [ ] Order confirmation page
+- [x] Order review page
+- [x] Order confirmation page
 - [ ] Order confirmation email
 
 ### Payment Processing
@@ -337,13 +337,13 @@
 ## 13. Frontend (Angular)
 
 ### Public Storefront
-- [ ] Homepage
-- [ ] Product listing page
-- [ ] Product detail page
-- [ ] Category pages
-- [ ] Search functionality
-- [ ] Shopping cart page
-- [ ] Checkout pages
+- [x] Homepage
+- [x] Product listing page
+- [x] Product detail page
+- [x] Category pages
+- [x] Search functionality
+- [x] Shopping cart page
+- [x] Checkout pages
 - [ ] Customer account pages
 - [ ] Order tracking page
 - [ ] Blog pages
@@ -384,10 +384,10 @@
 - [ ] Scheduled tasks (cron jobs)
 
 ### Data Management
-- [ ] Database migrations
+- [x] Database migrations
 - [ ] Database backup system
-- [ ] Data seeding for development
-- [ ] Soft delete implementation
+- [x] Data seeding for development
+- [x] Soft delete implementation
 - [ ] Audit logging
 
 ---
@@ -396,7 +396,7 @@
 
 ### Application Security
 - [ ] Input sanitization
-- [ ] SQL injection prevention
+- [x] SQL injection prevention
 - [ ] XSS prevention
 - [ ] CSRF protection
 - [ ] Rate limiting on sensitive endpoints

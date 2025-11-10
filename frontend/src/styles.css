@@ -17,19 +17,87 @@
   --color-shadow-dark: rgba(2,6,23,0.6);
 }
 
-html, body { height: 100%; }
-body { margin: 0; font-family: "Inter", system-ui, -apple-system, sans-serif; }
+@layer base {
+  :root {
+    color-scheme: light;
+    --app-bg-base: var(--color-bg-light-start);
+    --app-bg-surface: var(--color-bg-light-end);
+    --app-text-primary: var(--color-text-primary);
+    --app-text-muted: #475569;
+    --app-link: var(--color-link);
+    --app-border: rgba(148, 163, 184, 0.25);
+    --app-shadow: 0 18px 48px var(--color-shadow-light);
+  }
 
-a { @apply text-blue-400 hover:text-blue-500 underline-offset-4; }
+  :root[data-theme='dark'],
+  .dark {
+    color-scheme: dark;
+    --app-bg-base: var(--color-bg-dark-start);
+    --app-bg-surface: var(--color-bg-dark-end);
+    --app-text-primary: var(--color-text-dark);
+    --app-text-muted: #cbd5e1;
+    --app-link: #a5b4fc;
+    --app-border: rgba(37, 99, 235, 0.35);
+    --app-shadow: 0 28px 72px var(--color-shadow-dark);
+  }
 
-@keyframes gradient-pan { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%}}
-.bg-app-gradient { background-image: linear-gradient(135deg, var(--color-bg-light-start), var(--color-bg-light-end)); background-size:200% 200%; }
-.dark .bg-app-gradient { background-image: linear-gradient(135deg, var(--color-bg-dark-start), var(--color-bg-dark-end)); }
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: "Inter", system-ui, -apple-system, sans-serif;
+    background: radial-gradient(140% 120% at top left, var(--app-bg-surface), var(--app-bg-base));
+    color: var(--app-text-primary);
+    transition: background 0.4s ease, color 0.3s ease;
+  }
+
+  a {
+    color: var(--app-link);
+    text-decoration: none;
+    text-underline-offset: 4px;
+    transition: color 0.2s ease;
+  }
+
+  a:hover {
+    color: #3b82f6;
+  }
+
+  .dark a:hover {
+    color: #bfdbfe;
+  }
+}
+
+@keyframes gradient-pan { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+.bg-app-gradient { background-image: linear-gradient(135deg, var(--app-bg-surface), var(--app-bg-base)); background-size:200% 200%; }
 .bg-app-gradient-animated { animation: gradient-pan 14s ease-in-out infinite; }
-.shadow-brand { box-shadow: 0 18px 48px var(--color-shadow-light); }
-.dark .shadow-brand { box-shadow: 0 28px 72px var(--color-shadow-dark); }
+.shadow-brand { box-shadow: var(--app-shadow); }
 
-.btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold transition; }
+@layer components {
+  .app-shell {
+    width: min(1280px, 100%);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: clamp(1rem, 4vw, 3.25rem);
+    padding-right: clamp(1rem, 4vw, 3.25rem);
+  }
+
+  .surface-card {
+    border-radius: 1.25rem;
+    border: 1px solid var(--app-border);
+    backdrop-filter: blur(14px);
+    background-color: rgba(255, 255, 255, 0.78);
+    box-shadow: var(--app-shadow);
+  }
+
+  .dark .surface-card {
+    background-color: rgba(15, 23, 42, 0.82);
+  }
+}
+
+.btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold transition; min-height: 44px; }
 .btn-primary { @apply bg-blue-900 text-white hover:bg-blue-950; }
 .dark .btn-primary { @apply bg-[color:var(--color-gold)] text-slate-100 hover:bg-amber-400; }
 

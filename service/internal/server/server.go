@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -45,24 +46,49 @@ type Shop struct {
 }
 
 type Product struct {
-	UUID        uuid.UUID `db:"uuid" json:"uuid"`
-	ShopUUID    uuid.UUID `db:"shop_uuid" json:"shopUuid"`
-	Title       string    `db:"title" json:"title"`
-	Slug        string    `db:"slug" json:"slug"`
-	Summary     string    `db:"summary" json:"summary"`
-	PriceCents  int64     `db:"price_cents" json:"priceCents"`
-	Currency    string    `db:"currency" json:"currency"`
-	Stock       int64     `db:"stock" json:"stock"`
-	ImageURL    *string   `db:"image_url" json:"imageUrl,omitempty"`
-	Category    string    `db:"category" json:"category"`
-	Images      []string  `db:"images" json:"images"`
-	Rating      float32   `db:"rating" json:"rating"`
-	ReviewCount int64     `db:"review_count" json:"reviewCount"`
-	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
-	UpdatedAt   time.Time `db:"updated_at" json:"updatedAt"`
-	Published   bool      `db:"published" json:"published"`
-	ShopName    string    `db:"shop_name" json:"shopName"`
-	ShopSlug    string    `db:"shop_slug" json:"shopSlug"`
+	UUID        uuid.UUID  `db:"uuid" json:"uuid"`
+	ShopUUID    uuid.UUID  `db:"shop_uuid" json:"shopUuid"`
+	Title       string     `db:"title" json:"title"`
+	Slug        string     `db:"slug" json:"slug"`
+	Summary     string     `db:"summary" json:"summary"`
+	PriceCents  int64      `db:"price_cents" json:"priceCents"`
+	Currency    string     `db:"currency" json:"currency"`
+	Stock       int64      `db:"stock" json:"stock"`
+	ImageURL    *string    `db:"image_url" json:"imageUrl,omitempty"`
+	Category    string     `db:"category" json:"category"`
+	Images      []string   `db:"images" json:"images"`
+	Rating      float32    `db:"rating" json:"rating"`
+	ReviewCount int64      `db:"review_count" json:"reviewCount"`
+	CreatedAt   time.Time  `db:"created_at" json:"createdAt"`
+	UpdatedAt   time.Time  `db:"updated_at" json:"updatedAt"`
+	DeletedAt   *time.Time `db:"deleted_at" json:"-"`
+	Published   bool       `db:"published" json:"published"`
+	ShopName    string     `db:"shop_name" json:"shopName"`
+	ShopSlug    string     `db:"shop_slug" json:"shopSlug"`
+}
+
+type StoreUser struct {
+	UUID      uuid.UUID `db:"uuid" json:"uuid"`
+	StoreUUID uuid.UUID `db:"store_uuid" json:"storeUuid"`
+	UserUUID  uuid.UUID `db:"user_uuid" json:"userUuid"`
+	Role      string    `db:"role" json:"role"`
+	Status    string    `db:"status" json:"status"`
+	CreatedAt time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt time.Time `db:"updated_at" json:"updatedAt"`
+}
+
+type StoreInvitation struct {
+	UUID       uuid.UUID  `db:"uuid" json:"uuid"`
+	StoreUUID  uuid.UUID  `db:"store_uuid" json:"storeUuid"`
+	Email      string     `db:"email" json:"email"`
+	Role       string     `db:"role" json:"role"`
+	Token      string     `db:"token" json:"token,omitempty"`
+	Status     string     `db:"status" json:"status"`
+	InvitedBy  uuid.UUID  `db:"invited_by" json:"invitedBy"`
+	ExpiresAt  time.Time  `db:"expires_at" json:"expiresAt"`
+	CreatedAt  time.Time  `db:"created_at" json:"createdAt"`
+	UpdatedAt  time.Time  `db:"updated_at" json:"updatedAt"`
+	AcceptedAt *time.Time `db:"accepted_at" json:"acceptedAt,omitempty"`
 }
 
 func New(opts Options) *fiber.App {
@@ -158,12 +184,12 @@ func New(opts Options) *fiber.App {
 			}
 		}
 		var items []Product
-		base := `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url, p.created_at, p.updated_at, p.published,
+		base := `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url, p.created_at, p.updated_at, p.deleted_at, p.published,
                         p.category, p.images, COALESCE(p.rating,0) AS rating, COALESCE(p.review_count,0) AS review_count,
                         s.name AS shop_name, s.slug AS shop_slug
                  FROM products p
                  JOIN shops s ON s.uuid = p.shop_uuid
-                 WHERE p.published = true AND s.public = true`
+                 WHERE p.deleted_at IS NULL AND p.published = true AND s.public = true`
 		args := []any{}
 		if q != "" {
 			base += " AND (LOWER(p.title) LIKE LOWER($1) OR LOWER(s.name) LIKE LOWER($1))"
@@ -195,9 +221,10 @@ func New(opts Options) *fiber.App {
 		var item Product
 		err := opts.DB.Get(&item, `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url,
                                          p.category, p.images, COALESCE(p.rating,0) AS rating, COALESCE(p.review_count,0) AS review_count,
-                                         p.created_at, p.updated_at, p.published,
+                                         p.created_at, p.updated_at, p.deleted_at, p.published,
                                          s.name AS shop_name, s.slug AS shop_slug
-                                  FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE p.uuid=$1`, id)
+                                  FROM products p JOIN shops s ON s.uuid=p.shop_uuid
+                                  WHERE p.uuid=$1 AND p.deleted_at IS NULL`, id)
 		if err != nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "not found"})
 		}
@@ -217,7 +244,7 @@ func New(opts Options) *fiber.App {
 		rows := []struct {
 			Category *string `db:"category"`
 		}{}
-		if err := opts.DB.Select(&rows, `SELECT DISTINCT NULLIF(TRIM(category),'') AS category FROM products WHERE published=true ORDER BY 1 ASC`); err != nil {
+		if err := opts.DB.Select(&rows, `SELECT DISTINCT NULLIF(TRIM(category),'') AS category FROM products WHERE published=true AND deleted_at IS NULL ORDER BY 1 ASC`); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 		out := make([]string, 0, len(rows))
@@ -241,9 +268,11 @@ func New(opts Options) *fiber.App {
 		var items []Product
 		err := opts.DB.Select(&items, `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url,
                                               p.category, p.images, COALESCE(p.rating,0) AS rating, COALESCE(p.review_count,0) AS review_count,
-                                              p.created_at, p.updated_at, p.published,
+                                              p.created_at, p.updated_at, p.deleted_at, p.published,
                                               s.name AS shop_name, s.slug AS shop_slug
-                                       FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE s.slug=$1 AND p.published=true ORDER BY p.created_at DESC`, slug)
+                                       FROM products p JOIN shops s ON s.uuid=p.shop_uuid
+                                       WHERE s.slug=$1 AND p.published=true AND p.deleted_at IS NULL
+                                       ORDER BY p.created_at DESC`, slug)
 		if err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
@@ -286,6 +315,16 @@ func New(opts Options) *fiber.App {
 		if err := opts.DB.Get(&exists, `SELECT COUNT(1) FROM shops WHERE slug=$1`, slug); err == nil && exists > 0 {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"success": false, "message": "slug already used"})
 		}
+		allowed := srvAuth.HasAnyAppRole(c, srvAuth.RoleOwner, srvAuth.RoleManager) ||
+			srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleAdmin) ||
+			srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleSupport)
+		if !allowed {
+			var owned int
+			_ = opts.DB.Get(&owned, `SELECT COUNT(1) FROM shops WHERE owner_uuid=$1`, owner)
+			if owned > 0 {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+			}
+		}
 		id := uuid.New()
 		var meta any
 		if body.Meta != nil {
@@ -305,7 +344,6 @@ func New(opts Options) *fiber.App {
 	})
 
 	app.Post("/v1/products", requireAuth, func(c *fiber.Ctx) error {
-		owner := srvAuth.UserID(c)
 		var body struct {
 			ShopSlug   string   `json:"shopSlug"`
 			Title      string   `json:"title"`
@@ -325,16 +363,15 @@ func New(opts Options) *fiber.App {
 		if body.Title == "" || body.Slug == "" || body.ShopSlug == "" || body.PriceCents < 0 || body.Currency == "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "missing fields"})
 		}
-		// verify shop ownership
-		var shop Shop
-		if err := opts.DB.Get(&shop, `SELECT uuid, name, slug, owner_uuid, public, description, created_at, updated_at FROM shops WHERE slug=$1`, body.ShopSlug); err != nil {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "shop not found"})
+		shop, role, err := ensureShopAccess(c, opts.DB, body.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
 		}
-		if shop.OwnerUUID.String() != owner {
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "not your shop"})
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
 		}
 		id := uuid.New()
-		_, err := opts.DB.Exec(`INSERT INTO products(uuid,shop_uuid,title,slug,summary,price_cents,currency,stock,image_url,published,category,images) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		_, err = opts.DB.Exec(`INSERT INTO products(uuid,shop_uuid,title,slug,summary,price_cents,currency,stock,image_url,published,category,images) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
 			id, shop.UUID, strings.TrimSpace(body.Title), strings.ToLower(strings.TrimSpace(body.Slug)), strings.TrimSpace(body.Summary), body.PriceCents, strings.ToUpper(body.Currency), body.Stock, body.ImageURL, body.Published, strings.TrimSpace(body.Category), pqStringArray(body.Images),
 		)
 		if err != nil {
@@ -343,16 +380,20 @@ func New(opts Options) *fiber.App {
 		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"uuid": id}})
 	})
 
-	// Update/Delete product (owner only)
 	app.Patch("/v1/products/:id", requireAuth, func(c *fiber.Ctx) error {
-		owner := srvAuth.UserID(c)
 		id := strings.TrimSpace(c.Params("id"))
-		var shopOwner uuid.UUID
-		if err := opts.DB.Get(&shopOwner, `SELECT s.owner_uuid FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE p.uuid=$1`, id); err != nil {
-			return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
+		var meta struct {
+			ShopSlug string `db:"slug"`
 		}
-		if shopOwner.String() != owner {
-			return c.Status(403).JSON(fiber.Map{"success": false, "message": "forbidden"})
+		if err := opts.DB.Get(&meta, `SELECT s.slug FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE p.uuid=$1 AND p.deleted_at IS NULL`, id); err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "not found"})
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
 		}
 		var body map[string]any
 		if err := c.BodyParser(&body); err != nil {
@@ -402,23 +443,54 @@ func New(opts Options) *fiber.App {
 		}
 		sets = append(sets, "updated_at=now()")
 		args = append(args, id)
-		if _, err := opts.DB.Exec("UPDATE products SET "+strings.Join(sets, ", ")+" WHERE uuid=$"+itoa(len(args)), args...); err != nil {
+		query := "UPDATE products SET " + strings.Join(sets, ", ") + " WHERE uuid=$" + itoa(len(args)) + " AND deleted_at IS NULL"
+		res, err := opts.DB.Exec(query, args...)
+		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
 		}
 		return c.JSON(fiber.Map{"success": true})
 	})
 
 	app.Delete("/v1/products/:id", requireAuth, func(c *fiber.Ctx) error {
-		owner := srvAuth.UserID(c)
 		id := strings.TrimSpace(c.Params("id"))
-		var shopOwner uuid.UUID
-		if err := opts.DB.Get(&shopOwner, `SELECT s.owner_uuid FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE p.uuid=$1`, id); err != nil {
+		var meta struct {
+			ShopSlug string `db:"slug"`
+		}
+		if err := opts.DB.Get(&meta, `SELECT s.slug FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE p.uuid=$1 AND p.deleted_at IS NULL`, id); err != nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "not found"})
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		res, err := tx.Exec(`UPDATE products SET deleted_at=now(), updated_at=now(), published=false WHERE uuid=$1 AND deleted_at IS NULL`, id)
+		if err != nil {
+			_ = tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			_ = tx.Rollback()
 			return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
 		}
-		if shopOwner.String() != owner {
-			return c.Status(403).JSON(fiber.Map{"success": false, "message": "forbidden"})
+		if _, err := tx.Exec(`DELETE FROM cart_items WHERE product_uuid=$1`, id); err != nil {
+			_ = tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
-		if _, err := opts.DB.Exec(`DELETE FROM products WHERE uuid=$1`, id); err != nil {
+		if _, err := tx.Exec(`DELETE FROM wishlist_items WHERE product_uuid=$1`, id); err != nil {
+			_ = tx.Rollback()
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if err := tx.Commit(); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 		return c.JSON(fiber.Map{"success": true})
@@ -426,26 +498,279 @@ func New(opts Options) *fiber.App {
 
 	// My shops + products
 	app.Get("/v1/my/shops", requireAuth, func(c *fiber.Ctx) error {
+		if !hasDashboardAccess(c, opts.DB) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
 		owner := srvAuth.UserID(c)
 		var shops []Shop
-		if err := opts.DB.Select(&shops, `SELECT uuid,name,slug,owner_uuid,public,description,created_at,updated_at FROM shops WHERE owner_uuid=$1 ORDER BY created_at DESC`, owner); err != nil {
+		const myShopsQuery = `
+		SELECT * FROM (
+			SELECT uuid,name,slug,owner_uuid,public,description,created_at,updated_at
+			FROM shops
+			WHERE owner_uuid=$1
+			UNION
+			SELECT s.uuid,s.name,s.slug,s.owner_uuid,s.public,s.description,s.created_at,s.updated_at
+			FROM store_users su
+			JOIN shops s ON s.uuid = su.store_uuid
+			WHERE su.user_uuid=$1 AND su.status='active'
+		) AS combined
+		ORDER BY created_at DESC`
+		if err := opts.DB.Select(&shops, myShopsQuery, owner); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 		return c.JSON(fiber.Map{"success": true, "data": shops})
 	})
 	app.Get("/v1/my/shops/:slug/products", requireAuth, func(c *fiber.Ctx) error {
-		owner := srvAuth.UserID(c)
 		slug := c.Params("slug")
-		var items []Product
-		err := opts.DB.Select(&items, `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url,
-                                              p.category, p.images, COALESCE(p.rating,0) AS rating, COALESCE(p.review_count,0) AS review_count,
-                                              p.created_at, p.updated_at, p.published,
-                                              s.name AS shop_name, s.slug AS shop_slug
-                                       FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE s.slug=$1 AND s.owner_uuid=$2 ORDER BY p.created_at DESC`, slug, owner)
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
 		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var items []Product
+		if err := opts.DB.Select(&items, `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url,
+                                              p.category, p.images, COALESCE(p.rating,0) AS rating, COALESCE(p.review_count,0) AS review_count,
+                                              p.created_at, p.updated_at, p.deleted_at, p.published,
+                                              s.name AS shop_name, s.slug AS shop_slug
+                                       FROM products p JOIN shops s ON s.uuid=p.shop_uuid
+                                       WHERE s.uuid=$1 AND p.deleted_at IS NULL
+                                       ORDER BY p.created_at DESC`, shop.UUID); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 		return c.JSON(fiber.Map{"success": true, "data": items})
+	})
+
+	app.Get("/v1/shops/:slug/team", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var members []StoreUser
+		if err := opts.DB.Select(&members, `SELECT uuid,store_uuid,user_uuid,role,status,created_at,updated_at FROM store_users WHERE store_uuid=$1 ORDER BY created_at ASC`, shop.UUID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		var invites []StoreInvitation
+		if err := opts.DB.Select(&invites, `SELECT uuid,store_uuid,email,role,token,status,invited_by,expires_at,created_at,updated_at,accepted_at FROM store_invitations WHERE store_uuid=$1 ORDER BY created_at DESC`, shop.UUID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		now := time.Now()
+		for i := range invites {
+			if !strings.EqualFold(invites[i].Status, "pending") || now.After(invites[i].ExpiresAt) {
+				invites[i].Token = ""
+			}
+		}
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
+			"members":     members,
+			"invitations": invites,
+		}})
+	})
+
+	app.Post("/v1/shops/:slug/team", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsInvites(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			UserUUID string `json:"userUuid"`
+			Role     string `json:"role"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		userUUID, err := uuid.Parse(strings.TrimSpace(body.UserUUID))
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid userUuid"})
+		}
+		if shop.OwnerUUID == userUUID {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "owner already manages this shop"})
+		}
+		teamRole, err := normalizeTeamRole(body.Role)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid role"})
+		}
+		_, err = opts.DB.Exec(`INSERT INTO store_users (store_uuid,user_uuid,role,status) VALUES($1,$2,$3,'active')
+			ON CONFLICT (store_uuid,user_uuid) DO UPDATE SET role=excluded.role, status='active', updated_at=now()`,
+			shop.UUID, userUUID, teamRole)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		var member StoreUser
+		if err := opts.DB.Get(&member, `SELECT uuid,store_uuid,user_uuid,role,status,created_at,updated_at FROM store_users WHERE store_uuid=$1 AND user_uuid=$2`, shop.UUID, userUUID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": member})
+	})
+
+	app.Patch("/v1/shops/:slug/team/:id", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		teamID := strings.TrimSpace(c.Params("id"))
+		memberUUID, err := uuid.Parse(teamID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid team member id"})
+		}
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsInvites(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			Role string `json:"role"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		teamRole, err := normalizeTeamRole(body.Role)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid role"})
+		}
+		res, err := opts.DB.Exec(`UPDATE store_users SET role=$1, updated_at=now() WHERE uuid=$2 AND store_uuid=$3`, teamRole, memberUUID, shop.UUID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "team member not found"})
+		}
+		return c.JSON(fiber.Map{"success": true})
+	})
+
+	app.Delete("/v1/shops/:slug/team/:id", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		memberID := strings.TrimSpace(c.Params("id"))
+		memberUUID, err := uuid.Parse(memberID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid team member id"})
+		}
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsInvites(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		res, err := opts.DB.Exec(`DELETE FROM store_users WHERE uuid=$1 AND store_uuid=$2`, memberUUID, shop.UUID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if affected, _ := res.RowsAffected(); affected == 0 {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "team member not found"})
+		}
+		return c.JSON(fiber.Map{"success": true})
+	})
+
+	app.Post("/v1/shops/:slug/invitations", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsInvites(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			Email string `json:"email"`
+			Role  string `json:"role"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		email := strings.ToLower(strings.TrimSpace(body.Email))
+		if email == "" || !strings.Contains(email, "@") {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid email"})
+		}
+		teamRole, err := normalizeTeamRole(body.Role)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid role"})
+		}
+		invitedBy := srvAuth.UserID(c)
+		inviterUUID, err := uuid.Parse(invitedBy)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid inviter"})
+		}
+		var existing int
+		_ = opts.DB.Get(&existing, `SELECT COUNT(1) FROM store_invitations WHERE store_uuid=$1 AND LOWER(email)=LOWER($2) AND status='pending'`, shop.UUID, email)
+		if existing > 0 {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"success": false, "message": "invitation already pending for this email"})
+		}
+		token := uuid.NewString()
+		if _, err := opts.DB.Exec(`INSERT INTO store_invitations (store_uuid,email,role,token,status,invited_by) VALUES($1,$2,$3,$4,'pending',$5)`,
+			shop.UUID, email, teamRole, token, inviterUUID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		var invite StoreInvitation
+		if err := opts.DB.Get(&invite, `SELECT uuid,store_uuid,email,role,token,status,invited_by,expires_at,created_at,updated_at,accepted_at FROM store_invitations WHERE store_uuid=$1 AND token=$2`, shop.UUID, token); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": invite})
+	})
+
+	app.Get("/v1/invitations/:token", func(c *fiber.Ctx) error {
+		token := strings.TrimSpace(c.Params("token"))
+		var payload struct {
+			StoreInvitation
+			ShopName string `db:"shop_name" json:"shopName"`
+			ShopSlug string `db:"shop_slug" json:"shopSlug"`
+		}
+		if err := opts.DB.Get(&payload, `SELECT i.uuid,i.store_uuid,i.email,i.role,i.token,i.status,i.invited_by,i.expires_at,i.created_at,i.updated_at,i.accepted_at,
+			s.name AS shop_name,s.slug AS shop_slug
+			FROM store_invitations i JOIN shops s ON s.uuid=i.store_uuid
+			WHERE i.token=$1`, token); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "invitation not found"})
+			}
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if !strings.EqualFold(payload.Status, "pending") {
+			return c.Status(fiber.StatusGone).JSON(fiber.Map{"success": false, "message": "invitation no longer valid"})
+		}
+		if time.Now().After(payload.ExpiresAt) {
+			_, _ = opts.DB.Exec(`UPDATE store_invitations SET status='expired', updated_at=now() WHERE uuid=$1`, payload.UUID)
+			return c.Status(fiber.StatusGone).JSON(fiber.Map{"success": false, "message": "invitation expired"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": payload})
+	})
+
+	app.Post("/v1/invitations/:token/accept", requireAuth, func(c *fiber.Ctx) error {
+		token := strings.TrimSpace(c.Params("token"))
+		var invite StoreInvitation
+		if err := opts.DB.Get(&invite, `SELECT uuid,store_uuid,email,role,token,status,invited_by,expires_at,created_at,updated_at,accepted_at FROM store_invitations WHERE token=$1`, token); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "invitation not found"})
+			}
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if !strings.EqualFold(invite.Status, "pending") {
+			return c.Status(fiber.StatusGone).JSON(fiber.Map{"success": false, "message": "invitation no longer valid"})
+		}
+		if time.Now().After(invite.ExpiresAt) {
+			_, _ = opts.DB.Exec(`UPDATE store_invitations SET status='expired', updated_at=now() WHERE uuid=$1`, invite.UUID)
+			return c.Status(fiber.StatusGone).JSON(fiber.Map{"success": false, "message": "invitation expired"})
+		}
+		userID := srvAuth.UserID(c)
+		userUUID, err := uuid.Parse(userID)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid user"})
+		}
+		if _, err := opts.DB.Exec(`INSERT INTO store_users (store_uuid,user_uuid,role,status) VALUES($1,$2,$3,'active')
+			ON CONFLICT (store_uuid,user_uuid) DO UPDATE SET role=excluded.role, status='active', updated_at=now()`,
+			invite.StoreUUID, userUUID, invite.Role); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if _, err := opts.DB.Exec(`UPDATE store_invitations SET status='accepted', accepted_at=now(), updated_at=now(), token=$2 WHERE uuid=$1`, invite.UUID, token); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true})
 	})
 
 	// Uploads
@@ -485,6 +810,9 @@ func New(opts Options) *fiber.App {
 
 	// Dev seed
 	app.Post("/v1/dev/seed", requireAuth, func(c *fiber.Ctx) error {
+		if !hasDashboardAccess(c, opts.DB) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
 		owner := srvAuth.UserID(c)
 		var count int
 		_ = opts.DB.Get(&count, `SELECT COUNT(1) FROM shops WHERE slug='demo-shop' AND owner_uuid=$1`, owner)
@@ -497,7 +825,7 @@ func New(opts Options) *fiber.App {
 		} else {
 			_ = opts.DB.Get(&shopID, `SELECT uuid FROM shops WHERE slug='demo-shop' AND owner_uuid=$1 LIMIT 1`, owner)
 		}
-		_ = opts.DB.Get(&count, `SELECT COUNT(1) FROM products WHERE shop_uuid=$1`, shopID)
+		_ = opts.DB.Get(&count, `SELECT COUNT(1) FROM products WHERE shop_uuid=$1 AND deleted_at IS NULL`, shopID)
 		if count == 0 {
 			for i := 1; i <= 3; i++ {
 				_, _ = opts.DB.Exec(`INSERT INTO products(uuid,shop_uuid,title,slug,summary,price_cents,currency,stock,published,category) VALUES($1,$2,$3,$4,$5,$6,'USD',10,true,'general')`, uuid.New(), shopID, fmt.Sprintf("Product %d", i), fmt.Sprintf("product-%d", i), "Demo product", int64(i*1000))
@@ -537,10 +865,11 @@ func New(opts Options) *fiber.App {
 		var prods []Product
 		if err := opts.DB.Select(&prods, `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url,
                                                  p.category, p.images, COALESCE(p.rating,0) AS rating, COALESCE(p.review_count,0) AS review_count,
-                                                 p.created_at, p.updated_at, p.published,
+                                                 p.created_at, p.updated_at, p.deleted_at, p.published,
                                                  s.name AS shop_name, s.slug AS shop_slug
                                           FROM products p JOIN shops s ON s.uuid=p.shop_uuid
-                                          WHERE s.owner_uuid=$1 AND (LOWER(p.title) LIKE LOWER($2) OR LOWER(p.summary) LIKE LOWER($2))
+                                          WHERE s.owner_uuid=$1 AND p.deleted_at IS NULL
+                                            AND (LOWER(p.title) LIKE LOWER($2) OR LOWER(p.summary) LIKE LOWER($2))
                                           ORDER BY p.updated_at DESC LIMIT 10`, owner, like); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
@@ -556,7 +885,7 @@ func New(opts Options) *fiber.App {
 		if err := opts.DB.Select(&orders, `SELECT DISTINCT o.uuid, o.total_cents, o.currency, o.status, o.created_at
                                            FROM orders o
                                            JOIN order_items oi ON oi.order_uuid=o.uuid
-                                           JOIN products p ON p.uuid=oi.product_uuid
+                                           JOIN products p ON p.uuid=oi.product_uuid AND p.deleted_at IS NULL
                                            JOIN shops s ON s.uuid=p.shop_uuid
                                            WHERE s.owner_uuid=$1 AND (
                                                 CAST(o.uuid AS TEXT) LIKE $2 OR LOWER(o.status) LIKE LOWER($2)
@@ -615,6 +944,104 @@ type Order struct {
 	CreatedAt  time.Time `db:"created_at" json:"createdAt"`
 }
 
+var allowedTeamRoles = map[string]bool{
+	"manager": true,
+	"staff":   true,
+}
+
+func hasDashboardAccess(c *fiber.Ctx, db *sqlx.DB) bool {
+	if srvAuth.HasAnyAppRole(c, srvAuth.RoleOwner, srvAuth.RoleManager, srvAuth.RoleStaff) ||
+		srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleAdmin) ||
+		srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleSupport) {
+		return true
+	}
+	user := srvAuth.UserID(c)
+	if user == "" {
+		return false
+	}
+	var count int
+	if err := db.Get(&count, `SELECT COUNT(1) FROM shops WHERE owner_uuid=$1`, user); err == nil && count > 0 {
+		return true
+	}
+	if err := db.Get(&count, `SELECT COUNT(1) FROM store_users WHERE user_uuid=$1 AND status='active'`, user); err == nil && count > 0 {
+		return true
+	}
+	return false
+}
+
+func normalizeTeamRole(role string) (string, error) {
+	r := strings.ToLower(strings.TrimSpace(role))
+	if allowedTeamRoles[r] {
+		return r, nil
+	}
+	return "", fmt.Errorf("invalid role")
+}
+
+func membershipRole(db *sqlx.DB, store uuid.UUID, user string) string {
+	var row struct {
+		Role   string `db:"role"`
+		Status string `db:"status"`
+	}
+	if err := db.Get(&row, `SELECT role, status FROM store_users WHERE store_uuid=$1 AND user_uuid=$2 LIMIT 1`, store, user); err == nil {
+		if strings.EqualFold(row.Status, "active") {
+			return strings.ToLower(strings.TrimSpace(row.Role))
+		}
+	}
+	return ""
+}
+
+func teamRoleAllowsManagement(role string) bool {
+	switch strings.ToLower(role) {
+	case "owner", "manager", "platform":
+		return true
+	default:
+		return false
+	}
+}
+
+func teamRoleAllowsInvites(role string) bool {
+	switch strings.ToLower(role) {
+	case "owner", "platform":
+		return true
+	default:
+		return false
+	}
+}
+
+func teamRoleAllowsView(role string) bool {
+	switch strings.ToLower(role) {
+	case "owner", "manager", "staff", "platform":
+		return true
+	default:
+		return false
+	}
+}
+
+func ensureShopAccess(c *fiber.Ctx, db *sqlx.DB, slug string) (Shop, string, error) {
+	slug = strings.TrimSpace(slug)
+	var shop Shop
+	if err := db.Get(&shop, `SELECT uuid, name, slug, owner_uuid, public, description, created_at, updated_at FROM shops WHERE slug=$1`, slug); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Shop{}, "", fiber.NewError(fiber.StatusNotFound, "shop not found")
+		}
+		return Shop{}, "", fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	user := srvAuth.UserID(c)
+	if user == "" {
+		return Shop{}, "", fiber.NewError(fiber.StatusUnauthorized, "unauthorized")
+	}
+	if shop.OwnerUUID.String() == user {
+		return shop, "owner", nil
+	}
+	if role := membershipRole(db, shop.UUID, user); role != "" {
+		return shop, role, nil
+	}
+	if srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleAdmin) || srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleSupport) {
+		return shop, "platform", nil
+	}
+	return Shop{}, "", fiber.NewError(fiber.StatusForbidden, "insufficient permissions")
+}
+
 func ensureCart(db *sqlx.DB, user string) (uuid.UUID, error) {
 	var id uuid.UUID
 	err := db.Get(&id, `SELECT uuid FROM carts WHERE user_uuid=$1`, user)
@@ -626,6 +1053,17 @@ func ensureCart(db *sqlx.DB, user string) (uuid.UUID, error) {
 		return id, nil
 	}
 	return id, err
+}
+
+func respondWithError(c *fiber.Ctx, err error) error {
+	if fe, ok := err.(*fiber.Error); ok {
+		msg := strings.TrimSpace(fe.Message)
+		if msg == "" {
+			msg = http.StatusText(fe.Code)
+		}
+		return c.Status(fe.Code).JSON(fiber.Map{"success": false, "message": msg})
+	}
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "server error"})
 }
 
 func ensureWishlist(db *sqlx.DB, user string) (uuid.UUID, error) {
@@ -649,7 +1087,8 @@ func getCart(c *fiber.Ctx, db *sqlx.DB) error {
 	}
 	var items []CartItem
 	q := `SELECT ci.uuid, ci.product_uuid, ci.quantity, p.title, p.price_cents, p.currency, p.image_url
-          FROM cart_items ci JOIN products p ON p.uuid=ci.product_uuid WHERE ci.cart_uuid=$1 ORDER BY ci.added_at DESC`
+          FROM cart_items ci JOIN products p ON p.uuid=ci.product_uuid AND p.deleted_at IS NULL
+          WHERE ci.cart_uuid=$1 ORDER BY ci.added_at DESC`
 	if err := db.Select(&items, q, cartID); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
@@ -692,7 +1131,7 @@ func replaceCart(c *fiber.Ctx, db *sqlx.DB) error {
 			continue
 		}
 		var exists int
-		if err := tx.Get(&exists, `SELECT COUNT(1) FROM products WHERE uuid=$1`, pid); err != nil || exists == 0 {
+		if err := tx.Get(&exists, `SELECT COUNT(1) FROM products WHERE uuid=$1 AND deleted_at IS NULL`, pid); err != nil || exists == 0 {
 			continue
 		}
 		qty := it.Quantity
@@ -724,7 +1163,7 @@ func getWishlist(c *fiber.Ctx, db *sqlx.DB) error {
 	             p.title, p.price_cents, p.currency, p.image_url,
 	             s.name AS shop_name, s.slug AS shop_slug
 	      FROM wishlist_items wi
-	      JOIN products p ON p.uuid=wi.product_uuid
+	      JOIN products p ON p.uuid=wi.product_uuid AND p.deleted_at IS NULL
 	      JOIN shops s ON s.uuid=p.shop_uuid
 	      WHERE wi.wishlist_uuid=$1
 	      ORDER BY wi.added_at DESC`
@@ -767,7 +1206,7 @@ func replaceWishlist(c *fiber.Ctx, db *sqlx.DB) error {
 		}
 		seen[pid] = struct{}{}
 		var exists int
-		if err := tx.Get(&exists, `SELECT COUNT(1) FROM products WHERE uuid=$1`, pid); err != nil || exists == 0 {
+		if err := tx.Get(&exists, `SELECT COUNT(1) FROM products WHERE uuid=$1 AND deleted_at IS NULL`, pid); err != nil || exists == 0 {
 			continue
 		}
 		if _, err := tx.Exec(`INSERT INTO wishlist_items(uuid,wishlist_uuid,product_uuid) VALUES($1,$2,$3)`, uuid.New(), wishlistID, pid); err != nil {
@@ -792,13 +1231,18 @@ func addCartItem(c *fiber.Ctx, db *sqlx.DB) error {
 	if err := c.BodyParser(&body); err != nil || body.ProductID == "" || body.Quantity <= 0 {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
 	}
+	pid := strings.TrimSpace(body.ProductID)
+	var exists int
+	if err := db.Get(&exists, `SELECT COUNT(1) FROM products WHERE uuid=$1 AND deleted_at IS NULL`, pid); err != nil || exists == 0 {
+		return c.Status(404).JSON(fiber.Map{"success": false, "message": "product unavailable"})
+	}
 	cartID, err := ensureCart(db, user)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 	// upsert
 	_, err = db.Exec(`INSERT INTO cart_items(cart_uuid,product_uuid,quantity) VALUES($1,$2,$3)
-                      ON CONFLICT (cart_uuid, product_uuid) DO UPDATE SET quantity=cart_items.quantity+EXCLUDED.quantity`, cartID, body.ProductID, body.Quantity)
+                      ON CONFLICT (cart_uuid, product_uuid) DO UPDATE SET quantity=cart_items.quantity+EXCLUDED.quantity`, cartID, pid, body.Quantity)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
@@ -861,7 +1305,10 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 		Currency    string    `db:"currency"`
 	}
 	var rows []row
-	if err := db.Select(&rows, `SELECT ci.product_uuid, ci.quantity, p.price_cents, p.currency FROM cart_items ci JOIN products p ON p.uuid=ci.product_uuid WHERE ci.cart_uuid=$1`, cartID); err != nil {
+	if err := db.Select(&rows, `SELECT ci.product_uuid, ci.quantity, p.price_cents, p.currency
+                                FROM cart_items ci
+                                JOIN products p ON p.uuid=ci.product_uuid AND p.deleted_at IS NULL
+                                WHERE ci.cart_uuid=$1`, cartID); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 	if len(rows) == 0 {

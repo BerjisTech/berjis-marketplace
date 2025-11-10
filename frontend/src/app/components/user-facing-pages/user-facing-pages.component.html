@@ -1,40 +1,86 @@
-<header class="sticky top-0 left-0 right-0 z-40 w-full h-16 bg-white/70 dark:bg-slate-950/70 backdrop-blur border-b border-blue-900/20 dark:border-slate-800">
-  <div class="h-full px-[clamp(1rem,6vw,3rem)] flex items-center gap-3">
-    <a routerLink="/" class="text-xl font-bold text-blue-900 dark:text-white" aria-label="Berjis Marketplace home">Berjis Marketplace</a>
-    <button *ngIf="showFilterControls()" type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="toggleFilters()" [attr.aria-expanded]="showFilters()" aria-controls="filters-rail">{{ showFilters() ? 'Hide Filters' : 'Filters' }}</button>
-    <button *ngIf="showFilterControls()" type="button" class="rounded-full border border-blue-900/20 dark:border-slate-700 px-4 h-10 text-sm" (click)="clearFilters()">Clear</button>
-    <form class="flex-1 flex items-center gap-2" (submit)="$event.preventDefault(); applyQuery()">
-      <input class="flex-1 h-10 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-400 dark:focus:ring-amber-400" placeholder="Search products, shops." aria-label="Search products and shops" [ngModel]="q()" (ngModelChange)="q.set($event)" name="q" />
-      <button class="btn btn-primary rounded-full h-10 px-5">Search</button>
-    </form>
-    <select *ngIf="showFilterControls()" class="rounded-full border border-blue-900/20 dark:border-slate-700 h-10 px-3 text-sm" [ngModel]="sort()" (ngModelChange)="sort.set($event); applyQuery()" aria-label="Sort">
-      <option value="">Sort</option>
-      <option value="price_asc">Price: Low to High</option>
-      <option value="price_desc">Price: High to Low</option>
-      <option value="newest">Newest</option>
-    </select>
-    <a routerLink="/wishlist" class="relative rounded-full border border-blue-900/20 dark:border-slate-700 px-3 h-10 grid place-items-center text-sm focus-visible:ring-2 focus-visible:ring-amber-400" aria-label="Wishlist">
-      <span class="material-symbols-outlined text-[18px] align-middle">favorite</span>
-      <span class="absolute -top-1 -right-1 text-[10px] rounded-full bg-amber-500 text-black px-1.5 py-0.5" *ngIf="wishlistCount()>0">{{ wishlistCount() }}</span>
+<header class="sticky top-0 left-0 right-0 z-40 w-full backdrop-blur border-b border-white/40 bg-white/75 shadow-sm dark:border-slate-800/60 dark:bg-slate-950/75">
+  <div class="app-shell flex flex-wrap items-center gap-3 py-3 md:flex-nowrap">
+    <a routerLink="/" class="order-1 text-2xl font-semibold tracking-tight text-blue-900 dark:text-white" aria-label="Berjis Marketplace home">
+      Berjis Marketplace
     </a>
-    <div class="relative">
-      <button type="button" (click)="toggleMiniCart()" class="relative rounded-full border border-blue-900/20 dark:border-slate-700 px-3 h-10 grid place-items-center text-sm" aria-label="Toggle mini cart" [attr.aria-expanded]="miniCartOpen()">
-        <span class="material-symbols-outlined text-[18px] align-middle">shopping_cart</span>
-        <span class="absolute -top-1 -right-1 text-[10px] rounded-full bg-amber-500 text-black px-1.5 py-0.5" *ngIf="cartCount()>0">{{ cartCount() }}</span>
+
+    <form class="order-2 flex w-full flex-wrap items-center gap-2 md:flex-1 md:flex-nowrap" (submit)="$event.preventDefault(); applyQuery()">
+      <input
+        class="w-full flex-1 min-h-[44px] rounded-full border border-transparent bg-white/80 px-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-400/70 dark:bg-slate-900/70 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/60"
+        placeholder="Search products, shops."
+        aria-label="Search products and shops"
+        [ngModel]="q()"
+        (ngModelChange)="q.set($event)"
+        name="q"
+      />
+      <button type="submit" class="btn btn-primary rounded-full px-6">
+        Search
       </button>
-      <app-mini-cart [open]="miniCartOpen()" (openChange)="miniCartOpen.set($event)"></app-mini-cart>
+    </form>
+
+    <div *ngIf="showFilterControls()" class="order-3 flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
+      <button
+        type="button"
+        class="min-h-[44px] flex-1 rounded-full border border-blue-900/20 bg-white/70 px-4 text-sm font-medium shadow-sm transition hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:border-amber-400 dark:focus-visible:ring-amber-400"
+        (click)="toggleFilters()"
+        [attr.aria-expanded]="showFilters()"
+        aria-controls="filters-rail"
+      >
+        {{ showFilters() ? 'Hide Filters' : 'Filters' }}
+      </button>
+      <button
+        type="button"
+        class="min-h-[44px] flex-1 rounded-full border border-blue-900/20 bg-white/70 px-4 text-sm font-medium shadow-sm transition hover:border-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:border-rose-300 dark:focus-visible:ring-rose-300"
+        (click)="clearFilters()"
+      >
+        Clear
+      </button>
+      <select
+        class="min-h-[44px] w-full rounded-full border border-blue-900/20 bg-white/80 px-3 text-sm shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200 dark:focus-visible:ring-amber-400 md:w-auto"
+        [ngModel]="sort()"
+        (ngModelChange)="sort.set($event); applyQuery()"
+        aria-label="Sort"
+      >
+        <option value="">Sort</option>
+        <option value="price_asc">Price: Low to High</option>
+        <option value="price_desc">Price: High to Low</option>
+        <option value="newest">Newest</option>
+      </select>
     </div>
-    <app-dark-mode-toggle></app-dark-mode-toggle>
+
+    <div class="order-4 flex w-full items-center justify-end gap-2 md:ml-auto md:w-auto">
+      <a
+        routerLink="/wishlist"
+        class="relative inline-flex min-h-[44px] items-center justify-center rounded-full border border-blue-900/20 bg-white/70 px-4 text-sm font-medium shadow-sm transition hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:border-amber-400 dark:focus-visible:ring-amber-400"
+        aria-label="Wishlist"
+      >
+        <span class="material-symbols-outlined text-[18px] align-middle">favorite</span>
+        <span class="sr-only">Wishlist</span>
+        <span class="absolute -top-1 -right-1 text-[10px] rounded-full bg-amber-500 text-black px-1.5 py-0.5" *ngIf="wishlistCount()>0">{{ wishlistCount() }}</span>
+      </a>
+      <div class="relative">
+        <button
+          type="button"
+          (click)="toggleMiniCart()"
+          class="relative inline-flex min-h-[44px] items-center justify-center rounded-full border border-blue-900/20 bg-white/70 px-4 text-sm font-medium shadow-sm transition hover:border-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100 dark:hover:border-amber-400 dark:focus-visible:ring-amber-400"
+          aria-label="Toggle mini cart"
+          [attr.aria-expanded]="miniCartOpen()"
+        >
+          <span class="material-symbols-outlined text-[18px] align-middle">shopping_cart</span>
+          <span class="absolute -top-1 -right-1 text-[10px] rounded-full bg-amber-500 text-black px-1.5 py-0.5" *ngIf="cartCount()>0">{{ cartCount() }}</span>
+        </button>
+        <app-mini-cart [open]="miniCartOpen()" (openChange)="miniCartOpen.set($event)"></app-mini-cart>
+      </div>
+      <app-dark-mode-toggle></app-dark-mode-toggle>
+    </div>
   </div>
 </header>
 
 <router-outlet></router-outlet>
 <app-toast-container></app-toast-container>
-<footer
-    class="mt-auto border-t border-slate-200/50 dark:border-blue-900/40 bg-white/70 dark:bg-slate-950/80 backdrop-blur py-6 text-center text-sm text-slate-700 dark:text-slate-300">
+
+<footer class="mt-auto border-t border-slate-200/50 bg-white/75 backdrop-blur dark:border-blue-900/40 dark:bg-slate-950/80">
+  <div class="app-shell py-6 text-center text-sm text-slate-700 dark:text-slate-300">
     &copy; {{ copyRightYear }} Berjis Tech
+  </div>
 </footer>
-
-
-
-

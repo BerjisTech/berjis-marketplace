@@ -1,6 +1,6 @@
 import { Component, signal, computed, inject, OnInit, DoCheck } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, NgForm, AbstractControl } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CartService, CartItem } from '../app/core/services/cart.service';
 import { CreateOrderPayload, OrderService } from '../app/core/services/order.service';
@@ -24,7 +24,14 @@ export class CheckoutPageComponent implements OnInit, DoCheck {
   items = this.cart.items;
   subtotalCents = computed(()=> this.cart.totalCents());
 
-  next(){ if (this.step()==='shipping') this.step.set('payment'); else if (this.step()==='payment') this.step.set('review'); }
+  advanceFromShipping(form: NgForm){
+    if (!this.validateForm(form)) { return; }
+    this.step.set('payment');
+  }
+  advanceFromPayment(form: NgForm){
+    if (!this.validateForm(form)) { return; }
+    this.step.set('review');
+  }
   back(){ if (this.step()==='payment') this.step.set('shipping'); else if (this.step()==='review') this.step.set('payment'); }
 
   async placeOrder(){
@@ -40,6 +47,7 @@ export class CheckoutPageComponent implements OnInit, DoCheck {
     this.orderId.set(res.id);
     this.cart.clear();
     this.placing.set(false);
+    try { localStorage.removeItem('checkout_progress'); } catch { /* ignore */ }
     this.router.navigate(['/checkout/confirmation', res.id]);
   }
   // Persist checkout progress
@@ -62,6 +70,28 @@ export class CheckoutPageComponent implements OnInit, DoCheck {
       productId: item.productId,
       quantity: item.quantity,
     };
+  }
+
+  fieldInvalid(form: NgForm, control: string): boolean {
+    const ctrl = form.controls[control];
+    return !!ctrl && ctrl.invalid && (ctrl.touched || form.submitted);
+  }
+
+  hasError(form: NgForm, control: string, key: string): boolean {
+    const ctrl = form.controls[control];
+    return !!ctrl && !!ctrl.errors?.[key] && (ctrl.touched || form.submitted);
+  }
+
+  private validateForm(form: NgForm): boolean {
+    if (form.valid) {
+      return true;
+    }
+    Object.values(form.controls).forEach(control => {
+      const inner: AbstractControl | undefined = (control as { control?: AbstractControl }).control;
+      inner?.markAsTouched();
+      inner?.updateValueAndValidity();
+    });
+    return false;
   }
 }
 
