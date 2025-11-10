@@ -63,6 +63,7 @@ import { CategoryPageComponent } from './pages/category-page.component';
 import { NewShopPageComponent } from './pages/new-shop-page.component';
 import { GetStartedPageComponent } from './pages/get-started-page.component';
 import { UserFacingPagesComponent } from './app/components/user-facing-pages/user-facing-pages.component';
+import { InviteAcceptPageComponent } from './pages/invite-accept-page.component';
 import { authGuard } from './app/core/guards/auth.guard';
 
 export const routes: Routes = [
@@ -137,6 +138,7 @@ export const routes: Routes = [
     { path: 'settings/customer-privacy', component: SettingsCustomerPrivacyPageComponent },
     { path: 'settings/policies', component: SettingsPoliciesPageComponent },
   ] },
+  { path: 'invite/:token', component: InviteAcceptPageComponent },
   { path: 'dashboard/shops/new', component: NewShopPageComponent },
   { path: '**', redirectTo: '' }
 ];

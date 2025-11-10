@@ -154,9 +154,9 @@ src/
 - Revenue reports
 
 **Team Management**
-- Invite managers/staff to individual shops with role assignments
-- Pending invitation tokens with expiry and acceptance flow
-- Manage active team members (update roles, remove access)
+- [x] Invite managers/staff to individual shops with role assignments
+- [x] Pending invitation tokens with expiry and acceptance flow
+- [x] Manage active team members (update roles, remove access)
 
 **7. User Profile**
 - Profile information editing
@@ -363,10 +363,11 @@ CREATE TABLE order_items (
 - GET `/api/orders/:id` - Get single order
 - PUT `/api/orders/:id/status` - Update order status (admin only)
 
-**Users:**
-- GET `/api/users/profile` - Get user profile
-- PUT `/api/users/profile` - Update user profile
-- GET `/api/users` - List all users (admin only)
+**Users (Core API authoritative):**
+- GET `/v1/users/profile` - Retrieve the active Core profile *(served by `./api`; no marketplace duplicate)*
+- PUT `/v1/users/profile` - Update profile fields *(served by `./api`; marketplace stores only app-specific extensions)*
+- GET `/v1/users` - Platform-level listing for elevated roles *(served by `./api`; gated to Core admin/support)*
+- Marketplace-specific customer/contact data (e.g., shopper preferences, store roles) is stored in the marketplace service database alongside shop records.
 
 **Teams:**
 - GET `/v1/shops/{slug}/team` - list team members and pending invitations

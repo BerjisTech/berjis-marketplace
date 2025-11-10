@@ -362,6 +362,11 @@
 - [ ] Caching strategy
 - [ ] Bundle size optimization
 
+### Team Collaboration (Dashboard)
+- [x] Team management dashboard UI (list/update/remove roles)
+- [x] Invite by email workflow (form + pending list + copy link)
+- [x] Invitation acceptance route and handler
+
 ---
 
 ## 14. Backend (Go)

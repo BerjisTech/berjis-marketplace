@@ -1,0 +1,95 @@
+<div class="min-h-[70vh] bg-gradient-to-b from-blue-50 via-white to-white px-[clamp(1rem,6vw,3rem)] py-16 dark:from-slate-950 dark:via-slate-950 dark:to-slate-950">
+  <div class="mx-auto max-w-2xl rounded-2xl border border-blue-900/10 bg-white/95 p-8 shadow-xl shadow-blue-900/5 dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-slate-900/40">
+    <div class="flex items-center gap-3">
+      <span class="material-symbols-outlined text-3xl text-blue-900 dark:text-amber-300">group_add</span>
+      <div>
+        <h1 class="text-2xl font-semibold text-blue-900 dark:text-white">Join this shop team</h1>
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          Accept the invitation below to gain access to the marketplace dashboard.
+        </p>
+      </div>
+    </div>
+
+    <div *ngIf="loading()" class="mt-8 text-sm text-slate-600 dark:text-slate-300">
+      Verifying your invitation…
+    </div>
+
+    <div *ngIf="!loading() && error()" class="mt-8 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-200">
+      {{ error() }}
+      <div class="mt-3">
+        <a routerLink="/" class="text-sm font-medium text-blue-700 transition hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200">
+          Return to marketplace
+        </a>
+      </div>
+    </div>
+
+    <ng-container *ngIf="!loading() && !error() && invitation() as invite">
+      <div class="mt-6 space-y-4 rounded-xl border border-blue-900/15 bg-blue-50/70 p-6 dark:border-slate-800 dark:bg-slate-900/60">
+        <div class="flex flex-col gap-1">
+          <span class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Shop</span>
+          <span class="text-lg font-semibold text-blue-900 dark:text-white">
+            {{ invite.shopName || (invite.shopSlug | uppercase) || 'Marketplace shop' }}
+          </span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">
+            Invite sent to {{ invite.email }}
+          </span>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <div class="rounded-lg bg-white/90 p-4 text-sm text-slate-700 shadow-sm dark:bg-slate-950/70 dark:text-slate-200">
+            <span class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Role</span>
+            <span class="text-base font-medium text-blue-900 dark:text-amber-200">{{ invite.role | titlecase }}</span>
+          </div>
+          <div class="rounded-lg bg-white/90 p-4 text-sm text-slate-700 shadow-sm dark:bg-slate-950/70 dark:text-slate-200">
+            <span class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Expires</span>
+            <span class="text-base font-medium text-blue-900 dark:text-white">{{ invite.expiresAt | date:'medium' }}</span>
+          </div>
+        </div>
+
+        <div *ngIf="invite.status === 'pending'; else inviteStatusBlock" class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
+          This invitation is active. Accepting will grant you access to the shop dashboard.
+        </div>
+        <ng-template #inviteStatusBlock>
+          <div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-900/30 dark:text-emerald-200">
+            Invitation marked as {{ invite.status }}.
+          </div>
+        </ng-template>
+      </div>
+
+      <div class="mt-6 flex flex-col gap-3 md:flex-row md:items-center">
+        <div *ngIf="!sessionValid()" class="rounded-md border border-blue-900/15 bg-blue-50/60 px-4 py-3 text-xs text-blue-900 dark:border-slate-800 dark:bg-slate-900/70 dark:text-slate-200">
+          Sign in to accept this invitation. You'll be redirected back here automatically.
+        </div>
+        <div class="flex flex-1 flex-wrap items-center gap-3">
+          <button
+            type="button"
+            class="rounded-full bg-blue-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-60"
+            *ngIf="invite.status === 'pending'"
+            [disabled]="accepting()"
+            (click)="sessionValid() ? accept() : goToLogin()">
+            <ng-container *ngIf="accepting(); else acceptLabel">
+              <span class="material-symbols-outlined mr-2 inline-block align-middle text-[18px] animate-spin">progress_activity</span>
+              Accepting…
+            </ng-container>
+            <ng-template #acceptLabel>Accept invitation</ng-template>
+          </button>
+
+          <button
+            type="button"
+            class="rounded-full border border-blue-900/20 px-6 py-3 text-sm font-semibold text-blue-900 transition hover:border-blue-900 hover:text-blue-950 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
+            *ngIf="invite.status === 'pending' && !sessionValid()"
+            (click)="goToLogin()">
+            Sign in first
+          </button>
+
+          <button
+            type="button"
+            class="rounded-full bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            *ngIf="invite.status !== 'pending'"
+            (click)="viewDashboard()">
+            Go to dashboard
+          </button>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>
