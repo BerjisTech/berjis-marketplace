@@ -1,0 +1,353 @@
+yarn run v1.22.22
+$ E:\Berjis\Apps\Web\berjis-ecosystem\node_modules\.bin\ng lint
+
+Linting "marketplace"...
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\core\services\order.service.ts
+  8:10  error  Array type using 'Array<T>' is forbidden. Use 'T[]' instead  @typescript-eslint/array-type
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\core\services\product.service.ts
+   8:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  11:26  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  14:23  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  15:27  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  20:27  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\core\services\query-params.service.ts
+   4:13  error  Use an `interface` instead of a `type`    @typescript-eslint/consistent-type-definitions
+  27:37  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  43:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\shared\components\filters-rail\filters-rail.component.html
+   2:1  error  click must be accompanied by either keyup, keydown or keypress event for accessibility  @angular-eslint/template/click-events-have-key-events
+   2:1  error  Elements with interaction handlers must be focusable                                    @angular-eslint/template/interactive-supports-focus
+  11:7  error  A label component must be associated with a form element                                @angular-eslint/template/label-has-associated-control
+  15:9  error  A label component must be associated with a form element                                @angular-eslint/template/label-has-associated-control
+  22:7  error  A label component must be associated with a form element                                @angular-eslint/template/label-has-associated-control
+  29:7  error  A label component must be associated with a form element                                @angular-eslint/template/label-has-associated-control
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\shared\components\mini-cart\mini-cart.component.html
+  13:11  error  <img/> element must have a text alternative  @angular-eslint/template/alt-text
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\shared\components\mini-cart\mini-cart.component.ts
+  16:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\shared\components\product-card\product-card.component.ts
+  15:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\shared\components\toast\toast-container.component.ts
+  13:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\app\shared\components\toast\toast.service.ts
+  3:13  error  Use an `interface` instead of a `type`  @typescript-eslint/consistent-type-definitions
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\main.ts
+  1:10  error  'enableProdMode' is defined but never used       @typescript-eslint/no-unused-vars
+  1:26  error  'importProvidersFrom' is defined but never used  @typescript-eslint/no-unused-vars
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\analytics-live-view-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\analytics-overview-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\analytics-reports-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\cart-page.component.ts
+  9:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\category-page.component.html
+  19:71  error  Expected `!==` but received `!=`  @angular-eslint/template/eqeqeq
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\category-page.component.ts
+  13:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  21:21  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  32:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  32:45  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  32:68  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  32:94  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  50:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  58:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  62:8   error  '_' is defined but never used                                                                                                                                           @typescript-eslint/no-unused-vars
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\checkout-page.component.ts
+  10:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\content-blog-posts-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\content-files-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\content-menus-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\content-overview-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\customers-overview-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\customers-segments-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\dashboard-overview-page.component.ts
+   9:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  16:18  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  17:17  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  18:21  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  20:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  27:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  35:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\dashboard-page.component.ts
+  11:13   error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  18:18   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  20:21   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:36   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:49   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:65   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:81   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:97   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:111  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:125  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  30:141  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  31:24   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  38:15   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  41:15   error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  44:30   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  45:89   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  59:19   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  67:20   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  74:18   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  75:42   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  82:20   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  85:20   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\discounts-overview-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\get-started-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\home-page.component.html
+  50:70  error  Expected `!==` but received `!=`  @angular-eslint/template/eqeqeq
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\home-page.component.ts
+  12:6   error  Use an `interface` instead of a `type`                                                                                                                                  @typescript-eslint/consistent-type-definitions
+  13:6   error  Use an `interface` instead of a `type`                                                                                                                                  @typescript-eslint/consistent-type-definitions
+  17:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  38:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  38:41  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  38:71  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  38:94  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  67:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  77:21  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  78:21  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  84:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  91:22  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  92:32  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  93:17  error  Empty block statement                                                                                                                                                   no-empty
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\marketing-attributions-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\marketing-automations-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\marketing-campaigns-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\marketing-overview-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\markets-catalogs-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\markets-overview-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\new-shop-form.component.ts
+  10:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  32:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  32:41  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  34:16  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  36:34  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  38:13  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  63:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  83:10  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  85:17  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\new-shop-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\order-confirmation-page.component.ts
+   7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  14:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\orders-abandoned-checkouts-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\orders-draft-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\orders-overview-page.component.ts
+  7:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\orders-returns-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\product-page.component.html
+  22:11  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  28:11  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\product-page.component.ts
+  13:13   error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  20:20   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  23:20   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  28:15   error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  28:46   error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  28:72   error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  28:99   error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  28:134  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  31:19   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  34:23   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  35:53   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  62:32   error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-collections-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-gift-cards-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-inventory-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-new-page.component.html
+   14:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   17:11  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   53:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   57:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   70:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   74:13  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   78:13  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   86:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+   97:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  101:13  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  105:13  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  123:11  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  131:13  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  135:13  error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  144:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  146:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  168:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  170:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  172:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  174:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+  176:9   error  A label component must be associated with a form element  @angular-eslint/template/label-has-associated-control
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-new-page.component.ts
+  10:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  18:10  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  50:18  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  54:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  54:41  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  57:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-overview-page.component.ts
+  10:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  17:18  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  19:18  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  23:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  25:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  32:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-purchase-orders-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-transfers-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-apps-and-sales-channels-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-billing-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-checkout-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-customer-accounts-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-customer-events-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-customer-privacy-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-domains-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-general-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-languages-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-locations-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-metafields-and-metaobjects-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-notifications-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-page.component.ts
+  6:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-payments-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-plan-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-policies-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-shipping-and-delivery-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-taxes-and-duties-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\settings-users-page.component.ts
+  3:42  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)  @angular-eslint/component-selector
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\shop-page.component.html
+  17:71  error  Expected `!==` but received `!=`  @angular-eslint/template/eqeqeq
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\shop-page.component.ts
+  14:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  21:17  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  22:21  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  32:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  32:45  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  32:68  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  32:94  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  36:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  50:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+  58:19  error  Unexpected any. Specify a different type                                                                                                                                @typescript-eslint/no-explicit-any
+
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\wishlist-page.component.ts
+   9:13  error  The selector should start with one of these prefixes: "app" (https://angular.dev/style-guide#choosing-component-selectors)                                              @angular-eslint/component-selector
+  17:15  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+  17:50  error  Prefer using the inject() function over constructor parameter injection. Use Angular's migration schematic to automatically refactor: ng generate @angular/core:inject  @angular-eslint/prefer-inject
+
+✖ 196 problems (196 errors, 0 warnings)
+  5 errors and 0 warnings potentially fixable with the `--fix` option.
+
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.

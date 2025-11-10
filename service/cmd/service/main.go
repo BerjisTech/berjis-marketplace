@@ -28,6 +28,8 @@ func main() {
 		CoreAPIBase:       cfg.CoreAPIBase,
 		DB:                dbc,
 		UploadsPublicBase: cfg.UploadsPublicBase,
+		TaxRatePercent:    cfg.TaxRatePercent,
+		ShippingFlatCents: cfg.ShippingFlatCents,
 	})
 
 	addr := ":" + cfg.Port

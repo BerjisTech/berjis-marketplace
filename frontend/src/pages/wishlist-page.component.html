@@ -1,0 +1,30 @@
+<div class="min-h-screen pt-16 px-[clamp(1rem,6vw,3rem)] pb-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
+  <h1 class="text-2xl font-bold text-blue-900 dark:text-white mb-4">Wishlist</h1>
+  <p *ngIf="items().length === 0" class="text-slate-600 dark:text-slate-300">
+    Your wishlist is empty. <a routerLink="/" class="underline">Browse products</a>
+  </p>
+
+  <div *ngIf="items().length > 0" class="wishlist-grid">
+    <article *ngFor="let item of items()" class="wishlist-card">
+      <div class="wishlist-image">
+        <img *ngIf="item.imageUrl" [src]="item.imageUrl" [alt]="item.title" />
+        <div *ngIf="!item.imageUrl" class="wishlist-image-placeholder" aria-hidden="true"></div>
+      </div>
+      <div class="wishlist-body">
+        <div class="wishlist-meta text-xs text-slate-500 dark:text-slate-400">
+          <a *ngIf="item.shopSlug" [routerLink]="['/shop', item.shopSlug]" class="wishlist-shop-link">{{ item.shopName }}</a>
+        </div>
+        <h2 class="wishlist-title text-base font-semibold text-blue-900 dark:text-white">{{ item.title }}</h2>
+        <div class="wishlist-price text-sm text-slate-700 dark:text-slate-200">
+          {{ (item.priceCents / 100) | number:'1.2-2' }} {{ item.currency }}
+        </div>
+      </div>
+      <div class="wishlist-actions">
+        <button type="button" class="btn btn-primary rounded-full h-10 px-4" (click)="moveToCart(item.productId)">Add to cart</button>
+        <button type="button" class="wishlist-remove" (click)="remove(item.productId)" aria-label="Remove {{ item.title }} from wishlist">
+          Remove
+        </button>
+      </div>
+    </article>
+  </div>
+</div>

@@ -10,7 +10,6 @@ import { Component, OnInit, signal } from '@angular/core';
 export class DarkModeToggleComponent implements OnInit {
   isDark = signal(false);
   copyRightYear = new Date().getFullYear();
-  constructor() { }
 
   ngOnInit(): void {
     const persisted = (localStorage.getItem('theme') || '').toLowerCase();

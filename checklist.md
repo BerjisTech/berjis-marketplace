@@ -134,9 +134,9 @@
 ## 5. Checkout & Payment
 
 ### Shopping Cart
-- [ ] Add to cart functionality
-- [ ] Cart persistence
-- [ ] Cart calculations (subtotal, tax, shipping)
+- [x] Add to cart functionality
+- [x] Cart persistence
+- [x] Cart calculations (subtotal, tax, shipping)
 - [ ] Apply discount codes
 - [ ] Gift card application
 

@@ -27,7 +27,11 @@
         <div class="mt-4 flex items-center gap-3">
           <label class="text-sm">Qty</label>
           <input type="number" min="1" class="w-20 rounded-full border px-3 h-10" [ngModel]="quantity()" (ngModelChange)="quantity.set(Math.max(1, +$event||1))" />
-          <button class="btn btn-primary" [disabled]="product()?.stock===0" (click)="addToCart()">Add to cart</button>
+          <button class="btn btn-primary" type="button" [disabled]="product()?.stock===0" (click)="addToCart()">Add to cart</button>
+          <button type="button" class="rounded-full border border-blue-900/30 dark:border-slate-700 h-10 px-4 text-sm text-blue-900 dark:text-slate-200 hover:border-amber-400 focus-visible:ring-2 focus-visible:ring-amber-400 transition" (click)="addToWishlist()" [attr.aria-label]="'Save ' + (product()?.title || 'product') + ' to wishlist'">
+            <span class="material-symbols-outlined text-[18px] align-middle mr-1">favorite</span>
+            Wishlist
+          </button>
         </div>
         <div class="mt-4 text-xs text-slate-500" *ngIf="product()?.stock===0">Out of stock</div>
         <div class="mt-8 prose prose-sm dark:prose-invert max-w-none" *ngIf="product()?.description" [innerHTML]="product()?.description"></div>

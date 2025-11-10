@@ -1,11 +1,11 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { CoreAuthService as SharedCoreAuthService, CoreAuthSession } from '@berjis/angular-auth';
 
-type VerifyResult = { success: boolean; data?: CoreAuthSession; message?: string };
+export interface VerifyResult { success: boolean; data?: CoreAuthSession; message?: string }
 
 @Injectable({ providedIn: 'root' })
 export class CoreAuthService {
-  constructor(private core: SharedCoreAuthService) {}
+  private readonly core = inject(SharedCoreAuthService);
 
   async verify(): Promise<VerifyResult> {
     const data = await this.core.verify();
@@ -22,4 +22,3 @@ export class CoreAuthService {
     return { success: true, data };
   }
 }
-

@@ -71,6 +71,7 @@ export const routes: Routes = [
       { path: '', component: HomePageComponent },
       { path: 'get-started', component: GetStartedPageComponent, canActivate: [authGuard] },
       { path: 'cart', loadComponent: () => import('./pages/cart-page.component').then(m => m.CartPageComponent) },
+      { path: 'wishlist', loadComponent: () => import('./pages/wishlist-page.component').then(m => m.WishlistPageComponent) },
       { path: 'checkout', loadComponent: () => import('./pages/checkout-page.component').then(m => m.CheckoutPageComponent) },
       { path: 'checkout/confirmation/:id', loadComponent: () => import('./pages/order-confirmation-page.component').then(m => m.OrderConfirmationPageComponent) },
       { path: 'product/:id', component: ProductPageComponent },

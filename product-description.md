@@ -440,7 +440,7 @@ CREATE TABLE order_items (
 - [ ] Build user profile page
 - [ ] Create profile edit form
 - [ ] Implement address management
-- [ ] Add wishlist functionality
+- [x] Add wishlist functionality
 - [ ] Build modal system
 - [ ] Create toast notification system
 - [ ] Implement loading states
@@ -452,13 +452,13 @@ CREATE TABLE order_items (
 - [ ] Implement lazy loading for routes
 - [ ] Add transition animations
 - [ ] Optimize images
-- [ ] Add meta tags for SEO
+- [x] Add meta tags for SEO
 - [ ] Implement form validation messages
-- [ ] Add accessibility attributes
+- [x] Add accessibility attributes
 - [ ] Test responsive design
-- [ ] Add hover effects and micro-interactions
-- [ ] Implement keyboard navigation
-- [ ] Add golden neon glows on interactive elements
+- [x] Add hover effects and micro-interactions
+- [x] Implement keyboard navigation
+- [x] Add golden neon glows on interactive elements
 
 ---
 
@@ -550,6 +550,8 @@ CREATE TABLE order_items (
 - Add console logs for debugging
 - Test all user flows
 - Ensure accessibility standards
+- Marketplace pricing surfaces server configuration from `/v1/settings/pricing` (see `TAX_RATE_PERCENT` and `SHIPPING_FLAT_CENTS` env vars for overrides).
+- Open Graph metadata lives at `public/assets/og-marketplace.png` and is referenced from `index.html` for rich embeds.
 
 ---
 

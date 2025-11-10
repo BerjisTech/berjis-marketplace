@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { CartService } from '../app/core/services/cart.service';
+import { WishlistService } from '../app/core/services/wishlist.service';
 import { ToastService } from '../app/shared/components/toast/toast.service';
 import { environment } from '../environments/environment';
 
@@ -24,7 +25,7 @@ export class ProductPageComponent implements OnInit {
   selectedImage = signal<string | null>(null);
   selectedVariantId = signal<string | null>(null);
 
-  constructor(private route: ActivatedRoute, private http: HttpClient, private cart: CartService, private toasts: ToastService) {}
+  constructor(private route: ActivatedRoute, private http: HttpClient, private cart: CartService, private wishlist: WishlistService, private toasts: ToastService) {}
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id')!;
     this.http.get<any>(`${this.api}/v1/products/${id}`).subscribe(r => {
@@ -41,6 +42,19 @@ export class ProductPageComponent implements OnInit {
     const p = this.product(); if (!p) return;
     this.cart.add({ productId: p.uuid, title: p.title, priceCents: p.priceCents, currency: p.currency, imageUrl: p.imageUrl, variantId: this.selectedVariantId() }, this.quantity());
     this.toasts.show('Added to cart');
+  }
+  addToWishlist(){
+    const p = this.product(); if (!p) return;
+    this.wishlist.add({
+      productId: p.uuid,
+      title: p.title,
+      priceCents: this.displayPriceCents(),
+      currency: p.currency,
+      imageUrl: p.imageUrl ?? undefined,
+      shopName: p.shopName,
+      shopSlug: p.shopSlug
+    });
+    this.toasts.show('Saved to wishlist');
   }
   displayPriceCents(): number {
     const p = this.product(); if (!p) return 0;

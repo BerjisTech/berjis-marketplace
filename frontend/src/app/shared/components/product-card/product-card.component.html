@@ -1,4 +1,7 @@
-<article class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
+<article class="product-card">
+  <button type="button" class="product-card__wishlist" (click)="addToWishlist($event)" [attr.aria-label]="'Save ' + (product?.title || 'product') + ' to wishlist'">
+    <span class="material-symbols-outlined text-[18px] align-middle">favorite</span>
+  </button>
   <div class="aspect-4/3 rounded-lg bg-blue-100 dark:bg-slate-900 mb-3 overflow-hidden">
     <img *ngIf="product?.imageUrl" [src]="product.imageUrl" alt="" class="w-full h-full object-cover" />
   </div>
@@ -10,4 +13,3 @@
   </h3>
   <div class="mt-2 text-sm text-slate-700 dark:text-slate-200">{{ (product?.priceCents/100) | number:'1.2-2' }} {{ product?.currency }}</div>
 </article>
-

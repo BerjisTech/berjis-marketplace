@@ -5,7 +5,8 @@
   "scripts": {
     "postinstall": "",
     "build": "ng build --configuration production",
-    "start": "ng serve --port 5500 --host 0.0.0.0"
+    "start": "ng serve --port 5500 --host 0.0.0.0",
+    "lint": "ng lint"
   },
   "dependencies": {
     "@angular/animations": "^18.2.0",
@@ -22,13 +23,18 @@
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^18.2.0",
+    "@angular-eslint/builder": "20.5.2",
     "@angular/cli": "^18.2.0",
     "@angular/compiler-cli": "^18.2.0",
+    "@eslint/js": "^9.39.0",
+    "@tailwindcss/postcss": "^4.1.14",
     "@types/node": "^20.12.12",
-    "typescript": "~5.5.4",
+    "angular-eslint": "20.5.2",
+    "eslint": "^9.39.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.14",
-    "@tailwindcss/postcss": "^4.1.14"
+    "typescript": "~5.5.4",
+    "typescript-eslint": "8.46.3"
   },
   "packageManager": "yarn@1.22.22"
 }

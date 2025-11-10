@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 type Config struct {
 	AppName           string
@@ -10,11 +13,31 @@ type Config struct {
 	CoreAPIBase       string
 	AllowedOrigins    string
 	UploadsPublicBase string
+	TaxRatePercent    float64
+	ShippingFlatCents int64
 }
 
 func getenv(k, def string) string {
 	if v := os.Getenv(k); v != "" {
 		return v
+	}
+	return def
+}
+
+func getenvFloat(k string, def float64) float64 {
+	if v := os.Getenv(k); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return def
+}
+
+func getenvInt64(k string, def int64) int64 {
+	if v := os.Getenv(k); v != "" {
+		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
+			return i
+		}
 	}
 	return def
 }
@@ -28,5 +51,7 @@ func Load() Config {
 		CoreAPIBase:       getenv("CORE_API_BASE", "http://localhost:8080"),
 		AllowedOrigins:    getenv("ALLOWED_ORIGINS", "*"),
 		UploadsPublicBase: getenv("UPLOADS_PUBLIC_BASE", "/uploads"),
+		TaxRatePercent:    getenvFloat("TAX_RATE_PERCENT", 8.5),
+		ShippingFlatCents: getenvInt64("SHIPPING_FLAT_CENTS", 1500),
 	}
 }

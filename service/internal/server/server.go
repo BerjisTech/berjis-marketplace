@@ -28,6 +28,8 @@ type Options struct {
 	CoreAPIBase       string
 	DB                *sqlx.DB
 	UploadsPublicBase string
+	TaxRatePercent    float64
+	ShippingFlatCents int64
 }
 
 type Shop struct {
@@ -124,6 +126,15 @@ func New(opts Options) *fiber.App {
 
 	// Health
 	app.Get("/v1/health", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"success": true, "message": "ok"}) })
+	app.Get("/v1/settings/pricing", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"success": true,
+			"data": fiber.Map{
+				"taxRatePercent":    opts.TaxRatePercent,
+				"shippingFlatCents": opts.ShippingFlatCents,
+			},
+		})
+	})
 
 	// Static uploads
 	_ = os.MkdirAll("/data/uploads/products", 0755)
@@ -497,10 +508,15 @@ func New(opts Options) *fiber.App {
 
 	// Cart minimal endpoints
 	app.Get("/v1/cart", requireAuth, func(c *fiber.Ctx) error { return getCart(c, opts.DB) })
+	app.Put("/v1/cart", requireAuth, func(c *fiber.Ctx) error { return replaceCart(c, opts.DB) })
 	app.Post("/v1/cart/items", requireAuth, func(c *fiber.Ctx) error { return addCartItem(c, opts.DB) })
 	app.Put("/v1/cart/items/:id", requireAuth, func(c *fiber.Ctx) error { return updateCartItem(c, opts.DB) })
 	app.Delete("/v1/cart/items/:id", requireAuth, func(c *fiber.Ctx) error { return deleteCartItem(c, opts.DB) })
 	app.Delete("/v1/cart", requireAuth, func(c *fiber.Ctx) error { return clearCart(c, opts.DB) })
+
+	// Wishlist endpoints
+	app.Get("/v1/wishlist", requireAuth, func(c *fiber.Ctx) error { return getWishlist(c, opts.DB) })
+	app.Put("/v1/wishlist", requireAuth, func(c *fiber.Ctx) error { return replaceWishlist(c, opts.DB) })
 
 	// Orders minimal endpoints
 	app.Post("/v1/orders", requireAuth, func(c *fiber.Ctx) error { return createOrderFromCart(c, opts.DB) })
@@ -567,6 +583,19 @@ func New(opts Options) *fiber.App {
 // helpers
 func pqStringArray(v []string) interface{} { return pq.Array(v) }
 
+// Wishlist models
+type WishlistItem struct {
+	UUID        uuid.UUID `db:"uuid" json:"uuid"`
+	ProductUUID uuid.UUID `db:"product_uuid" json:"productUuid"`
+	Title       string    `db:"title" json:"title"`
+	PriceCents  int64     `db:"price_cents" json:"priceCents"`
+	Currency    string    `db:"currency" json:"currency"`
+	ImageURL    *string   `db:"image_url" json:"imageUrl,omitempty"`
+	ShopName    string    `db:"shop_name" json:"shopName"`
+	ShopSlug    string    `db:"shop_slug" json:"shopSlug"`
+	AddedAt     time.Time `db:"added_at" json:"addedAt"`
+}
+
 // Cart models
 type CartItem struct {
 	UUID        uuid.UUID `db:"uuid" json:"uuid"`
@@ -599,6 +628,19 @@ func ensureCart(db *sqlx.DB, user string) (uuid.UUID, error) {
 	return id, err
 }
 
+func ensureWishlist(db *sqlx.DB, user string) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := db.Get(&id, `SELECT uuid FROM wishlists WHERE user_uuid=$1`, user)
+	if err == sql.ErrNoRows {
+		id = uuid.New()
+		if _, e := db.Exec(`INSERT INTO wishlists(uuid,user_uuid) VALUES($1,$2)`, id, user); e != nil {
+			return uuid.Nil, e
+		}
+		return id, nil
+	}
+	return id, err
+}
+
 func getCart(c *fiber.Ctx, db *sqlx.DB) error {
 	user := srvAuth.UserID(c)
 	cartID, err := ensureCart(db, user)
@@ -618,6 +660,127 @@ func getCart(c *fiber.Ctx, db *sqlx.DB) error {
 		currency = it.Currency
 	}
 	return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"items": items, "totalCents": total, "currency": currency, "cartId": cartID}})
+}
+
+func replaceCart(c *fiber.Ctx, db *sqlx.DB) error {
+	user := srvAuth.UserID(c)
+	var body struct {
+		Items []struct {
+			ProductID string `json:"productId"`
+			Quantity  int    `json:"quantity"`
+		} `json:"items"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
+	}
+	cartID, err := ensureCart(db, user)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	tx, err := db.Beginx()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM cart_items WHERE cart_uuid=$1`, cartID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	count := 0
+	for _, it := range body.Items {
+		pid := strings.TrimSpace(it.ProductID)
+		if pid == "" || it.Quantity <= 0 {
+			continue
+		}
+		var exists int
+		if err := tx.Get(&exists, `SELECT COUNT(1) FROM products WHERE uuid=$1`, pid); err != nil || exists == 0 {
+			continue
+		}
+		qty := it.Quantity
+		if qty > 1000 {
+			qty = 1000
+		}
+		if _, err := tx.Exec(`INSERT INTO cart_items(uuid,cart_uuid,product_uuid,quantity) VALUES($1,$2,$3,$4)`, uuid.New(), cartID, pid, qty); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		count++
+	}
+	if _, err := tx.Exec(`UPDATE carts SET updated_at=now() WHERE uuid=$1`, cartID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	if err := tx.Commit(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	return getCart(c, db)
+}
+
+func getWishlist(c *fiber.Ctx, db *sqlx.DB) error {
+	user := srvAuth.UserID(c)
+	wishlistID, err := ensureWishlist(db, user)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	var items []WishlistItem
+	q := `SELECT wi.uuid, wi.product_uuid, wi.added_at,
+	             p.title, p.price_cents, p.currency, p.image_url,
+	             s.name AS shop_name, s.slug AS shop_slug
+	      FROM wishlist_items wi
+	      JOIN products p ON p.uuid=wi.product_uuid
+	      JOIN shops s ON s.uuid=p.shop_uuid
+	      WHERE wi.wishlist_uuid=$1
+	      ORDER BY wi.added_at DESC`
+	if err := db.Select(&items, q, wishlistID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"items": items, "wishlistId": wishlistID}})
+}
+
+func replaceWishlist(c *fiber.Ctx, db *sqlx.DB) error {
+	user := srvAuth.UserID(c)
+	var body struct {
+		Items []struct {
+			ProductID string `json:"productId"`
+		} `json:"items"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
+	}
+	wishlistID, err := ensureWishlist(db, user)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	tx, err := db.Beginx()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM wishlist_items WHERE wishlist_uuid=$1`, wishlistID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	seen := make(map[string]struct{})
+	for _, it := range body.Items {
+		pid := strings.TrimSpace(it.ProductID)
+		if pid == "" {
+			continue
+		}
+		if _, ok := seen[pid]; ok {
+			continue
+		}
+		seen[pid] = struct{}{}
+		var exists int
+		if err := tx.Get(&exists, `SELECT COUNT(1) FROM products WHERE uuid=$1`, pid); err != nil || exists == 0 {
+			continue
+		}
+		if _, err := tx.Exec(`INSERT INTO wishlist_items(uuid,wishlist_uuid,product_uuid) VALUES($1,$2,$3)`, uuid.New(), wishlistID, pid); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+	}
+	if _, err := tx.Exec(`UPDATE wishlists SET updated_at=now() WHERE uuid=$1`, wishlistID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	if err := tx.Commit(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	return getWishlist(c, db)
 }
 
 func addCartItem(c *fiber.Ctx, db *sqlx.DB) error {

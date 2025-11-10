@@ -1,22 +1,22 @@
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { DarkModeToggleComponent } from "../dark-mode-toggle/dark-mode-toggle.component";
 import { ActivatedRoute, RouterLink, RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { QueryParamsService } from '../../core/services/query-params.service';
 import { CartService } from '../../core/services/cart.service';
+import { WishlistService } from '../../core/services/wishlist.service';
 import { MiniCartComponent } from '../../shared/components/mini-cart/mini-cart.component';
 import { ToastContainerComponent } from '../../shared/components/toast/toast-container.component';
 
 @Component({
   selector: 'app-user-facing-pages',
   standalone: true,
-  imports: [RouterOutlet, DarkModeToggleComponent, CommonModule, FormsModule, MiniCartComponent, ToastContainerComponent],
+  imports: [RouterOutlet, RouterLink, DarkModeToggleComponent, CommonModule, FormsModule, MiniCartComponent, ToastContainerComponent],
   templateUrl: './user-facing-pages.component.html',
   styleUrl: './user-facing-pages.component.css'
 })
-export class UserFacingPagesComponent {
+export class UserFacingPagesComponent implements OnInit {
 
   copyRightYear = new Date().getFullYear();
   sort = signal<string>('');
@@ -24,7 +24,12 @@ export class UserFacingPagesComponent {
   showFilters = signal<boolean>(false);
   showFilterControls = signal<boolean>(true);
   miniCartOpen = signal<boolean>(false);
-  constructor(private router: Router, private route: ActivatedRoute, private _http: HttpClient, private qps: QueryParamsService, private cart: CartService) {}
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  private readonly qps = inject(QueryParamsService);
+  private readonly cart = inject(CartService);
+  private readonly wishlist = inject(WishlistService);
+
   ngOnInit(): void {
     this.route.queryParamMap.subscribe(qp => {
       this.q.set(qp.get('q') || '');
@@ -49,6 +54,7 @@ export class UserFacingPagesComponent {
     this.qps.clear(this.router, this.route);
   }
   cartCount(){ return this.cart.count(); }
+  wishlistCount(){ return this.wishlist.items().length; }
   toggleMiniCart(){ this.miniCartOpen.set(!this.miniCartOpen()); }
 
 }
