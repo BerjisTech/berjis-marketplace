@@ -1,23 +1,54 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { environment } from '../../../../src/environments/environment';
+import { Observable } from 'rxjs';
+import { environment } from '../../../environments/environment';
+
+export interface ProductSummary {
+  uuid: string;
+  title: string;
+  priceCents: number;
+  currency: string;
+  imageUrl?: string;
+  shopName?: string;
+  shopSlug?: string;
+  published?: boolean;
+  stock?: number;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  total?: number;
+}
+
+export type CreateProductPayload = Record<string, unknown>;
+
+export interface UploadResponse {
+  url: string;
+}
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
-  private api = environment.apiBase;
-  constructor(private http: HttpClient) {}
+  private readonly http = inject(HttpClient);
+  private readonly api = environment.apiBase;
 
-  listMyShopProducts(shopSlug: string){
-    return this.http.get<any>(`${this.api}/v1/my/shops/${shopSlug}/products`, { withCredentials: true });
+  listMyShopProducts(shopSlug: string): Observable<ApiResponse<ProductSummary[]>> {
+    return this.http.get<ApiResponse<ProductSummary[]>>(
+      `${this.api}/v1/my/shops/${shopSlug}/products`,
+      { withCredentials: true },
+    );
   }
 
-  createProduct(body: any){
-    return this.http.post<any>(`${this.api}/v1/products`, body, { withCredentials: true });
+  createProduct(body: CreateProductPayload): Observable<ApiResponse<ProductSummary>> {
+    return this.http.post<ApiResponse<ProductSummary>>(`${this.api}/v1/products`, body, {
+      withCredentials: true,
+    });
   }
 
-  upload(file: File){
-    const fd = new FormData(); fd.append('file', file);
-    return this.http.post<any>(`${this.api}/v1/uploads`, fd, { withCredentials: true });
+  upload(file: File): Observable<ApiResponse<UploadResponse>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<ApiResponse<UploadResponse>>(`${this.api}/v1/uploads`, formData, {
+      withCredentials: true,
+    });
   }
 }
-

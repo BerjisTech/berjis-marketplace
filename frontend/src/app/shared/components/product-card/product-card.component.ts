@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { ToastService } from '../toast/toast.service';
+import { ProductSummary } from '../../../core/services/product.service';
 
 @Component({
   standalone: true,
@@ -12,11 +13,11 @@ import { ToastService } from '../toast/toast.service';
   styleUrls: ['./product-card.component.css']
 })
 export class ProductCardComponent {
-  @Input() product: any;
+  @Input() product?: ProductSummary;
   @Input() showShop = false;
 
-  private wishlist = inject(WishlistService);
-  private toasts = inject(ToastService);
+  private readonly wishlist = inject(WishlistService);
+  private readonly toasts = inject(ToastService);
 
   addToWishlist(event: MouseEvent){
     event.stopPropagation();

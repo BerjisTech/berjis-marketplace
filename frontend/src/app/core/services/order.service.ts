@@ -5,7 +5,7 @@ import { environment } from '../../../environments/environment';
 
 export interface CreateOrderPayload {
   shipping: Record<string, unknown>;
-  items: Array<{ productId: string; quantity: number; [key: string]: unknown }>;
+  items: { productId: string; quantity: number; [key: string]: unknown }[];
   payment: Record<string, unknown>;
   subtotalCents: number;
   [key: string]: unknown;

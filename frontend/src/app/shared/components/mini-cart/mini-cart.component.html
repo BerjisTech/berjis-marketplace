@@ -10,7 +10,7 @@
     <div *ngIf="items().length>0" class="max-h-64 overflow-y-auto flex flex-col gap-2">
       <div *ngFor="let it of items(); let i = index" class="flex items-center gap-2 border rounded-lg p-2">
         <div class="w-12 h-12 rounded bg-blue-100 dark:bg-slate-900 overflow-hidden">
-          <img *ngIf="it.imageUrl" [src]="it.imageUrl" class="w-full h-full object-cover" />
+          <img *ngIf="it.imageUrl" [src]="it.imageUrl" class="w-full h-full object-cover" [attr.alt]="it.title || 'Product image'" />
         </div>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium truncate">{{ it.title }}</div>
@@ -34,4 +34,3 @@
     </div>
   </div>
 </div>
-

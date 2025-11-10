@@ -1,13 +1,14 @@
-import { Component, EventEmitter, Input, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, WritableSignal, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
 import { environment } from '../environments/environment';
+import { ApiResponse } from '../app/core/services/product.service';
 
 @Component({
   standalone: true,
-  selector: 'new-shop-form',
+  selector: 'app-new-shop-form',
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './new-shop-form.component.html',
   styleUrls: ['./new-shop-form.component.css']
@@ -29,13 +30,14 @@ export class NewShopFormComponent {
   slugEdited = signal(false);
   slugStatus = signal<'idle'|'checking'|'available'|'taken'|'error'>('idle');
 
-  constructor(private http: HttpClient, private router: Router) {}
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
-  toggle(list: any, value: string) {
-    const sig = list as ReturnType<typeof signal<string[]>>;
-    const next = new Set((sig as any)());
+  toggle(list: WritableSignal<string[]>, value: string) {
+    const current = list();
+    const next = new Set(current);
     if (next.has(value)) next.delete(value); else next.add(value);
-    (sig as any).set(Array.from(next));
+    list.set(Array.from(next));
   }
 
   onNameChange(v: string) {
@@ -60,9 +62,9 @@ export class NewShopFormComponent {
     if (!s) { this.slugStatus.set('idle'); return; }
     this.slugStatus.set('checking');
     // Try a conventional availability endpoint; ignore errors if backend differs
-    this.http.get<any>(`${this.api}/v1/shops/slug-availability?slug=${encodeURIComponent(s)}`, { withCredentials: true }).subscribe({
+    this.http.get<ApiResponse<{ available: boolean }>>(`${this.api}/v1/shops/slug-availability?slug=${encodeURIComponent(s)}`, { withCredentials: true }).subscribe({
       next: (r) => {
-        const ok = r?.data?.available ?? r?.available ?? false;
+        const ok = r?.data?.available ?? false;
         this.slugStatus.set(ok ? 'available' : 'taken');
       },
       error: () => { this.slugStatus.set('error'); }
@@ -75,14 +77,14 @@ export class NewShopFormComponent {
     const slug = (this.slug().trim() || this.slugify(name));
     if (!name || !slug) return;
 
-    const meta = {
+    const meta: ShopMeta = {
       salesChannels: this.salesChannels(),
       businessType: this.businessType(),
       otherPlatforms: this.otherPlatforms(),
       planToSell: this.planToSell(),
-    } as any;
+    };
 
-    const body: any = { name, slug, description: '', meta };
+    const body: CreateShopPayload = { name, slug, description: '', meta };
     this.submitting.set(true);
     this.errorMsg.set('');
     this.http.post(`${this.api}/v1/shops`, body, { withCredentials: true }).subscribe({
@@ -107,4 +109,19 @@ export class NewShopFormComponent {
     });
   }
 }
+
+export interface ShopMeta {
+  salesChannels: string[];
+  businessType: 'new' | 'existing' | '';
+  otherPlatforms: string[];
+  planToSell: 'own-products' | 'digital' | 'dropshipping' | 'services' | 'print-on-demand' | 'later' | '';
+}
+
+export interface CreateShopPayload {
+  name: string;
+  slug: string;
+  description: string;
+  meta: ShopMeta;
+}
+
 

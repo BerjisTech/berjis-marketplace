@@ -6,7 +6,7 @@ import { PricingService } from '../app/core/services/pricing.service';
 
 @Component({
   standalone: true,
-  selector: 'cart-page',
+  selector: 'app-cart-page',
   imports: [CommonModule, RouterLink],
   templateUrl: './cart-page.component.html',
   styleUrls: ['./cart-page.component.css']
@@ -26,3 +26,4 @@ export class CartPageComponent {
   remove(i: number){ const it = this.items()[i]; this.cart.remove(it.productId, it.variantId||null); }
   clear(){ this.cart.clear(); }
 }
+

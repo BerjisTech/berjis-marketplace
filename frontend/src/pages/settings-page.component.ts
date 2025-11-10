@@ -3,10 +3,11 @@ import { CommonModule } from '@angular/common';
 
 @Component({
   standalone: true,
-  selector: 'settings-page',
+  selector: 'app-settings-page',
   imports: [CommonModule],
   templateUrl: './settings-page.component.html',
   styleUrls: ['./settings-page.component.css']
 })
 export class SettingsPageComponent {}
+
 

@@ -3,10 +3,11 @@ import { CommonModule } from '@angular/common';
 
 @Component({
   standalone: true,
-  selector: 'orders-draft-page',
+  selector: 'app-orders-draft-page',
   imports: [CommonModule],
   templateUrl: './orders-draft-page.component.html',
   styleUrls: ['./orders-draft-page.component.css']
 })
 export class OrdersDraftPageComponent {}
+
 

@@ -14,13 +14,15 @@
 
   <div class="flex items-center justify-between mb-1">
     <h1 class="text-2xl font-bold text-blue-900 dark:text-white">Category: {{ category() }}</h1>
-    <a routerLink="/" class="text-sm">← Back to marketplace</a>
+    <a routerLink="/" class="text-sm">&larr; Back to marketplace</a>
   </div>
-  <div class="text-xs text-slate-600 dark:text-slate-400 mb-3" *ngIf="total()!=null">Showing {{ ((page()-1)*perPage())+1 }}–{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}</div>
+  <div class="text-xs text-slate-600 dark:text-slate-400 mb-3" *ngIf="total() !== null">
+    Showing {{ ((page()-1)*perPage())+1 }}-{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}
+  </div>
   <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
     <article *ngFor="let p of products()" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
       <div class="aspect-[4/3] rounded-lg bg-blue-100 dark:bg-slate-900 mb-3 overflow-hidden">
-        <img *ngIf="p.imageUrl" [src]="p.imageUrl" alt="" class="w-full h-full object-cover"/>
+        <img *ngIf="p.imageUrl" [src]="p.imageUrl" [attr.alt]="p.title || 'Product image'" class="w-full h-full object-cover"/>
       </div>
       <div class="text-sm text-slate-600 dark:text-slate-400 mb-1">
         <a [routerLink]="['/shop', p.shopSlug]" class="rounded-full px-2 py-0.5 border border-blue-900/25 dark:border-slate-700 bg-blue-50 dark:bg-slate-900/60">{{ p.shopName }}</a>

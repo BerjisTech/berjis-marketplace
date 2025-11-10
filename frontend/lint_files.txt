@@ -1,0 +1,7 @@
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\home-page.component.ts
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-new-page.component.html
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-new-page.component.ts
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\products-overview-page.component.ts
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\shop-page.component.html
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\shop-page.component.ts
+E:\Berjis\Apps\Web\berjis-ecosystem\marketplace\frontend\src\pages\wishlist-page.component.ts

@@ -3,10 +3,11 @@ import { CommonModule } from '@angular/common';
 
 @Component({
   standalone: true,
-  selector: 'products-inventory-page',
+  selector: 'app-products-inventory-page',
   imports: [CommonModule],
   templateUrl: './products-inventory-page.component.html',
   styleUrls: ['./products-inventory-page.component.css']
 })
 export class ProductsInventoryPageComponent {}
+
 

@@ -1,24 +1,27 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { ProductService } from '../app/core/services/product.service';
 import { environment } from '../environments/environment';
+import { ApiResponse } from '../app/core/services/product.service';
 
 @Component({
   standalone: true,
-  selector: 'products-new-page',
+  selector: 'app-products-new-page',
   imports: [CommonModule, FormsModule],
   templateUrl: './products-new-page.component.html',
   styleUrls: ['./products-new-page.component.css']
 })
 export class ProductsNewPageComponent implements OnInit {
-  private api = environment.apiBase;
+  private readonly http = inject(HttpClient);
+  private readonly productsApi = inject(ProductService);
+  private readonly api = environment.apiBase;
   // Basic product model for skeleton form
-  model: any = {
+  model: ProductDraft = {
     title: 'Short sleeve t-shirt',
     description: '',
-    mediaFiles: [],
+    mediaFiles: [] as string[],
     category: '',
     price: 0,
     compareAt: null,
@@ -47,14 +50,12 @@ export class ProductsNewPageComponent implements OnInit {
     themeTemplate: 'default'
   };
   submitting = signal(false);
-  shops = signal<any[]>([]);
+  shops = signal<ShopSummary[]>([]);
   shopSlug = signal<string>('');
   chosenFileName = signal<string>('No file chosen');
 
-  constructor(private http: HttpClient, private productsApi: ProductService) {}
-
   ngOnInit(): void {
-    this.http.get<any>(`${this.api}/v1/my/shops`, { withCredentials: true }).subscribe(r => {
+    this.http.get<ApiResponse<ShopSummary[]>>(`${this.api}/v1/my/shops`, { withCredentials: true }).subscribe(r => {
       const arr = r?.data || []; this.shops.set(arr);
       if (arr.length && !this.shopSlug()) this.shopSlug.set(arr[0].slug);
     });
@@ -79,3 +80,44 @@ export class ProductsNewPageComponent implements OnInit {
     });
   }
 }
+
+export interface ProductDraft {
+  title: string;
+  description: string;
+  mediaFiles: string[];
+  category: string;
+  price: number;
+  compareAt: number | null;
+  unitPrice: number | null;
+  chargeTax: boolean;
+  costPerItem: number | null;
+  inventoryTracked: boolean;
+  quantity: number;
+  sku: string;
+  barcode: string;
+  allowOversell: boolean;
+  physicalProduct: boolean;
+  packagePreset: string;
+  weight: number;
+  weightUnit: string;
+  countryOfOrigin: string;
+  hsCode: string;
+  seoTitle: string;
+  seoDescription: string;
+  publishOnlineStore: boolean;
+  publishPOS: boolean;
+  type: string;
+  vendor: string;
+  collections: string;
+  tags: string;
+  themeTemplate: string;
+  [key: string]: unknown;
+}
+
+export interface ShopSummary {
+  uuid: string;
+  name: string;
+  slug: string;
+  description?: string;
+}
+

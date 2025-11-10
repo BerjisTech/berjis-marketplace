@@ -1,23 +1,26 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { environment } from '../environments/environment';
-import { DarkModeToggleComponent } from "src/app/components/dark-mode-toggle/dark-mode-toggle.component";
+import { DarkModeToggleComponent } from '../app/components/dark-mode-toggle/dark-mode-toggle.component';
+import { ApiResponse, CreateProductPayload, ProductSummary } from '../app/core/services/product.service';
 
 @Component({
   standalone: true,
-  selector: 'dashboard-page',
+  selector: 'app-dashboard-page',
   imports: [CommonModule, FormsModule, RouterLink, RouterOutlet, DarkModeToggleComponent],
   templateUrl: './dashboard-page.component.html',
   styleUrls: ['./dashboard-page.component.css']
 })
-export class DashboardPageComponent implements OnInit {
-  api = environment.apiBase;
-  shops = signal<any[]>([]);
+export class DashboardPageComponent implements OnInit, OnDestroy {
+  private readonly http = inject(HttpClient);
+  private readonly api = environment.apiBase;
+
+  shops = signal<ShopSummary[]>([]);
   selectedShopSlug = signal<string>('');
-  products = signal<any[]>([]);
+  products = signal<ProductSummary[]>([]);
   // layout
   navCollapsed = signal<boolean>(false);
   toolsOpen = signal<boolean>(false);
@@ -27,22 +30,39 @@ export class DashboardPageComponent implements OnInit {
   // search
   searchQ = signal<string>('');
   searching = signal<boolean>(false);
-  searchResults = signal<{products:any[];orders:any[];customers:any[];marketing:any[];discounts:any[];content:any[];markets:any[];analytics:any[]}|null>(null);
-  private searchTimer: any;
+  searchResults = signal<DashboardSearchResults | null>(null);
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   // computed widths for grid columns
   get navW() { return this.navCollapsed() ? 60 : 220; }
   get toolsW() { return this.toolsOpen() ? 300 : 0; }
   // forms
   newShop = { name: '', slug: '', description: '' };
-  newProduct: any = { title: '', slug: '', summary: '', priceCents: 0, currency: 'USD', stock: 0, published: true, category: '' };
+  newProduct: CreateProductPayload = { title: '', slug: '', summary: '', priceCents: 0, currency: 'USD', stock: 0, published: true, category: '' };
   uploadBusy = signal(false);
 
-  constructor(private http: HttpClient) {}
   ngOnInit(): void { this.loadShops(); }
+  ngOnDestroy(): void {
+    if (this.searchTimer) {
+      clearTimeout(this.searchTimer);
+    }
+  }
 
-  loadShops(){ this.http.get<any>(`${this.api}/v1/my/shops`, { withCredentials: true }).subscribe(r => { this.shops.set(r.data||[]); if (this.shops().length && !this.selectedShopSlug()) { this.selectedShopSlug.set(this.shops()[0].slug); this.loadProducts(); } }); }
-  loadProducts(){ const slug = this.selectedShopSlug(); if(!slug) return; this.http.get<any>(`${this.api}/v1/my/shops/${slug}/products`, { withCredentials: true }).subscribe(r => this.products.set(r.data||[])); }
+  loadShops(): void {
+    this.http.get<ApiResponse<ShopSummary[]>>(`${this.api}/v1/my/shops`, { withCredentials: true }).subscribe(response => {
+      const shops = response?.data ?? [];
+      this.shops.set(shops);
+      if (shops.length && !this.selectedShopSlug()) {
+        this.selectedShopSlug.set(shops[0].slug);
+        this.loadProducts();
+      }
+    });
+  }
+  loadProducts(): void {
+    const slug = this.selectedShopSlug(); if(!slug) return;
+    this.http.get<ApiResponse<ProductSummary[]>>(`${this.api}/v1/my/shops/${slug}/products`, { withCredentials: true })
+      .subscribe(r => this.products.set(r?.data ?? []));
+  }
   onShopChange(ev: Event){ const value = (ev.target as HTMLSelectElement).value; this.selectedShopSlug.set(value); this.loadProducts(); }
   onSearchChange(v: string){
     this.searchQ.set(v);
@@ -56,34 +76,52 @@ export class DashboardPageComponent implements OnInit {
   private runSearch(){
     const q = this.searchQ().trim(); if (!q) { this.searchResults.set(null); return; }
     this.searching.set(true);
-    this.http.get<any>(`${this.api}/v1/search?q=${encodeURIComponent(q)}`, { withCredentials: true }).subscribe({
-      next: (r) => { this.searchResults.set(r?.data || null); this.searching.set(false); },
+    this.http.get<ApiResponse<DashboardSearchResults>>(`${this.api}/v1/search?q=${encodeURIComponent(q)}`, { withCredentials: true }).subscribe({
+      next: (r) => { this.searchResults.set(r?.data ?? null); this.searching.set(false); },
       error: () => { this.searchResults.set(null); this.searching.set(false); }
     });
   }
   
   createShop(){
     const b = this.newShop; if(!b.name || !b.slug) return;
-    this.http.post<any>(`${this.api}/v1/shops`, b, { withCredentials: true }).subscribe(()=>{ this.newShop = { name:'', slug:'', description:'' }; this.loadShops(); });
+    this.http.post<unknown>(`${this.api}/v1/shops`, b, { withCredentials: true }).subscribe(()=>{ this.newShop = { name:'', slug:'', description:'' }; this.loadShops(); });
   }
   async onFile(ev: Event){
     const input = ev.target as HTMLInputElement; const file = input.files?.[0]; if(!file) return;
     const fd = new FormData(); fd.append('file', file);
     this.uploadBusy.set(true);
     try {
-      const res: any = await this.http.post(`${this.api}/v1/uploads`, fd, { withCredentials: true }).toPromise();
-      this.newProduct.imageUrl = (res as any)?.data?.url || '';
+      const res = await this.http.post<ApiResponse<{ url: string }>>(`${this.api}/v1/uploads`, fd, { withCredentials: true }).toPromise();
+      this.newProduct = { ...this.newProduct, imageUrl: res?.data?.url ?? '' };
     } finally { this.uploadBusy.set(false); }
   }
   createProduct(){
     const slug = this.selectedShopSlug(); if(!slug) return; const b = { ...this.newProduct, shopSlug: slug };
     this.http.post(`${this.api}/v1/products`, b, { withCredentials: true }).subscribe(()=>{ this.newProduct = { title:'', slug:'', summary:'', priceCents:0, currency:'USD', stock:0, published:true, category:'' }; this.loadProducts(); });
   }
-  togglePublish(p: any){
+  togglePublish(p: ProductSummary){
     this.http.patch(`${this.api}/v1/products/${p.uuid}`, { published: !p.published }, { withCredentials: true }).subscribe(()=>{ this.loadProducts(); });
   }
-  deleteProduct(p: any){
+  deleteProduct(p: ProductSummary){
     this.http.delete(`${this.api}/v1/products/${p.uuid}`, { withCredentials: true }).subscribe(()=> this.loadProducts());
   }
   openAI(){ this.toolsOpen.set(true); }
+}
+
+export interface ShopSummary {
+  uuid: string;
+  name: string;
+  slug: string;
+  description?: string;
+}
+
+export interface DashboardSearchResults {
+  products: ProductSummary[];
+  orders: unknown[];
+  customers: unknown[];
+  marketing: unknown[];
+  discounts: unknown[];
+  content: unknown[];
+  markets: unknown[];
+  analytics: unknown[];
 }

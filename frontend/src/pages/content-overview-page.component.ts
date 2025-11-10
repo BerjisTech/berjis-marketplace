@@ -4,10 +4,11 @@ import { RouterLink } from '@angular/router';
 
 @Component({
   standalone: true,
-  selector: 'content-overview-page',
+  selector: 'app-content-overview-page',
   imports: [CommonModule, RouterLink],
   templateUrl: './content-overview-page.component.html',
   styleUrls: ['./content-overview-page.component.css']
 })
 export class ContentOverviewPageComponent {}
+
 

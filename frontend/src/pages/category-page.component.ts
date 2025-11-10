@@ -1,4 +1,4 @@
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -7,18 +7,24 @@ import { FiltersRailComponent } from '../app/shared/components/filters-rail/filt
 import { PaginationComponent } from '../app/shared/components/pagination/pagination.component';
 import { QueryParamsService } from '../app/core/services/query-params.service';
 import { environment } from '../environments/environment';
+import { ApiResponse, ProductSummary } from '../app/core/services/product.service';
 
 @Component({
   standalone: true,
-  selector: 'category-page',
+  selector: 'app-category-page',
   imports: [CommonModule, FormsModule, RouterLink, FiltersRailComponent, PaginationComponent],
   templateUrl: './category-page.component.html',
   styleUrls: ['./category-page.component.css']
 })
 export class CategoryPageComponent implements OnInit {
-  api = environment.apiBase;
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly http = inject(HttpClient);
+  private readonly qps = inject(QueryParamsService);
+
+  readonly api = environment.apiBase;
   category = signal<string>('');
-  products = signal<any[]>([]);
+  products = signal<ProductSummary[]>([]);
   loading = signal(true);
   page = signal<number>(1);
   perPage = signal<number>(24);
@@ -29,7 +35,7 @@ export class CategoryPageComponent implements OnInit {
   minPrice = signal<string>('');
   maxPrice = signal<string>('');
   sort = signal<string>('');
-  constructor(public route: ActivatedRoute, public router: Router, private http: HttpClient, private qps: QueryParamsService) {}
+
   ngOnInit(): void {
     this.qps.normalizeListing(this.router, this.route);
     const id = this.route.snapshot.paramMap.get('id') || '';
@@ -45,21 +51,25 @@ export class CategoryPageComponent implements OnInit {
       this.fetch();
     });
   }
-  fetch(){
+  fetch(): void {
     this.loading.set(true);
-    const params: any = { category: this.category() };
-    if (this.q()) params.q = this.q();
-    if (this.minPrice()) params.minPrice = this.minPrice();
-    if (this.maxPrice()) params.maxPrice = this.maxPrice();
-    if (this.sort()) params.sort = this.sort();
-    if (this.page()) params.page = this.page();
-    if (this.perPage()) params.limit = this.perPage();
-    const qs = new URLSearchParams(params).toString();
-    this.http.get<any>(`${this.api}/v1/products?${qs}`).subscribe(r => {
-      this.products.set(r.data||[]);
-      this.total.set(typeof r?.total === 'number' ? r.total : null);
-      this.loading.set(false);
-    }, _ => this.loading.set(false));
+    const params = new URLSearchParams({ category: this.category() });
+    if (this.q()) params.set('q', this.q());
+    if (this.minPrice()) params.set('minPrice', this.minPrice());
+    if (this.maxPrice()) params.set('maxPrice', this.maxPrice());
+    if (this.sort()) params.set('sort', this.sort());
+    params.set('page', String(this.page()));
+    params.set('limit', String(this.perPage()));
+
+    this.http.get<ApiResponse<ProductSummary[]>>(`${this.api}/v1/products?${params.toString()}`, { withCredentials: true })
+      .subscribe({
+        next: response => {
+          this.products.set(response?.data ?? []);
+          this.total.set(typeof response?.total === 'number' ? response.total : null);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false)
+      });
   }
   applyFilters(){ this.qps.merge(this.router, this.route, { q: this.q() || null, minPrice: this.minPrice() || null, maxPrice: this.maxPrice() || null, sort: this.sort() || null, page: 1, limit: this.perPage() || null, filters: null }); this.showFilters.set(false); }
   clearAllFilters(){ this.qps.merge(this.router, this.route, { q: null, minPrice: null, maxPrice: null, sort: null, filters: null }); this.showFilters.set(false); }
@@ -68,3 +78,4 @@ export class CategoryPageComponent implements OnInit {
   onOpenChange(v: boolean){ this.showFilters.set(v); this.qps.toggleFilters(this.router, this.route, v); }
   hasNext(){ const t = this.total(); return t!=null ? (this.page()*this.perPage() < t) : (this.products().length===this.perPage()); }
 }
+

@@ -4,10 +4,11 @@ import { RouterLink } from '@angular/router';
 
 @Component({
   standalone: true,
-  selector: 'markets-overview-page',
+  selector: 'app-markets-overview-page',
   imports: [CommonModule, RouterLink],
   templateUrl: './markets-overview-page.component.html',
   styleUrls: ['./markets-overview-page.component.css']
 })
 export class MarketsOverviewPageComponent {}
+
 

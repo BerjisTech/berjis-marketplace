@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 
-export type ListingParams = {
+export interface ListingParams {
   q?: string | null;
   category?: string | null;
   minPrice?: string | null;
@@ -10,7 +10,7 @@ export type ListingParams = {
   page?: number | null;
   limit?: number | null;
   filters?: '1' | null;
-};
+}
 
 @Injectable({ providedIn: 'root' })
 export class QueryParamsService {
@@ -22,9 +22,9 @@ export class QueryParamsService {
       minPrice: qp.get('minPrice'),
       maxPrice: qp.get('maxPrice'),
       sort: qp.get('sort'),
-      page: qp.has('page') ? parseInt(qp.get('page') || '1', 10) : null,
-      limit: qp.has('limit') ? parseInt(qp.get('limit') || '24', 10) : null,
-      filters: qp.get('filters') as any
+      page: qp.has('page') ? this.ensureNumber(qp.get('page'), 1, 1) : null,
+      limit: qp.has('limit') ? this.ensureNumber(qp.get('limit'), 24, 1, 100) : null,
+      filters: qp.get('filters') === '1' ? '1' : null,
     };
   }
 
@@ -40,8 +40,19 @@ export class QueryParamsService {
     return this.merge(router, route, { filters: open ? '1' : null });
   }
 
-  ensureNumber(n: any, fallback: number, min?: number, max?: number){
-    let v = parseInt(n, 10); if (isNaN(v)) v = fallback; if (typeof min==='number') v = Math.max(min, v); if (typeof max==='number') v = Math.min(max, v); return v;
+  ensureNumber(value: string | null, fallback: number, min?: number, max?: number){
+    let parsed = Number.NaN;
+    if (typeof value === 'string' && value.trim() !== '') {
+      parsed = Number.parseInt(value, 10);
+    }
+    let result = Number.isNaN(parsed) ? fallback : parsed;
+    if (typeof min === 'number') {
+      result = Math.max(min, result);
+    }
+    if (typeof max === 'number') {
+      result = Math.min(max, result);
+    }
+    return result;
   }
 
   normalizeListing(router: Router, route: ActivatedRoute){

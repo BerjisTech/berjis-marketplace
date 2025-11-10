@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, computed } from '@angular/core';
+import { Component, EventEmitter, Input, Output, computed, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { CartService } from '../../../core/services/cart.service';
@@ -13,7 +13,7 @@ import { CartService } from '../../../core/services/cart.service';
 export class MiniCartComponent {
   @Input() open = false;
   @Output() openChange = new EventEmitter<boolean>();
-  constructor(public cart: CartService) {}
+  private readonly cart = inject(CartService);
   items = this.cart.items;
   subtotalCents = computed(() => this.cart.totalCents());
   close(){ this.openChange.emit(false); }

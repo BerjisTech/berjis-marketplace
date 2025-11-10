@@ -2,12 +2,12 @@ import { Component, signal, computed, inject, OnInit, DoCheck } from '@angular/c
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { CartService } from '../app/core/services/cart.service';
-import { OrderService } from '../app/core/services/order.service';
+import { CartService, CartItem } from '../app/core/services/cart.service';
+import { CreateOrderPayload, OrderService } from '../app/core/services/order.service';
 
 @Component({
   standalone: true,
-  selector: 'checkout-page',
+  selector: 'app-checkout-page',
   imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './checkout-page.component.html',
   styleUrls: ['./checkout-page.component.css']
@@ -29,7 +29,13 @@ export class CheckoutPageComponent implements OnInit, DoCheck {
 
   async placeOrder(){
     this.placing.set(true);
-    const body = { shipping: this.shipping, items: this.items(), payment: { method: 'mock' }, subtotalCents: this.subtotalCents() };
+    const lineItems = this.items().map(item => this.toOrderItem(item));
+    const body: CreateOrderPayload = {
+      shipping: { ...this.shipping },
+      items: lineItems,
+      payment: { method: 'mock' },
+      subtotalCents: this.subtotalCents(),
+    };
     const res = await this.orders.createOrder(body);
     this.orderId.set(res.id);
     this.cart.clear();
@@ -50,4 +56,12 @@ export class CheckoutPageComponent implements OnInit, DoCheck {
       return;
     }
   }
+
+  private toOrderItem(item: CartItem) {
+    return {
+      productId: item.productId,
+      quantity: item.quantity,
+    };
+  }
 }
+

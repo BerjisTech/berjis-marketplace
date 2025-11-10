@@ -33,7 +33,7 @@
           <ng-container *ngFor="let p of products().slice(0,4)">
             <a [routerLink]="['/product', p.uuid]" class="group rounded-2xl bg-white/80 dark:bg-slate-950/70 border border-blue-900/20 dark:border-slate-800 overflow-hidden hover:shadow-brand transition">
               <div class="aspect-4/3 bg-blue-100 dark:bg-slate-900">
-                <img *ngIf="p.imageUrl" [src]="p.imageUrl" alt="" class="w-full h-full object-cover group-hover:scale-[1.02] transition"/>
+                <img *ngIf="p.imageUrl" [src]="p.imageUrl" [attr.alt]="p.title || 'Product image'" class="w-full h-full object-cover group-hover:scale-[1.02] transition"/>
               </div>
               <div class="p-3">
                 <div class="text-xs text-slate-600 dark:text-slate-400 mb-1">{{ p.shopName }}</div>
@@ -47,7 +47,7 @@
     </div>
     <div class="mb-2 flex items-end justify-between">
       <h2 class="text-xl font-semibold text-blue-900 dark:text-white">All Products</h2>
-      <div class="text-xs text-slate-600 dark:text-slate-400" *ngIf="total()!=null">Showing {{ ((page()-1)*perPage())+1 }}–{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}</div>
+      <div class="text-xs text-slate-600 dark:text-slate-400" *ngIf="total() !== null">Showing {{ ((page()-1)*perPage())+1 }}-{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}</div>
     </div>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
       <ng-container *ngIf="!loading(); else loadingTpl">
