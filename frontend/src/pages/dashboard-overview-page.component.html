@@ -1,76 +1,145 @@
-<div class="space-y-6">
-  <!-- Promo / Plan -->
-  <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-      <div>
-        <div class="text-lg font-semibold text-blue-900 dark:text-white">Select a plan to get 3 months for $1/month</div>
-        <div class="text-sm text-slate-600 dark:text-slate-300">Upgrade any time to unlock all features.</div>
-      </div>
-      <a routerLink="/dashboard/settings/plan" class="btn btn-primary rounded-full h-10 px-5">Choose plan</a>
+<div class="space-y-6 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Dashboard</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Monitor store performance and finish setup tasks to get your marketplace live.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[200px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [value]="selectedShopSlug()"
+        (change)="changeShop($event.target.value)"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+      <a routerLink="/dashboard/settings/plan" class="btn btn-primary rounded-full h-10 px-5">Upgrade plan</a>
     </div>
   </div>
 
-  <!-- Empty states / setup tasks -->
-  <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-    <!-- No shop or generic name -->
-    <div *ngIf="(shops().length===0) || isGenericShopName(selectedShop?.name)" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
-      <div class="text-lg font-semibold text-blue-900 dark:text-white mb-2">{{ shops().length===0 ? 'Create your first shop' : 'Name your shop' }}</div>
-      <div class="text-sm text-slate-600 dark:text-slate-300 mb-4">Shop names must be unique.</div>
-      <div class="flex gap-2">
-        <a *ngIf="shops().length===0" routerLink="/dashboard/shops/new" class="btn btn-primary rounded-full h-10 px-5">Create shop</a>
-        <a *ngIf="shops().length>0" routerLink="/dashboard/settings/general" class="btn rounded-full h-10 px-5 border">Edit shop name</a>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <section class="grid gap-4 rounded-xl border border-blue-900/15 bg-white/85 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 md:grid-cols-[2fr,3fr]">
+    <div class="grid gap-3 sm:grid-cols-2">
+      <div class="metric-card">
+        <p class="metric-label">Total sales (30d)</p>
+        <p class="metric-value">{{ formatCurrency(metrics()?.totalSalesCents ?? 0, 'USD') }}</p>
+      </div>
+      <div class="metric-card">
+        <p class="metric-label">Orders</p>
+        <p class="metric-value">{{ metrics()?.ordersCount ?? 0 }}</p>
+      </div>
+      <div class="metric-card">
+        <p class="metric-label">Average order value</p>
+        <p class="metric-value">{{ formatCurrency(metrics()?.averageOrderValueCents ?? 0, 'USD') }}</p>
+      </div>
+      <div class="metric-card">
+        <p class="metric-label">Customers</p>
+        <p class="metric-value">{{ metrics()?.customersCount ?? 0 }}</p>
+      </div>
+    </div>
+    <div class="rounded-xl border border-blue-900/10 bg-gradient-to-br from-blue-50/80 to-white/80 p-4 dark:border-slate-800 dark:from-slate-900/70 dark:to-slate-950/70">
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-blue-900 dark:text-slate-100">Daily sales</h2>
+        <span class="text-xs text-slate-500 dark:text-slate-400">{{ salesSeries().length }} days</span>
+      </div>
+      <div class="mt-3">
+        <svg
+          [attr.viewBox]="'0 0 ' + chartWidth + ' ' + (chartHeight + 20)"
+          class="w-full text-blue-500 dark:text-blue-300"
+        >
+          <defs>
+            <linearGradient id="salesFill" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stop-color="currentColor" stop-opacity="0.35"></stop>
+              <stop offset="100%" stop-color="currentColor" stop-opacity="0"></stop>
+            </linearGradient>
+          </defs>
+          <path *ngIf="chartGradient()" [attr.d]="chartGradient()" fill="url(#salesFill)"></path>
+          <path *ngIf="chartPath()" [attr.d]="chartPath()" stroke="currentColor" stroke-width="2" fill="none"></path>
+          <line
+            *ngFor="let point of salesSeries(); let i = index"
+            [attr.x1]="(chartWidth / Math.max(salesSeries().length - 1, 1)) * i"
+            [attr.x2]="(chartWidth / Math.max(salesSeries().length - 1, 1)) * i"
+            [attr.y1]="chartHeight + 2"
+            [attr.y2]="chartHeight + 8"
+            stroke="currentColor"
+            stroke-width="1"
+            stroke-opacity="0.25"
+          ></line>
+          <text
+            *ngFor="let point of salesSeries(); let i = index"
+            [attr.x]="(chartWidth / Math.max(salesSeries().length - 1, 1)) * i"
+            [attr.y]="chartHeight + 18"
+            text-anchor="middle"
+            class="chart-label"
+          >
+            {{ point.date | slice:5 }}
+          </text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div
+      *ngIf="(shops().length === 0) || isGenericShopName(shops()[0]?.name)"
+      class="task-card"
+    >
+      <h3 class="task-title">{{ shops().length === 0 ? 'Create your first shop' : 'Name your shop' }}</h3>
+      <p class="task-body">Give your storefront a memorable name so customers recognize your brand.</p>
+      <div class="mt-3 flex gap-2">
+        <a *ngIf="shops().length === 0" routerLink="/dashboard/shops/new" class="btn btn-primary rounded-full h-10 px-5">Create shop</a>
+        <a *ngIf="shops().length > 0" routerLink="/dashboard/settings/general" class="btn rounded-full h-10 px-5 border">Edit name</a>
       </div>
     </div>
 
-    <!-- No products -->
-    <div *ngIf="shops().length>0 && products().length===0" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
-      <div class="flex items-start gap-3">
-        <div class="shrink-0 text-blue-600 dark:text-blue-300">
-          <!-- simple product vector -->
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.3 7L12 12l8.7-5"/><path d="M12 22V12"/></svg>
+    <div
+      *ngIf="products().length === 0"
+      class="task-card"
+    >
+      <h3 class="task-title">Add your first product</h3>
+      <p class="task-body">List at least one product to publish your storefront and start accepting orders.</p>
+      <div class="mt-3 flex gap-2">
+        <a routerLink="/dashboard/products/new" class="btn btn-primary rounded-full h-10 px-5">Add product</a>
+        <a routerLink="/dashboard/products/new" class="btn rounded-full h-10 px-5 border">Add sample</a>
+      </div>
+    </div>
+
+    <div class="task-card">
+      <h3 class="task-title">Complete payment setup</h3>
+      <p class="task-body">Connect a payment provider to accept cards and alternative payment methods.</p>
+      <a routerLink="/dashboard/settings/payments" class="btn rounded-full h-10 px-5 border">Choose provider</a>
+    </div>
+
+    <div class="task-card">
+      <h3 class="task-title">Configure shipping rates</h3>
+      <p class="task-body">Offer competitive shipping by defining default domestic and international rates.</p>
+      <a routerLink="/dashboard/settings/shipping-and-delivery" class="btn rounded-full h-10 px-5 border">Edit rates</a>
+    </div>
+
+    <div class="task-card">
+      <h3 class="task-title">Design your storefront</h3>
+      <p class="task-body">Apply a theme or generate one with AI to match your brand in minutes.</p>
+      <a routerLink="/dashboard/settings/apps-and-sales-channels" class="btn btn-primary rounded-full h-10 px-5">Launch editor</a>
+    </div>
+  </section>
+
+  <section *ngIf="products().length > 0" class="rounded-xl border border-blue-900/15 bg-white/85 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Recent products</h2>
+      <a routerLink="/dashboard/products" class="text-sm text-blue-600 underline dark:text-blue-300">View all</a>
+    </div>
+    <div class="mt-4 space-y-3">
+      <div *ngFor="let product of products()" class="flex items-center justify-between rounded-lg border border-blue-900/10 bg-white/80 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-950/60">
+        <div>
+          <div class="font-medium text-blue-900 dark:text-white">{{ product.title }}</div>
+          <div class="text-xs text-slate-500 dark:text-slate-400">SKU: {{ product.uuid | slice:0:8 }}</div>
         </div>
-        <div class="min-w-0">
-          <div class="text-lg font-semibold text-blue-900 dark:text-white">Add your first product</div>
-          <div class="text-sm text-slate-600 dark:text-slate-300">Start by adding a product and a few key details. Not ready? Start with a sample product.</div>
-          <div class="mt-3 flex gap-2">
-            <a routerLink="/dashboard/products/new" class="btn btn-primary rounded-full h-10 px-5">Add product</a>
-            <a routerLink="/dashboard/products/new" class="btn rounded-full h-10 px-5 border">Add sample</a>
-          </div>
+        <div class="text-sm text-slate-600 dark:text-slate-300">
+          {{ formatCurrency(product.priceCents ?? 0, product.currency ?? 'USD') }}
         </div>
       </div>
     </div>
-
-    <!-- Theme prompt -->
-    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
-      <div class="text-lg font-semibold text-blue-900 dark:text-white">Design your store</div>
-      <div class="text-sm text-slate-600 dark:text-slate-300">Describe your business to generate custom themes or browse pre-designed themes</div>
-      <div class="mt-3">
-        <a routerLink="/dashboard/settings/apps-and-sales-channels" class="btn btn-primary rounded-full h-10 px-5">Submit</a>
-      </div>
-      <div class="mt-2 text-sm text-slate-500">Example: “Modern handmade jewelry”</div>
-    </div>
-
-    <!-- Payments -->
-    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
-      <div class="text-lg font-semibold text-blue-900 dark:text-white">Set up a payment provider</div>
-      <div class="mt-2 flex gap-2 text-slate-700 dark:text-slate-200 text-sm">
-        <span class="rounded-full border px-3 py-1">PayPal Express</span>
-        <span class="rounded-full border px-3 py-1">Visa</span>
-        <span class="rounded-full border px-3 py-1">Mastercard</span>
-      </div>
-      <div class="mt-3">
-        <a routerLink="/dashboard/settings/payments" class="btn rounded-full h-10 px-5 border">Choose provider</a>
-      </div>
-    </div>
-
-    <!-- Shipping -->
-    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-5">
-      <div class="text-lg font-semibold text-blue-900 dark:text-white">Review your shipping rates</div>
-      <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">Domestic</div>
-      <div class="mt-3">
-        <a routerLink="/dashboard/settings/shipping-and-delivery" class="btn rounded-full h-10 px-5 border">Edit rates</a>
-      </div>
-    </div>
-  </div>
+  </section>
 </div>
-

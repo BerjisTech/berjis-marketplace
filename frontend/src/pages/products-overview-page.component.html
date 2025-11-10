@@ -1,45 +1,166 @@
-<div class="py-4">
-  <div class="flex items-center justify-between gap-3">
-    <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Products</h1>
-    <div class="flex items-center gap-2">
-      <select class="h-10 rounded-full border px-3" [ngModel]="shopSlug()" (ngModelChange)="shopSlug.set($event); load()">
+<div class="space-y-4 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Products</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">Manage inventory, pricing, and publishing status.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="shopSlug()"
+        (ngModelChange)="changeShop($event)"
+      >
         <option *ngFor="let s of shops()" [value]="s.slug">{{ s.name }}</option>
       </select>
-      <input class="h-10 rounded-full border px-3" placeholder="Search products" [ngModel]="q()" (ngModelChange)="q.set($event); load()" />
+      <input
+        class="h-10 rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        placeholder="Search products"
+        [ngModel]="q()"
+        (ngModelChange)="changeQuery($event)"
+      />
       <a routerLink="/dashboard/products/new" class="btn btn-primary rounded-full h-10 px-5">Add product</a>
     </div>
   </div>
-  <div class="mt-4 flex flex-wrap gap-2">
-    <a routerLink="/dashboard/products/collections" class="rounded-full border px-3 py-1">Collections</a>
-    <a routerLink="/dashboard/products/inventory" class="rounded-full border px-3 py-1">Inventory</a>
-    <a routerLink="/dashboard/products/purchase-orders" class="rounded-full border px-3 py-1">Purchase orders</a>
-    <a routerLink="/dashboard/products/transfers" class="rounded-full border px-3 py-1">Transfers</a>
-    <a routerLink="/dashboard/products/gift-cards" class="rounded-full border px-3 py-1">Gift cards</a>
+
+  <div class="flex flex-wrap gap-2">
+    <a routerLink="/dashboard/products/collections" class="chip-link">Collections</a>
+    <a routerLink="/dashboard/products/inventory" class="chip-link">Inventory</a>
+    <a routerLink="/dashboard/products/purchase-orders" class="chip-link">Purchase orders</a>
+    <a routerLink="/dashboard/products/transfers" class="chip-link">Transfers</a>
+    <a routerLink="/dashboard/products/gift-cards" class="chip-link">Gift cards</a>
   </div>
 
-  <div class="mt-6 overflow-auto rounded-xl border border-blue-900/20 dark:border-slate-800">
-    <table class="min-w-[720px] w-full text-sm">
-      <thead class="bg-blue-50/60 dark:bg-slate-900/60">
-        <tr class="text-left">
-          <th class="px-3 py-2">Title</th>
-          <th class="px-3 py-2">Price</th>
-          <th class="px-3 py-2">Stock</th>
-          <th class="px-3 py-2">Published</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let p of items()" class="border-t border-blue-900/10 dark:border-slate-800">
-          <td class="px-3 py-2">
-            <div class="font-medium text-blue-900 dark:text-white">{{ p.title }}</div>
-            <div class="text-xs text-slate-500">{{ p.uuid | slice:0:8 }}</div>
-          </td>
-          <td class="px-3 py-2">{{ (p.priceCents/100) | number:'1.2-2' }} {{ p.currency }}</td>
-          <td class="px-3 py-2">{{ p.stock ?? 0 }}</td>
-          <td class="px-3 py-2">{{ p.published ? 'Yes' : 'No' }}</td>
-        </tr>
-        <tr *ngIf="!loading() && items().length===0"><td class="px-3 py-4 text-slate-500" colspan="4">No products found</td></tr>
-        <tr *ngIf="loading()"><td class="px-3 py-4 text-slate-500" colspan="4">Loading…</td></tr>
-      </tbody>
-    </table>
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <div class="overflow-hidden rounded-xl border border-blue-900/15 bg-white/80 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <div class="overflow-auto">
+      <table class="min-w-[760px] w-full text-sm">
+        <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+          <tr class="text-left">
+            <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Product</th>
+            <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Price</th>
+            <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Stock</th>
+            <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Published</th>
+            <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let product of items()" class="border-t border-blue-900/10 bg-white/90 dark:border-slate-800 dark:bg-slate-950/60">
+            <td class="px-4 py-3 align-middle">
+              <div class="font-medium text-blue-900 dark:text-white">{{ product.title }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">SKU: {{ product.uuid | slice: 0:8 }}</div>
+              <div *ngIf="product.category" class="mt-1 inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-200">
+                {{ product.category }}
+              </div>
+            </td>
+            <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">
+              {{ formatMoney(product.priceCents ?? 0, product.currency ?? 'USD') }}
+            </td>
+            <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">
+              {{ product.stock ?? 0 }}
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <span
+                class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                [ngClass]="product.published ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-slate-200 text-slate-600 dark:bg-slate-900/50 dark:text-slate-300'"
+              >
+                {{ product.published ? 'Published' : 'Draft' }}
+              </span>
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <button type="button" class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200" (click)="openEdit(product)">
+                Edit
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="!loading() && items().length === 0">
+            <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+              No products found for this shop.
+            </td>
+          </tr>
+          <tr *ngIf="loading()">
+            <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+              Loading products&hellip;
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+
+<app-modal
+  [open]="editing()"
+  [title]="selectedProduct()?.title || 'Edit product'"
+  maxWidth="560px"
+  (closed)="closeEdit()"
+>
+  <form class="space-y-4" (ngSubmit)="saveEdit()">
+    <div class="grid gap-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="edit-title">Title</label>
+      <input
+        id="edit-title"
+        class="form-input"
+        name="title"
+        required
+        [(ngModel)]="editModel().title"
+      />
+    </div>
+    <div class="grid gap-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="edit-summary">Summary</label>
+      <textarea
+        id="edit-summary"
+        class="form-input min-h-[90px]"
+        name="summary"
+        [(ngModel)]="editModel().summary"
+      ></textarea>
+    </div>
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="edit-price">Price (USD)</label>
+        <input
+          id="edit-price"
+          class="form-input"
+          name="price"
+          inputmode="decimal"
+          [(ngModel)]="editModel().price"
+        />
+      </div>
+      <div class="grid gap-2">
+        <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="edit-stock">Stock</label>
+        <input
+          id="edit-stock"
+          class="form-input"
+          type="number"
+          min="0"
+          name="stock"
+          [(ngModel)]="editModel().stock"
+        />
+      </div>
+    </div>
+    <div class="grid gap-2">
+      <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="edit-category">Category</label>
+      <input
+        id="edit-category"
+        class="form-input"
+        name="category"
+        [(ngModel)]="editModel().category"
+        placeholder="e.g. apparel"
+      />
+    </div>
+    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+      <input
+        type="checkbox"
+        name="published"
+        [(ngModel)]="editModel().published"
+      />
+      <span>Published</span>
+    </label>
+    <div class="flex items-center justify-end gap-2 pt-2">
+      <button type="button" class="rounded-full border px-4 py-2 text-sm" (click)="closeEdit()">Cancel</button>
+      <button type="submit" class="btn btn-primary rounded-full px-5" [disabled]="editBusy()">Save changes</button>
+    </div>
+  </form>
+  <p *ngIf="editBusy()" class="pt-2 text-sm text-slate-500 dark:text-slate-300">Saving changes…</p>
+</app-modal>

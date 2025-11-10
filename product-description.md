@@ -441,30 +441,30 @@ CREATE TABLE order_items (
 - [x] Build order summary component
 - [x] Add mock payment processing
 - [x] Create order confirmation page
-- [ ] Build order history page
-- [ ] Implement order tracking
+- [x] Build order history page
+- [x] Implement order tracking
 
 ### Phase 6: Admin Dashboard
 - [x] Create admin route guard
 - [x] Build admin layout
 - [x] Implement team invitation & membership endpoints (Go)
-- [ ] Create dashboard component with metrics
-- [ ] Implement sales chart (custom built)
+- [x] Create dashboard component with metrics
+- [x] Implement sales chart (custom built)
 - [x] Build product management table
-- [ ] Create product edit modal
-- [ ] Build order management interface
-- [ ] Implement user management table
-- [ ] Add user role management
+- [x] Create product edit modal
+- [x] Build order management interface
+- [x] Implement user management table
+- [x] Add user role management
 
 ### Phase 7: User Experience
-- [ ] Build user profile page
-- [ ] Create profile edit form
-- [ ] Implement address management
+- [x] Build user profile page
+- [x] Create profile edit form
+- [x] Implement address management
 - [x] Add wishlist functionality
-- [ ] Build modal system
+- [x] Build modal system
 - [x] Create toast notification system
-- [ ] Implement loading states
-- [ ] Add error handling
+- [x] Implement loading states
+- [x] Add error handling
 - [ ] Build 404 page
 - [ ] Create footer component
 

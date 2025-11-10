@@ -60,6 +60,8 @@ export class SettingsUsersPageComponent implements OnInit {
 
   private readonly currentUserUuid = signal<string>('');
   private readonly platformRoles = signal<string[]>([]);
+  readonly transferTarget = signal<string>('');
+  readonly transferBusy = signal<boolean>(false);
 
   readonly selectedShop = computed(() => {
     const slug = this.selectedShopSlug();
@@ -88,6 +90,11 @@ export class SettingsUsersPageComponent implements OnInit {
   });
 
   readonly canManage = computed(() => {
+    const role = this.currentRole();
+    return role === 'owner' || role === 'platform';
+  });
+
+  readonly canTransfer = computed(() => {
     const role = this.currentRole();
     return role === 'owner' || role === 'platform';
   });
@@ -378,6 +385,34 @@ export class SettingsUsersPageComponent implements OnInit {
     }
     const message = (error.error && error.error.message) || error.message;
     return message || fallback;
+  }
+
+  transferOwnership(): void {
+    if (!this.canTransfer()) {
+      this.error.set('Only owners can transfer ownership.');
+      return;
+    }
+    const slug = this.selectedShopSlug();
+    const newOwner = this.transferTarget().trim();
+    if (!slug || !newOwner) {
+      this.error.set('Select a team member to transfer ownership.');
+      return;
+    }
+    this.transferBusy.set(true);
+    this.team
+      .transferOwnership(slug, { newOwnerUuid: newOwner })
+      .subscribe({
+        next: () => {
+          this.transferBusy.set(false);
+          this.message.set('Ownership transferred.');
+          this.transferTarget.set('');
+          this.loadShops();
+        },
+        error: (error: HttpErrorResponse) => {
+          this.transferBusy.set(false);
+          this.error.set(this.describeError(error, 'Could not transfer ownership.'));
+        },
+      });
   }
 }
 

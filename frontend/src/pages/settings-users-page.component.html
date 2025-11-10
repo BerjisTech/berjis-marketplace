@@ -134,6 +134,51 @@
     </div>
   </section>
 
+  <section
+    *ngIf="canTransfer()"
+    class="rounded-xl border border-blue-900/15 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 lg:col-span-2"
+  >
+    <div class="flex items-center justify-between gap-2">
+      <div>
+        <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Transfer ownership</h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          Move shop ownership to another team member. You'll become a manager automatically.
+        </p>
+      </div>
+    </div>
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <select
+        class="min-w-[220px] rounded-md border border-blue-900/20 bg-white/90 px-3 py-2 text-sm text-slate-900 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100"
+        [ngModel]="transferTarget()"
+        (ngModelChange)="transferTarget.set($event)"
+      >
+        <option value="">Select team member</option>
+        <option
+          *ngFor="let member of members()"
+          [value]="member.userUuid"
+          [disabled]="member.userUuid === selectedShop()?.ownerUuid"
+        >
+          {{ member.userUuid | slice:0:8 }} &ndash; {{ member.role | titlecase }}
+        </option>
+      </select>
+      <button
+        type="button"
+        class="rounded-md bg-blue-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-950 disabled:cursor-not-allowed disabled:opacity-60"
+        (click)="transferOwnership()"
+        [disabled]="transferBusy() || !transferTarget()"
+      >
+        <span *ngIf="transferBusy(); else transferLabel" class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+          Transferring
+        </span>
+        <ng-template #transferLabel>Transfer ownership</ng-template>
+      </button>
+    </div>
+    <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+      Ownership grants full control over billing, settings, and team management.
+    </p>
+  </section>
+
   <section class="rounded-xl border border-blue-900/15 bg-white/80 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
     <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Invitations</h2>
     <p class="text-xs text-slate-500 dark:text-slate-400">

@@ -1,0 +1,20 @@
+<div
+  class="modal-backdrop"
+  *ngIf="open"
+  (click)="onBackdropClick($event)"
+  (keydown)="onKeydown($event)"
+  tabindex="0"
+  role="presentation"
+>
+  <div class="modal-panel" [style.maxWidth]="maxWidth" role="dialog" aria-modal="true" [attr.aria-label]="title || 'Dialog'">
+    <div class="modal-header">
+      <h2 *ngIf="title" class="modal-title">{{ title }}</h2>
+      <button type="button" class="close-btn" (click)="close()" aria-label="Close dialog">
+        &times;
+      </button>
+    </div>
+    <div class="modal-body">
+      <ng-content></ng-content>
+    </div>
+  </div>
+</div>

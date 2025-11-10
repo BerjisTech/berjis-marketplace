@@ -1,8 +1,209 @@
-<div class="py-4">
-  <h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Customers Overview</h1>
-  <div class="flex flex-wrap gap-2">
-    <a routerLink="/dashboard/customers/segments" class="rounded-full border px-3 py-1">Segments</a>
+<div class="space-y-5 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Customers</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Track lifetime value, Recent activity, and manage customer records per shop.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="selectedShopSlug()"
+        (ngModelChange)="changeShop($event)"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+      <input
+        class="h-10 rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        placeholder="Search customers"
+        [ngModel]="search()"
+        (ngModelChange)="updateSearch($event)"
+      />
+      <input
+        class="h-10 rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        placeholder="Filter by tag"
+        [ngModel]="tagFilter()"
+        (ngModelChange)="updateTagFilter($event)"
+      />
+      <a routerLink="/dashboard/customers/segments" class="chip-link">Segments</a>
+    </div>
   </div>
-  <p class="mt-6 text-sm text-slate-600 dark:text-slate-300">Skeleton for customer list and KPIs.</p>
+
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <section class="rounded-xl border border-blue-900/15 bg-white/85 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Add customer</h2>
+    <p class="text-sm text-slate-600 dark:text-slate-300">
+      Capture an email to start tracking lifetime value, orders, and marketing preferences.
+    </p>
+    <form class="mt-4 grid gap-3 md:grid-cols-2" (ngSubmit)="createCustomer()">
+      <div class="grid gap-2 md:col-span-2">
+        <label class="form-label" for="customer-email">Email</label>
+        <input
+          id="customer-email"
+          class="form-input"
+          placeholder="customer@example.com"
+          required
+          name="email"
+          [(ngModel)]="newCustomer().email"
+        />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="customer-first-name">First name</label>
+        <input id="customer-first-name" class="form-input" name="firstName" [(ngModel)]="newCustomer().firstName" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="customer-last-name">Last name</label>
+        <input id="customer-last-name" class="form-input" name="lastName" [(ngModel)]="newCustomer().lastName" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="customer-phone">Phone</label>
+        <input id="customer-phone" class="form-input" name="phone" [(ngModel)]="newCustomer().phone" />
+      </div>
+      <div class="grid gap-2 md:col-span-2">
+        <label class="form-label" for="customer-notes">Internal notes</label>
+        <textarea
+          id="customer-notes"
+          class="form-input min-h-[80px]"
+          name="notes"
+          [(ngModel)]="newCustomer().notes"
+          placeholder="Important preferences, VIP context"
+        ></textarea>
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="customer-tags">Tags</label>
+        <input
+          id="customer-tags"
+          class="form-input"
+          placeholder="vip, wholesale"
+          name="tags"
+          [(ngModel)]="newCustomer().tags"
+        />
+      </div>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <input type="checkbox" name="marketingOptIn" [(ngModel)]="newCustomer().marketingOptIn" />
+        <span>Opted into marketing emails</span>
+      </label>
+      <div class="md:col-span-2 flex items-center justify-end gap-2">
+        <button type="submit" class="btn btn-primary rounded-full px-5" [disabled]="createBusy()">Add customer</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="overflow-hidden rounded-xl border border-blue-900/15 bg-white/85 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <div class="overflow-auto">
+      <table class="min-w-[860px] w-full text-sm">
+        <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+          <tr class="text-left text-slate-600 dark:text-slate-300">
+            <th class="px-4 py-3 font-medium">Customer</th>
+            <th class="px-4 py-3 font-medium">Email</th>
+            <th class="px-4 py-3 font-medium">Lifetime value</th>
+            <th class="px-4 py-3 font-medium">Orders</th>
+            <th class="px-4 py-3 font-medium">Last order</th>
+            <th class="px-4 py-3 font-medium">Tags</th>
+            <th class="px-4 py-3 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let customer of customersList()"
+            class="border-t border-blue-900/10 bg-white/90 dark:border-slate-800 dark:bg-slate-950/60"
+          >
+            <td class="px-4 py-3 align-middle">
+              <div class="font-medium text-blue-900 dark:text-white">{{ customerName(customer) }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">Created {{ formatDate(customer.createdAt) }}</div>
+            <div
+              *ngIf="customer.marketingOptIn"
+              class="mt-1 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200"
+            >
+              Marketing opt-in
+            </div>
+            <div *ngIf="customer.notes" class="mt-2 text-xs italic text-slate-500 dark:text-slate-400">
+              {{ customer.notes }}
+            </div>
+          </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">{{ customer.email }}</td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              {{ formatCurrency(customer.totalSpentCents ?? 0, 'USD') }}
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">{{ customer.ordersCount ?? 0 }}</td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">{{ formatDate(customer.lastOrderAt) }}</td>
+            <td class="px-4 py-3 align-middle">
+              <div class="flex flex-wrap gap-1">
+                <span
+                  *ngFor="let tag of tags(customer)"
+                  class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-200"
+                >
+                  {{ tag }}
+                </span>
+              </div>
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <button
+                type="button"
+                class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+                (click)="openOrdersModal(customer)"
+              >
+                View orders
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="!loading() && customersList().length === 0">
+            <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+              No customers yet. Add one above to begin.
+            </td>
+          </tr>
+          <tr *ngIf="loading()">
+            <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+              Loading customers&hellip;
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
+<app-modal
+  [open]="ordersModalOpen()"
+  [title]="selectedCustomer() ? customerName(selectedCustomer()!) : 'Orders'"
+  maxWidth="720px"
+  (closed)="closeOrdersModal()"
+>
+  <div *ngIf="ordersError()" class="notice error mb-3">{{ ordersError() }}</div>
+  <div *ngIf="ordersLoading()" class="text-sm text-slate-500 dark:text-slate-300">
+    Loading order history&hellip;
+  </div>
+  <table *ngIf="!ordersLoading() && customerOrders().length > 0" class="w-full text-sm">
+    <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+      <tr class="text-left text-slate-600 dark:text-slate-300">
+        <th class="px-3 py-2 font-medium">Order</th>
+        <th class="px-3 py-2 font-medium">Total</th>
+        <th class="px-3 py-2 font-medium">Status</th>
+        <th class="px-3 py-2 font-medium">Placed</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let order of customerOrders()" class="border-t border-blue-900/10 dark:border-slate-800">
+        <td class="px-3 py-2 align-middle">
+          <div class="font-medium text-blue-900 dark:text-white">{{ order.uuid | slice:0:8 }}</div>
+          <div class="text-xs text-slate-500 dark:text-slate-400">
+            Updated {{ formatDate(order.updatedAt) }}
+          </div>
+        </td>
+        <td class="px-3 py-2 align-middle text-slate-700 dark:text-slate-200">
+          {{ formatCurrency(order.totalCents ?? 0, order.currency ?? 'USD') }}
+        </td>
+        <td class="px-3 py-2 align-middle">
+          <span class="status-pill">{{ order.status | titlecase }}</span>
+        </td>
+        <td class="px-3 py-2 align-middle text-slate-700 dark:text-slate-200">{{ formatDate(order.createdAt) }}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p *ngIf="!ordersLoading() && customerOrders().length === 0" class="text-sm text-slate-500 dark:text-slate-300">
+    No orders recorded yet.
+  </p>
+</app-modal>

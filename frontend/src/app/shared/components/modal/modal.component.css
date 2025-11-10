@@ -1,0 +1,76 @@
+:host {
+  display: contents;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 60;
+}
+
+.modal-panel {
+  width: 100%;
+  background: rgba(248, 250, 252, 0.98);
+  border-radius: 1rem;
+  border: 1px solid rgba(15, 76, 129, 0.15);
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.45);
+  padding: 1.5rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+:host-context(.dark) .modal-panel {
+  background: rgba(15, 23, 42, 0.95);
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+
+:host-context(.dark) .modal-title {
+  color: #f8fafc;
+}
+
+.close-btn {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  color: #1e3a8a;
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.close-btn:hover {
+  transform: scale(1.05);
+  color: #f59e0b;
+}
+
+:host-context(.dark) .close-btn {
+  color: #f8fafc;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}

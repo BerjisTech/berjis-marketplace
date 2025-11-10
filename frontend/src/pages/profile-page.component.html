@@ -1,0 +1,160 @@
+<div class="space-y-6 py-4">
+  <div>
+    <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Account profile</h1>
+    <p class="text-sm text-slate-600 dark:text-slate-300">
+      Keep your contact details up to date and manage saved addresses for fulfillment.
+    </p>
+  </div>
+
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <section class="rounded-xl border border-blue-900/15 bg-white/85 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Profile information</h2>
+    <form class="mt-4 grid gap-3 md:grid-cols-2" (ngSubmit)="saveProfile()">
+      <div class="grid gap-2">
+        <label class="form-label" for="display-name">Display name</label>
+        <input id="display-name" class="form-input" name="displayName" [(ngModel)]="profileForm().displayName" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="profile-email">Email</label>
+        <input id="profile-email" class="form-input" required type="email" name="email" [(ngModel)]="profileForm().email" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="profile-phone">Phone</label>
+        <input id="profile-phone" class="form-input" name="phone" [(ngModel)]="profileForm().phone" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="profile-timezone">Timezone</label>
+        <input id="profile-timezone" class="form-input" name="timezone" [(ngModel)]="profileForm().timezone" placeholder="e.g. UTC, America/New_York" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="profile-avatar">Avatar URL</label>
+        <input id="profile-avatar" class="form-input" name="avatarUrl" [(ngModel)]="profileForm().avatarUrl" />
+      </div>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <input type="checkbox" name="marketingOptIn" [(ngModel)]="profileForm().marketingOptIn" />
+        <span>Receive product updates and tips</span>
+      </label>
+      <div class="md:col-span-2 flex items-center justify-end gap-2">
+        <button type="submit" class="btn btn-primary rounded-full px-5" [disabled]="profileBusy()">Save profile</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="rounded-xl border border-blue-900/15 bg-white/85 p-5 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Saved addresses</h2>
+        <p class="text-sm text-slate-600 dark:text-slate-300">Default shipping and billing addresses speed up checkout.</p>
+      </div>
+      <button type="button" class="btn btn-primary rounded-full px-5" (click)="openAddressModal()">Add address</button>
+    </div>
+    <div *ngIf="addresses().length === 0" class="mt-4 rounded-lg border border-dashed border-blue-900/20 bg-blue-50/50 p-4 text-sm text-blue-900 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">
+      No addresses yet. Add one to reuse during checkout or fulfillment.
+    </div>
+    <div class="mt-4 grid gap-3">
+      <div
+        *ngFor="let address of addresses()"
+        class="rounded-lg border border-blue-900/15 bg-white/90 p-4 text-sm dark:border-slate-800 dark:bg-slate-950/60"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <div class="text-sm font-semibold text-blue-900 dark:text-white">{{ address.label || 'Address' }}</div>
+            <div class="text-slate-600 dark:text-slate-300">
+              {{ address.recipientName || profile()?.displayName || profile()?.email }}
+            </div>
+            <div class="text-slate-600 dark:text-slate-300">
+              {{ address.line1 }}<span *ngIf="address.line2">, {{ address.line2 }}</span>
+            </div>
+            <div class="text-slate-600 dark:text-slate-300">
+              {{ address.city }}, {{ address.region }} {{ address.postalCode }}
+            </div>
+            <div class="text-slate-600 dark:text-slate-300">{{ address.country }}</div>
+            <div class="text-slate-500 dark:text-slate-400" *ngIf="address.phone">{{ address.phone }}</div>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <span *ngIf="address.isDefaultShipping" class="badge badge-emerald">Default shipping</span>
+              <span *ngIf="address.isDefaultBilling" class="badge badge-blue">Default billing</span>
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" class="rounded-full border px-3 py-1 text-sm" (click)="openAddressModal(address)">
+              Edit
+            </button>
+            <button
+              type="button"
+              class="rounded-full border border-rose-200 px-3 py-1 text-sm text-rose-600"
+              (click)="deleteAddress(address)"
+              [disabled]="addressBusy()"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<app-modal
+  [open]="addressModalOpen()"
+  [title]="editingAddress() ? 'Edit address' : 'Add address'"
+  maxWidth="560px"
+  (closed)="closeAddressModal()"
+>
+  <form class="space-y-3" (ngSubmit)="saveAddress()">
+    <div class="grid gap-2">
+      <label class="form-label" for="address-label">Label</label>
+      <input id="address-label" class="form-input" name="label" [(ngModel)]="addressForm().label" placeholder="Warehouse" />
+    </div>
+    <div class="grid gap-2">
+      <label class="form-label" for="address-recipient">Recipient</label>
+      <input id="address-recipient" class="form-input" name="recipientName" [(ngModel)]="addressForm().recipientName" />
+    </div>
+    <div class="grid gap-2">
+      <label class="form-label" for="address-line1">Address line 1</label>
+      <input id="address-line1" class="form-input" name="line1" required [(ngModel)]="addressForm().line1" />
+    </div>
+    <div class="grid gap-2">
+      <label class="form-label" for="address-line2">Address line 2</label>
+      <input id="address-line2" class="form-input" name="line2" [(ngModel)]="addressForm().line2" />
+    </div>
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="address-city">City</label>
+        <input id="address-city" class="form-input" required name="city" [(ngModel)]="addressForm().city" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="address-region">State / Region</label>
+        <input id="address-region" class="form-input" required name="region" [(ngModel)]="addressForm().region" />
+      </div>
+    </div>
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="address-postal">Postal code</label>
+        <input id="address-postal" class="form-input" required name="postalCode" [(ngModel)]="addressForm().postalCode" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="address-country">Country</label>
+        <input id="address-country" class="form-input" required name="country" [(ngModel)]="addressForm().country" />
+      </div>
+    </div>
+    <div class="grid gap-2">
+      <label class="form-label" for="address-phone">Phone</label>
+      <input id="address-phone" class="form-input" name="phone" [(ngModel)]="addressForm().phone" />
+    </div>
+    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+      <input type="checkbox" name="defaultShipping" [(ngModel)]="addressForm().defaultShipping" />
+      <span>Default shipping address</span>
+    </label>
+    <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+      <input type="checkbox" name="defaultBilling" [(ngModel)]="addressForm().defaultBilling" />
+      <span>Default billing address</span>
+    </label>
+    <div class="flex items-center justify-end gap-2 pt-2">
+      <button type="button" class="rounded-full border px-4 py-2 text-sm" (click)="closeAddressModal()">Cancel</button>
+      <button type="submit" class="btn btn-primary rounded-full px-5" [disabled]="addressBusy()">Save address</button>
+    </div>
+  </form>
+  <p *ngIf="addressBusy()" class="pt-2 text-sm text-slate-500 dark:text-slate-300">Saving address…</p>
+</app-modal>

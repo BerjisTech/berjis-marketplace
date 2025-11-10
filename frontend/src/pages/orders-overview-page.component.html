@@ -1,13 +1,192 @@
-<div class="py-4">
-  <h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Orders Overview</h1>
-  <p class="text-sm text-slate-600 dark:text-slate-300 mb-4">Quick links</p>
-  <div class="flex flex-wrap gap-2">
-    <a routerLink="/dashboard/orders/draft" class="rounded-full border px-3 py-1">Draft</a>
-    <a routerLink="/dashboard/orders/abandoned-checkouts" class="rounded-full border px-3 py-1">Abandoned checkouts</a>
-    <a routerLink="/dashboard/orders/returns" class="rounded-full border px-3 py-1">Returns</a>
+<div class="space-y-5 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Orders</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Review recent orders, fulfillment states, and tracking information across your shop.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="selectedShopSlug()"
+        (ngModelChange)="changeShop($event)"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+      <select
+        class="h-10 rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="statusFilter()"
+        (ngModelChange)="changeStatusFilter($event)"
+      >
+        <option value="all">All statuses</option>
+        <option *ngFor="let status of statusOptions()" [value]="status">{{ status | titlecase }}</option>
+      </select>
+      <input
+        class="h-10 rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        placeholder="Search orders or email"
+        [ngModel]="search()"
+        (ngModelChange)="changeSearch($event)"
+      />
+      <a routerLink="/dashboard/orders/draft" class="chip-link">Drafts</a>
+      <a routerLink="/dashboard/orders/abandoned-checkouts" class="chip-link">Abandoned checkouts</a>
+      <a routerLink="/dashboard/orders/returns" class="chip-link">Returns</a>
+    </div>
   </div>
-  <div class="mt-6 text-sm text-slate-600 dark:text-slate-300">
-    <p>Placeholder for orders KPIs, recent orders, and filters.</p>
-  </div>
+
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <section
+    *ngIf="metrics() as snapshot"
+    class="grid gap-3 rounded-xl border border-blue-900/15 bg-white/85 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 md:grid-cols-4"
+  >
+    <div class="metric-card">
+      <p class="metric-label">Total sales</p>
+      <p class="metric-value">{{ formatCurrency(snapshot.totalSalesCents ?? 0, 'USD') }}</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Orders</p>
+      <p class="metric-value">{{ snapshot.ordersCount ?? 0 }}</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Avg order value</p>
+      <p class="metric-value">{{ formatCurrency(snapshot.averageOrderValueCents ?? 0, 'USD') }}</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Customers</p>
+      <p class="metric-value">{{ snapshot.customersCount ?? 0 }}</p>
+    </div>
+  </section>
+
+  <section class="overflow-hidden rounded-xl border border-blue-900/15 bg-white/85 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <div class="overflow-auto">
+      <table class="min-w-[960px] w-full text-sm">
+        <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+          <tr class="text-left text-slate-600 dark:text-slate-300">
+            <th class="px-4 py-3 font-medium">Order</th>
+            <th class="px-4 py-3 font-medium">Customer</th>
+            <th class="px-4 py-3 font-medium">Total</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Tracking</th>
+            <th class="px-4 py-3 font-medium">Updated</th>
+            <th class="px-4 py-3 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let order of filteredOrders()"
+            class="border-t border-blue-900/10 bg-white/90 dark:border-slate-800 dark:bg-slate-950/60"
+          >
+            <td class="px-4 py-3 align-middle">
+              <div class="font-medium text-blue-900 dark:text-white">{{ order.uuid | slice:0:12 }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">Placed {{ formatDate(order.createdAt) }}</div>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              <div>{{ order.customerEmail || '—' }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ order.customerName }}</div>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              {{ formatCurrency(order.totalCents ?? 0, order.currency ?? 'USD') }}
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <span class="status-pill">{{ order.status | titlecase }}</span>
+            </td>
+            <td class="px-4 py-3 align-middle text-xs text-slate-600 dark:text-slate-300">
+              <div *ngIf="order.trackingNumber; else noTracking">
+                <strong>{{ order.trackingNumber }}</strong>
+                <span *ngIf="order.shippingCarrier">({{ order.shippingCarrier }})</span>
+                <div *ngIf="order.trackingUrl">
+                  <a
+                    class="text-blue-600 underline dark:text-blue-300"
+                    [href]="order.trackingUrl"
+                    target="_blank"
+                    rel="noopener"
+                  >
+                    Track package
+                  </a>
+                </div>
+              </div>
+              <ng-template #noTracking>—</ng-template>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">{{ formatDate(order.updatedAt) }}</td>
+            <td class="px-4 py-3 align-middle">
+              <button
+                type="button"
+                class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+                (click)="openEdit(order)"
+              >
+                Update
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="!loading() && filteredOrders().length === 0">
+            <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+              No orders match the current filters.
+            </td>
+          </tr>
+          <tr *ngIf="loading()">
+            <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+              Loading orders&hellip;
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
 </div>
 
+<app-modal
+  [open]="editModalOpen()"
+  [title]="editOrder() ? ('Update ' + (editOrder()?.uuid | slice:0:12)) : 'Update order'"
+  maxWidth="560px"
+  (closed)="closeEdit()"
+>
+  <form class="space-y-4" (ngSubmit)="saveEdit()">
+    <div class="grid gap-2">
+      <label class="form-label" for="order-status">Status</label>
+      <select
+        id="order-status"
+        class="form-input"
+        name="status"
+        [(ngModel)]="editForm().status"
+      >
+        <option *ngFor="let status of statusOptions()" [value]="status">{{ status | titlecase }}</option>
+      </select>
+    </div>
+    <div class="grid gap-2">
+      <label class="form-label" for="tracking-number">Tracking number</label>
+      <input
+        id="tracking-number"
+        class="form-input"
+        name="trackingNumber"
+        [(ngModel)]="editForm().trackingNumber"
+      />
+    </div>
+    <div class="grid gap-2">
+      <label class="form-label" for="tracking-url">Tracking URL</label>
+      <input
+        id="tracking-url"
+        class="form-input"
+        name="trackingUrl"
+        [(ngModel)]="editForm().trackingUrl"
+        placeholder="https://carrier.example/track/123"
+      />
+    </div>
+    <div class="grid gap-2">
+      <label class="form-label" for="shipping-carrier">Carrier</label>
+      <input
+        id="shipping-carrier"
+        class="form-input"
+        name="shippingCarrier"
+        [(ngModel)]="editForm().shippingCarrier"
+        placeholder="FedEx"
+      />
+    </div>
+    <div class="flex items-center justify-end gap-2 pt-2">
+      <button type="button" class="rounded-full border px-4 py-2 text-sm" (click)="closeEdit()">Cancel</button>
+      <button type="submit" class="btn btn-primary rounded-full px-5" [disabled]="editBusy()">Save changes</button>
+    </div>
+  </form>
+  <p *ngIf="editBusy()" class="pt-2 text-sm text-slate-500 dark:text-slate-300">Saving changes…</p>
+</app-modal>

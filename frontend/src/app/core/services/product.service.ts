@@ -13,6 +13,9 @@ export interface ProductSummary {
   shopSlug?: string;
   published?: boolean;
   stock?: number;
+  summary?: string;
+  category?: string;
+  images?: string[];
 }
 
 export interface ApiResponse<T> {
@@ -42,6 +45,14 @@ export class ProductService {
     return this.http.post<ApiResponse<ProductSummary>>(`${this.api}/v1/products`, body, {
       withCredentials: true,
     });
+  }
+
+  updateProduct(productUuid: string, body: Record<string, unknown>): Observable<ApiResponse<ProductSummary>> {
+    return this.http.patch<ApiResponse<ProductSummary>>(
+      `${this.api}/v1/products/${encodeURIComponent(productUuid)}`,
+      body,
+      { withCredentials: true },
+    );
   }
 
   upload(file: File): Observable<ApiResponse<UploadResponse>> {

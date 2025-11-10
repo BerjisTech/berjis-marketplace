@@ -49,6 +49,14 @@ export interface CreateInvitationPayload {
   role: string;
 }
 
+export interface TransferOwnershipPayload {
+  newOwnerUuid: string;
+}
+
+export interface TransferOwnershipResponse {
+  ownerUuid: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TeamService {
   private readonly http = inject(HttpClient);
@@ -103,6 +111,17 @@ export class TeamService {
     return this.http.post<ApiResponse<unknown>>(
       `${this.api}/v1/invitations/${encodeURIComponent(token)}/accept`,
       {},
+      { withCredentials: true }
+    );
+  }
+
+  transferOwnership(
+    slug: string,
+    payload: TransferOwnershipPayload
+  ): Observable<ApiResponse<TransferOwnershipResponse>> {
+    return this.http.post<ApiResponse<TransferOwnershipResponse>>(
+      `${this.api}/v1/shops/${encodeURIComponent(slug)}/transfer`,
+      payload,
       { withCredentials: true }
     );
   }

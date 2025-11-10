@@ -20,6 +20,7 @@ import { ProductsNewPageComponent } from './pages/products-new-page.component';
 
 import { CustomersOverviewPageComponent } from './pages/customers-overview-page.component';
 import { CustomersSegmentsPageComponent } from './pages/customers-segments-page.component';
+import { ProfilePageComponent } from './pages/profile-page.component';
 
 import { MarketingOverviewPageComponent } from './pages/marketing-overview-page.component';
 import { MarketingCampaignsPageComponent } from './pages/marketing-campaigns-page.component';
@@ -98,6 +99,8 @@ export const routes: Routes = [
     // Customers
     { path: 'customers', component: CustomersOverviewPageComponent },
     { path: 'customers/segments', component: CustomersSegmentsPageComponent },
+    // Account
+    { path: 'profile', component: ProfilePageComponent },
     // Marketing
     { path: 'marketing', component: MarketingOverviewPageComponent },
     { path: 'marketing/campaigns', component: MarketingCampaignsPageComponent },

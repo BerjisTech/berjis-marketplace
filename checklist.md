@@ -16,7 +16,7 @@
 - [x] Store switching interface
 - [x] Team invitation system
 - [x] Team member roles and permissions
-- [ ] Store ownership transfer
+- [x] Store ownership transfer
 - [x] Team member management (add/remove/update roles)
 - [x] User-store relationship mapping
 - [x] Store isolation (data segregation per store)
@@ -29,7 +29,7 @@
 - [ ] Categories table
 - [x] Orders table
 - [x] Order_items table
-- [ ] Customers table
+- [x] Customers table
 - [ ] Inventory table
 - [ ] Collections table
 - [ ] Discounts table
@@ -115,13 +115,13 @@
 ## 4. Customer Management
 
 ### Customer Database
-- [ ] Customer profiles
-- [ ] Customer registration
-- [ ] Customer order history
-- [ ] Customer lifetime value calculation
-- [ ] Customer notes
-- [ ] Customer tags
-- [ ] Customer search and filtering
+- [x] Customer profiles
+- [x] Customer registration
+- [x] Customer order history
+- [x] Customer lifetime value calculation
+- [x] Customer notes
+- [x] Customer tags
+- [x] Customer search and filtering
 
 ### Segmentation
 - [ ] Customer segment creation
