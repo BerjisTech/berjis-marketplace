@@ -141,13 +141,22 @@
               </div>
             </td>
             <td class="px-4 py-3 align-middle">
-              <button
-                type="button"
-                class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
-                (click)="openOrdersModal(customer)"
-              >
-                View orders
-              </button>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+                  (click)="openEditModal(customer)"
+                >
+                  Edit details
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+                  (click)="openDetailDrawer(customer)"
+                >
+                  View details
+                </button>
+              </div>
             </td>
           </tr>
           <tr *ngIf="!loading() && customersList().length === 0">
@@ -166,44 +175,304 @@
   </section>
 </div>
 
-<app-modal
-  [open]="ordersModalOpen()"
-  [title]="selectedCustomer() ? customerName(selectedCustomer()!) : 'Orders'"
-  maxWidth="720px"
-  (closed)="closeOrdersModal()"
+<div
+  *ngIf="detailOpen()"
+  class="fixed inset-0 z-50 flex items-stretch justify-end bg-slate-900/25 backdrop-blur-sm dark:bg-slate-950/60"
 >
-  <div *ngIf="ordersError()" class="notice error mb-3">{{ ordersError() }}</div>
-  <div *ngIf="ordersLoading()" class="text-sm text-slate-500 dark:text-slate-300">
-    Loading order history&hellip;
+  <button
+    type="button"
+    class="hidden flex-1 cursor-pointer border-0 bg-transparent md:block"
+    aria-label="Close customer drawer"
+    (click)="closeDetailDrawer()"
+  ></button>
+  <article
+    class="detail-drawer relative h-full w-full max-w-[430px] bg-white shadow-2xl transition dark:bg-slate-950"
+  >
+    <header class="flex items-start justify-between border-b border-slate-200/70 p-5 dark:border-slate-800">
+      <div class="space-y-1">
+        <div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Customer</div>
+        <h2 class="text-lg font-semibold text-blue-900 dark:text-white">
+          {{ selectedCustomer() ? customerName(selectedCustomer()!) : 'Details' }}
+        </h2>
+        <p class="text-xs text-slate-500 dark:text-slate-400">
+          {{ selectedCustomer()?.email }}
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button
+          *ngIf="selectedCustomer()"
+          type="button"
+          class="rounded-full border border-blue-900/20 px-3 py-1 text-xs font-medium text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+          (click)="openEditModal(selectedCustomer()!)"
+        >
+          Edit
+        </button>
+        <button
+          type="button"
+          class="rounded-full border border-blue-900/20 px-3 py-1 text-xs font-medium text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+          aria-label="Close"
+          (click)="closeDetailDrawer()"
+        >
+          Close
+        </button>
+      </div>
+    </header>
+    <div class="flex h-[calc(100%-68px)] flex-col">
+      <div class="flex-1 overflow-y-auto px-5 py-6">
+        <div *ngIf="detailError()" class="notice error mb-4">{{ detailError() }}</div>
+        <div *ngIf="detailLoading()" class="mb-4 text-sm text-slate-500 dark:text-slate-300">
+          Fetching latest profile details&hellip;
+        </div>
+
+        <ng-container *ngIf="selectedCustomer() as detail">
+          <section class="detail-section">
+            <h3>Overview</h3>
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="detail-card">
+                <div class="detail-label">Total spent</div>
+                <div class="detail-value">
+                  {{ formatCurrency(detail.totalSpentCents ?? 0, 'USD') }}
+                </div>
+              </div>
+              <div class="detail-card">
+                <div class="detail-label">Orders</div>
+                <div class="detail-value">{{ detail.ordersCount ?? 0 }}</div>
+              </div>
+              <div class="detail-card">
+                <div class="detail-label">Average order</div>
+                <div class="detail-value">{{ averageOrderValue(detail) }}</div>
+              </div>
+              <div class="detail-card">
+                <div class="detail-label">Last order</div>
+                <div class="detail-value text-sm">
+                  {{ detail.lastOrderAt ? formatDate(detail.lastOrderAt) : 'No orders yet' }}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="detail-section">
+            <h3>Contact</h3>
+            <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+              <li>Email: <span class="font-medium text-blue-900 dark:text-white">{{ detail.email }}</span></li>
+              <li>
+                Phone:
+                <span class="font-medium text-blue-900 dark:text-white">
+                  {{ detail.phone || 'Not provided' }}
+                </span>
+              </li>
+              <li>{{ marketingStatus(detail) }}</li>
+            </ul>
+          </section>
+
+          <section class="detail-section">
+            <div class="flex items-center justify-between">
+              <h3>Tags</h3>
+              <button
+                type="button"
+                class="text-xs font-medium text-blue-600 underline-offset-2 hover:underline dark:text-blue-300"
+                (click)="openEditModal(detail)"
+              >
+                Manage tags
+              </button>
+            </div>
+            <div *ngIf="tags(detail).length > 0; else noTags" class="flex flex-wrap gap-1.5">
+              <span
+                *ngFor="let tag of tags(detail)"
+                class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/50 dark:text-blue-200"
+              >
+                {{ tag }}
+              </span>
+            </div>
+            <ng-template #noTags>
+              <p class="text-sm text-slate-500 dark:text-slate-400">No tags assigned yet.</p>
+            </ng-template>
+          </section>
+
+          <section class="detail-section">
+            <h3>Addresses</h3>
+            <div class="rounded-xl border border-blue-900/15 bg-white/70 p-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+              <ng-container *ngIf="hasLinkedAccount(detail); else noAccount">
+                No addresses captured for this customer yet.
+              </ng-container>
+              <ng-template #noAccount>
+                Customer is not linked to a Berjis account. Addresses will appear once they create one.
+              </ng-template>
+            </div>
+          </section>
+
+          <section class="detail-section">
+            <div class="flex items-center justify-between">
+              <h3>Timeline</h3>
+              <span class="text-xs text-slate-500 dark:text-slate-400">
+                {{ detailTimeline().length }} events
+              </span>
+            </div>
+            <ng-container *ngIf="detailTimeline().length > 0; else emptyTimeline">
+              <ol class="space-y-3">
+                <li
+                  *ngFor="let event of detailTimeline()"
+                  class="flex items-start gap-3 rounded-xl border border-blue-900/10 bg-white/80 p-3 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+                >
+                  <span
+                    class="material-symbols-outlined text-[18px] leading-none"
+                    [ngClass]="timelineAccent(event)"
+                  >
+                    {{ timelineIcon(event) }}
+                  </span>
+                  <div class="space-y-1">
+                    <div class="font-medium text-blue-900 dark:text-white">{{ event.title }}</div>
+                    <div *ngIf="event.subtitle" class="text-xs text-slate-500 dark:text-slate-400">
+                      {{ event.subtitle }}
+                    </div>
+                    <div class="text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                      {{ formatDate(event.timestamp) }}
+                    </div>
+                  </div>
+                </li>
+              </ol>
+            </ng-container>
+            <ng-template #emptyTimeline>
+              <p class="text-sm text-slate-500 dark:text-slate-400">No activity recorded yet.</p>
+            </ng-template>
+          </section>
+
+          <section class="detail-section">
+            <div class="flex items-center justify-between">
+              <h3>Orders</h3>
+              <span class="text-xs text-slate-500 dark:text-slate-400">
+                {{ detail.ordersCount ?? 0 }} total
+              </span>
+            </div>
+            <div *ngIf="detailOrdersError()" class="notice error mb-3">{{ detailOrdersError() }}</div>
+            <div *ngIf="detailOrdersLoading()" class="text-sm text-slate-500 dark:text-slate-300">
+              Loading order history&hellip;
+            </div>
+            <table *ngIf="!detailOrdersLoading() && detailOrders().length > 0" class="w-full text-sm">
+              <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+                <tr class="text-left text-slate-600 dark:text-slate-300">
+                  <th class="px-3 py-2 font-medium">Order</th>
+                  <th class="px-3 py-2 font-medium">Total</th>
+                  <th class="px-3 py-2 font-medium">Status</th>
+                  <th class="px-3 py-2 font-medium">Placed</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let order of detailOrders()" class="border-t border-blue-900/10 dark:border-slate-800">
+                  <td class="px-3 py-2 align-middle">
+                    <div class="font-medium text-blue-900 dark:text-white">{{ order.uuid | slice:0:8 }}</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      Updated {{ formatDate(order.updatedAt) }}
+                    </div>
+                  </td>
+                  <td class="px-3 py-2 align-middle text-slate-700 dark:text-slate-200">
+                    {{ formatCurrency(order.totalCents ?? 0, order.currency ?? 'USD') }}
+                  </td>
+                  <td class="px-3 py-2 align-middle">
+                    <span class="status-pill">{{ order.status | titlecase }}</span>
+                  </td>
+                  <td class="px-3 py-2 align-middle text-slate-700 dark:text-slate-200">
+                    {{ formatDate(order.createdAt) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p *ngIf="!detailOrdersLoading() && detailOrders().length === 0" class="text-sm text-slate-500 dark:text-slate-300">
+              No orders recorded yet.
+            </p>
+          </section>
+        </ng-container>
+      </div>
+    </div>
+  </article>
+</div>
+
+<app-modal
+  [open]="editModalOpen()"
+  [title]="editingCustomer() ? 'Edit ' + customerName(editingCustomer()!) : 'Edit customer'"
+  maxWidth="720px"
+  (closed)="closeEditModal()"
+>
+  <div *ngIf="editError()" class="notice error mb-3">{{ editError() }}</div>
+
+  <div
+    *ngIf="editingCustomer()"
+    class="mb-4 rounded-xl border border-blue-900/15 bg-blue-50/60 p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200"
+  >
+    <div class="font-medium text-blue-900 dark:text-white">{{ customerName(editingCustomer()!) }}</div>
+    <div class="mt-2 flex flex-wrap gap-3 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+      <span>Joined {{ formatDate(editingCustomer()!.createdAt) }}</span>
+      <span>Orders {{ editingCustomer()!.ordersCount }}</span>
+      <span>Last order {{ formatDate(editingCustomer()!.lastOrderAt) }}</span>
+    </div>
   </div>
-  <table *ngIf="!ordersLoading() && customerOrders().length > 0" class="w-full text-sm">
-    <thead class="bg-blue-50/70 dark:bg-slate-900/70">
-      <tr class="text-left text-slate-600 dark:text-slate-300">
-        <th class="px-3 py-2 font-medium">Order</th>
-        <th class="px-3 py-2 font-medium">Total</th>
-        <th class="px-3 py-2 font-medium">Status</th>
-        <th class="px-3 py-2 font-medium">Placed</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr *ngFor="let order of customerOrders()" class="border-t border-blue-900/10 dark:border-slate-800">
-        <td class="px-3 py-2 align-middle">
-          <div class="font-medium text-blue-900 dark:text-white">{{ order.uuid | slice:0:8 }}</div>
-          <div class="text-xs text-slate-500 dark:text-slate-400">
-            Updated {{ formatDate(order.updatedAt) }}
-          </div>
-        </td>
-        <td class="px-3 py-2 align-middle text-slate-700 dark:text-slate-200">
-          {{ formatCurrency(order.totalCents ?? 0, order.currency ?? 'USD') }}
-        </td>
-        <td class="px-3 py-2 align-middle">
-          <span class="status-pill">{{ order.status | titlecase }}</span>
-        </td>
-        <td class="px-3 py-2 align-middle text-slate-700 dark:text-slate-200">{{ formatDate(order.createdAt) }}</td>
-      </tr>
-    </tbody>
-  </table>
-  <p *ngIf="!ordersLoading() && customerOrders().length === 0" class="text-sm text-slate-500 dark:text-slate-300">
-    No orders recorded yet.
-  </p>
+
+  <div *ngIf="editLoading()" class="mb-3 text-sm text-slate-500 dark:text-slate-300">
+    Loading latest details&hellip;
+  </div>
+
+  <form class="mt-2" (ngSubmit)="updateCustomer()" novalidate>
+    <fieldset class="grid gap-3 md:grid-cols-2" [disabled]="editBusy() || editLoading()">
+      <div class="grid gap-2 md:col-span-2">
+        <label class="form-label" for="edit-customer-email">Email</label>
+        <input
+          id="edit-customer-email"
+          class="form-input"
+          placeholder="customer@example.com"
+          required
+          name="editEmail"
+          [(ngModel)]="editForm().email"
+        />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="edit-customer-first-name">First name</label>
+        <input id="edit-customer-first-name" class="form-input" name="editFirstName" [(ngModel)]="editForm().firstName" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="edit-customer-last-name">Last name</label>
+        <input id="edit-customer-last-name" class="form-input" name="editLastName" [(ngModel)]="editForm().lastName" />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="edit-customer-phone">Phone</label>
+        <input id="edit-customer-phone" class="form-input" name="editPhone" [(ngModel)]="editForm().phone" />
+      </div>
+      <div class="grid gap-2 md:col-span-2">
+        <label class="form-label" for="edit-customer-notes">Internal notes</label>
+        <textarea
+          id="edit-customer-notes"
+          class="form-input min-h-[80px]"
+          name="editNotes"
+          [(ngModel)]="editForm().notes"
+          placeholder="Important preferences, VIP context"
+        ></textarea>
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="edit-customer-tags">Tags</label>
+        <input
+          id="edit-customer-tags"
+          class="form-input"
+          placeholder="vip, wholesale"
+          name="editTags"
+          [(ngModel)]="editForm().tags"
+        />
+      </div>
+      <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+        <input type="checkbox" name="editMarketingOptIn" [(ngModel)]="editForm().marketingOptIn" />
+        <span>Opted into marketing emails</span>
+      </label>
+      <div class="md:col-span-2 flex items-center justify-end gap-2">
+        <button
+          type="button"
+          class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+          (click)="closeEditModal()"
+          [disabled]="editBusy()"
+        >
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary rounded-full px-5" [disabled]="editBusy()">
+          {{ editBusy() ? 'Saving...' : 'Save changes' }}
+        </button>
+      </div>
+    </fieldset>
+  </form>
 </app-modal>

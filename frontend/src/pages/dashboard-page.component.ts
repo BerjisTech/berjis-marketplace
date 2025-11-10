@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { environment } from '../environments/environment';
 import { DarkModeToggleComponent } from '../app/components/dark-mode-toggle/dark-mode-toggle.component';
+import { ProfileService, UserProfile } from '../app/core/services/profile.service';
 import { ApiResponse, CreateProductPayload, ProductSummary } from '../app/core/services/product.service';
 
 @Component({
@@ -17,6 +18,7 @@ import { ApiResponse, CreateProductPayload, ProductSummary } from '../app/core/s
 export class DashboardPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly api = environment.apiBase;
+  private readonly profileService = inject(ProfileService);
 
   shops = signal<ShopSummary[]>([]);
   selectedShopSlug = signal<string>('');
@@ -32,6 +34,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   searching = signal<boolean>(false);
   searchResults = signal<DashboardSearchResults | null>(null);
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  profile = signal<UserProfile | null>(null);
+  profileLoading = signal<boolean>(false);
 
   // computed widths for grid columns
   get navW() { return this.navCollapsed() ? 60 : 220; }
@@ -41,7 +45,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   newProduct: CreateProductPayload = { title: '', slug: '', summary: '', priceCents: 0, currency: 'USD', stock: 0, published: true, category: '' };
   uploadBusy = signal(false);
 
-  ngOnInit(): void { this.loadShops(); }
+  ngOnInit(): void {
+    this.loadShops();
+    this.loadProfile();
+  }
   ngOnDestroy(): void {
     if (this.searchTimer) {
       clearTimeout(this.searchTimer);
@@ -106,6 +113,54 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     this.http.delete(`${this.api}/v1/products/${p.uuid}`, { withCredentials: true }).subscribe(()=> this.loadProducts());
   }
   openAI(){ this.toolsOpen.set(true); }
+
+  loadProfile(): void {
+    this.profileLoading.set(true);
+    this.profileService.getProfile().subscribe({
+      next: (response) => {
+        const data = response?.data;
+        if (data?.profile) {
+          this.profile.set(data.profile);
+        }
+        this.profileLoading.set(false);
+      },
+      error: () => {
+        this.profileLoading.set(false);
+      }
+    });
+  }
+
+  profileName(): string {
+    const profile = this.profile();
+    if (!profile) {
+      return '';
+    }
+    if (profile.displayName && profile.displayName.trim().length > 0) {
+      return profile.displayName.trim();
+    }
+    return (profile.email ?? '').trim();
+  }
+
+  profileEmail(): string {
+    return this.profile()?.email ?? '';
+  }
+
+  profileInitials(): string {
+    const profile = this.profile();
+    const fallback = profile?.displayName?.trim() || profile?.email?.trim() || '';
+    if (!fallback) {
+      return '?';
+    }
+    const parts = fallback.split(/[\s@._-]+/).filter(Boolean).slice(0, 2);
+    if (!parts.length) {
+      return '?';
+    }
+    return parts.map(part => part.charAt(0).toUpperCase()).join('').slice(0, 2);
+  }
+
+  toggleUserMenu(): void {
+    this.userMenuOpen.set(!this.userMenuOpen());
+  }
 }
 
 export interface ShopSummary {

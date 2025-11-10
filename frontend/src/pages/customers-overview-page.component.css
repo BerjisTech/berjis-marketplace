@@ -109,3 +109,56 @@
   background: rgba(59, 130, 246, 0.25);
   color: #9ec5ff;
 }
+
+.detail-section {
+  margin-bottom: 1.75rem;
+}
+
+.detail-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.detail-section h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+:host-context(.dark) .detail-section h3 {
+  color: #e2e8f0;
+}
+
+.detail-card {
+  border-radius: 0.95rem;
+  border: 1px solid rgba(15, 76, 129, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.9rem 1rem;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+}
+
+:host-context(.dark) .detail-card {
+  border-color: rgba(148, 163, 184, 0.15);
+  background: rgba(15, 23, 42, 0.65);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.35);
+}
+
+.detail-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+}
+
+:host-context(.dark) .detail-label {
+  color: #94a3b8;
+}
+
+.detail-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+:host-context(.dark) .detail-value {
+  color: #f1f5f9;
+}

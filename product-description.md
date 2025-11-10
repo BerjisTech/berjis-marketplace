@@ -452,6 +452,8 @@ CREATE TABLE order_items (
 - [x] Implement sales chart (custom built)
 - [x] Build product management table
 - [x] Create product edit modal
+- [x] Create customer edit modal (details + update flow)
+- [x] Build customer detail drawer with timeline and metrics
 - [x] Build order management interface
 - [x] Implement user management table
 - [x] Add user role management
@@ -460,6 +462,7 @@ CREATE TABLE order_items (
 - [x] Build user profile page
 - [x] Create profile edit form
 - [x] Implement address management
+- [x] Wire dashboard header user menu to live profile data
 - [x] Add wishlist functionality
 - [x] Build modal system
 - [x] Create toast notification system

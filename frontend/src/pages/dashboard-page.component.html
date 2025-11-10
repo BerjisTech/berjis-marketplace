@@ -44,19 +44,39 @@
       <button class="rounded-full h-9 w-9 grid place-items-center border border-blue-900/20 dark:border-slate-700"
         (click)="openAI()"><span class="material-symbols-outlined text-[18px]">smart_toy</span></button>
       <div class="relative">
-        <button
-          class="rounded-full h-9 w-9 grid place-items-center border border-blue-900/20 dark:border-slate-700 overflow-hidden"
-          (click)="userMenuOpen.set(!userMenuOpen())">
-          <span class="material-symbols-outlined text-[18px]">account_circle</span>
-        </button>
+      <button
+        type="button"
+        class="relative h-9 w-9 overflow-hidden rounded-full border border-blue-900/20 bg-white/80 text-xs font-semibold uppercase text-blue-900 shadow-sm transition hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100"
+        (click)="toggleUserMenu()"
+        [attr.aria-expanded]="userMenuOpen()"
+        aria-haspopup="true"
+        aria-label="Open account menu">
+        <ng-container *ngIf="profile()?.avatarUrl; else profileInitialsTpl">
+          <img [src]="profile()?.avatarUrl" alt="" class="h-full w-full object-cover" />
+        </ng-container>
+      </button>
+      <ng-template #profileInitialsTpl>
+        <span>{{ profileInitials() }}</span>
+      </ng-template>
+      <div
+        class="absolute right-0 mt-2 w-52 rounded-xl border border-blue-900/20 bg-white p-2 shadow-brand dark:border-slate-700 dark:bg-slate-950"
+        *ngIf="userMenuOpen()">
         <div
-          class="absolute right-0 mt-2 w-44 rounded-xl border border-blue-900/20 dark:border-slate-700 bg-white dark:bg-slate-950 shadow-brand p-2"
-          *ngIf="userMenuOpen()">
-          <a routerLink="/dashboard/profile"
-            class="block px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover=bgs-slate-900/60">Account</a>
-          <a routerLink="/auth/logout"
-            class="block px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover=bgs-slate-900/60">Sign out</a>
+          *ngIf="profile()"
+          class="mb-2 rounded-lg bg-blue-50/70 p-3 text-left text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+          <div class="font-medium text-blue-900 dark:text-white">{{ profileName() || 'Account' }}</div>
+          <div class="text-xs text-slate-500 dark:text-slate-400">{{ profileEmail() }}</div>
         </div>
+        <div *ngIf="profileLoading() && !profile()" class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+          Loading profile&hellip;
+        </div>
+        <a
+          routerLink="/dashboard/profile"
+          class="block rounded-lg px-3 py-2 text-sm hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Account settings</a>
+        <a
+          routerLink="/auth/logout"
+          class="block rounded-lg px-3 py-2 text-sm hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Sign out</a>
+      </div>
       </div>
       <app-dark-mode-toggle></app-dark-mode-toggle>
     </div>
@@ -202,4 +222,3 @@
     <span class="material-symbols-outlined">tune</span>
   </button>
 </div>
-

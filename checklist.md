@@ -122,6 +122,8 @@
 - [x] Customer notes
 - [x] Customer tags
 - [x] Customer search and filtering
+- [x] Customer profile editing UI (modal + API update)
+- [x] Customer detail drawer with timeline and order history snapshot
 
 ### Segmentation
 - [ ] Customer segment creation
@@ -366,6 +368,7 @@
 - [x] Team management dashboard UI (list/update/remove roles)
 - [x] Invite by email workflow (form + pending list + copy link)
 - [x] Invitation acceptance route and handler
+- [x] Dashboard header user menu surfaces profile name, email, and avatar
 
 ---
 
