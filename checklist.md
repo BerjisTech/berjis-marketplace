@@ -26,14 +26,14 @@
 - [x] Stores table
 - [x] Store_users (team membership) table
 - [x] Products table (with store_id)
-- [ ] Categories table
+- [x] Categories table
 - [x] Orders table
 - [x] Order_items table
 - [x] Customers table
-- [ ] Inventory table
-- [ ] Collections table
-- [ ] Discounts table
-- [ ] Gift_cards table
+- [x] Inventory table
+- [x] Collections table
+- [x] Discounts table
+- [x] Gift_cards table
 - [ ] Blog_posts table
 - [ ] Files/Media table
 - [ ] Menus table
