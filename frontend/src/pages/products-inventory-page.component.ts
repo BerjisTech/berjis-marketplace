@@ -9,6 +9,7 @@ import {
   InventoryAlert,
   InventoryAdjustment,
   InventoryEntry,
+  InventoryLocation,
   InventoryService,
 } from '../app/core/services/inventory.service';
 
@@ -67,6 +68,17 @@ export class ProductsInventoryPageComponent implements OnInit {
   readonly safetyForm = signal<SafetyFormModel>({
     safetyStock: 0,
   });
+  readonly locations = signal<InventoryLocation[]>([]);
+  readonly locationLoading = signal<boolean>(false);
+  readonly locationBusy = signal<boolean>(false);
+  readonly locationError = signal<string>('');
+  readonly editingLocation = signal<InventoryLocation | null>(null);
+  readonly locationForm = signal<{ name: string; code: string; description: string; isPrimary: boolean }>({
+    name: '',
+    code: '',
+    description: '',
+    isPrimary: false,
+  });
 
   readonly hasInventory: Signal<boolean> = computed(
     () => !this.loading() && this.inventory().length > 0,
@@ -90,6 +102,7 @@ export class ProductsInventoryPageComponent implements OnInit {
           if (initial) {
             this.loadInventory();
             this.refreshAlerts();
+            this.loadLocations();
           } else {
             this.loading.set(false);
           }
@@ -109,6 +122,8 @@ export class ProductsInventoryPageComponent implements OnInit {
     this.history.set([]);
     this.loadInventory();
     this.refreshAlerts();
+    this.resetLocationForm();
+    this.loadLocations();
   }
 
   loadInventory(): void {
@@ -278,6 +293,118 @@ export class ProductsInventoryPageComponent implements OnInit {
           this.error.set('Could not update safety stock.');
         },
       });
+  }
+
+  loadLocations(): void {
+    const slug = this.shopSlug();
+    if (!slug) {
+      this.locations.set([]);
+      return;
+    }
+    this.locationLoading.set(true);
+    this.locationError.set('');
+    this.inventoryApi.listLocations(slug).subscribe({
+      next: (response) => {
+        this.locations.set(response?.data ?? []);
+        this.locationLoading.set(false);
+      },
+      error: () => {
+        this.locationLoading.set(false);
+        this.locationError.set('Could not load locations.');
+      },
+    });
+  }
+
+  submitLocationForm(): void {
+    const slug = this.shopSlug();
+    if (!slug) {
+      return;
+    }
+    const form = this.locationForm();
+    const name = form.name.trim();
+    const code = form.code.trim();
+    if (!name || !code) {
+      this.locationError.set('Name and code are required.');
+      return;
+    }
+    this.locationBusy.set(true);
+    this.locationError.set('');
+    const payload = {
+      name,
+      code,
+      description: form.description.trim(),
+      isPrimary: form.isPrimary,
+    };
+    const editing = this.editingLocation();
+    const request = editing
+      ? this.inventoryApi.updateLocation(slug, editing.uuid, payload)
+      : this.inventoryApi.createLocation(slug, payload);
+    request.subscribe({
+      next: () => {
+        this.locationBusy.set(false);
+        this.message.set(editing ? 'Location updated.' : 'Location created.');
+        this.resetLocationForm();
+        this.loadLocations();
+      },
+      error: (err) => {
+        this.locationBusy.set(false);
+        const status = err?.status ?? 500;
+        if (status === 409) {
+          this.locationError.set('A location with that code already exists.');
+        } else if (status === 400) {
+          this.locationError.set('Location rejected. Check the values and try again.');
+        } else {
+          this.locationError.set('Could not save location.');
+        }
+      },
+    });
+  }
+
+  editLocation(location: InventoryLocation): void {
+    this.editingLocation.set(location);
+    this.locationForm.set({
+      name: location.name,
+      code: location.code,
+      description: location.description ?? '',
+      isPrimary: location.isPrimary,
+    });
+    this.locationError.set('');
+  }
+
+  cancelLocationEdit(): void {
+    this.resetLocationForm();
+  }
+
+  setPrimaryLocation(location: InventoryLocation): void {
+    const slug = this.shopSlug();
+    if (!slug) {
+      return;
+    }
+    this.locationBusy.set(true);
+    this.locationError.set('');
+    this.inventoryApi.updateLocation(slug, location.uuid, { isPrimary: true }).subscribe({
+      next: () => {
+        this.locationBusy.set(false);
+        this.message.set('Primary location updated.');
+        this.loadLocations();
+      },
+      error: () => {
+        this.locationBusy.set(false);
+        this.locationError.set('Could not update primary location.');
+      },
+    });
+  }
+
+  resetLocationForm(): void {
+    this.editingLocation.set(null);
+    this.locationForm.set({
+      name: '',
+      code: '',
+      description: '',
+      isPrimary: false,
+    });
+    this.locationError.set('');
+    this.locationBusy.set(false);
   }
 
   resolveAlert(alert: InventoryAlert): void {

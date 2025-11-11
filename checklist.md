@@ -64,9 +64,9 @@
 - [x] Low stock alerts
 - [x] Inventory adjustments
 - [x] Inventory history/audit log
-- [ ] Multi-location inventory (if needed)
-- [ ] Purchase orders system
-- [ ] Transfer system between locations
+- [x] Multi-location inventory (if needed)
+- [x] Purchase orders system
+- [x] Transfer system between locations
 
 ### Collections
 - [x] Collection creation

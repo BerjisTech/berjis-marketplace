@@ -20,6 +20,17 @@ export interface InventoryEntry {
   updatedAt: string;
 }
 
+export interface InventoryLocation {
+  uuid: string;
+  shopUuid: string;
+  name: string;
+  code: string;
+  description: string;
+  isPrimary: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface InventoryAdjustment {
   uuid: string;
   inventoryLevelUuid: string;
@@ -126,6 +137,41 @@ export class InventoryService {
     return this.http.post<ApiResponse<InventoryAlert>>(
       `${this.api}/v1/my/shops/${shopSlug}/inventory/alerts/${alertUuid}/resolve`,
       body,
+      { withCredentials: true },
+    );
+  }
+
+  listLocations(shopSlug: string): Observable<ApiResponse<InventoryLocation[]>> {
+    return this.http.get<ApiResponse<InventoryLocation[]>>(
+      `${this.api}/v1/my/shops/${shopSlug}/inventory/locations`,
+      { withCredentials: true },
+    );
+  }
+
+  createLocation(
+    shopSlug: string,
+    payload: { name: string; code: string; description?: string; isPrimary?: boolean },
+  ): Observable<ApiResponse<InventoryLocation>> {
+    return this.http.post<ApiResponse<InventoryLocation>>(
+      `${this.api}/v1/my/shops/${shopSlug}/inventory/locations`,
+      {
+        name: payload.name,
+        code: payload.code,
+        description: payload.description ?? '',
+        isPrimary: !!payload.isPrimary,
+      },
+      { withCredentials: true },
+    );
+  }
+
+  updateLocation(
+    shopSlug: string,
+    locationUuid: string,
+    payload: Partial<{ name: string; code: string; description: string; isPrimary: boolean }>,
+  ): Observable<ApiResponse<InventoryLocation>> {
+    return this.http.patch<ApiResponse<InventoryLocation>>(
+      `${this.api}/v1/my/shops/${shopSlug}/inventory/locations/${locationUuid}`,
+      payload,
       { withCredentials: true },
     );
   }

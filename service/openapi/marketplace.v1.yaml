@@ -167,6 +167,230 @@ paths:
       responses:
         '200': { description: ok }
         '404': { description: not found }
+  /v1/my/shops/{slug}/inventory/locations:
+    get:
+      summary: List inventory locations for a shop
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+    post:
+      summary: Create a new inventory location
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string }
+                description: { type: string }
+                isPrimary: { type: boolean }
+      responses:
+        '200': { description: ok }
+        '409': { description: conflict }
+  /v1/my/shops/{slug}/inventory/locations/{id}:
+    patch:
+      summary: Update an inventory location
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string }
+                description: { type: string }
+                isPrimary: { type: boolean }
+      responses:
+        '200': { description: ok }
+        '404': { description: not found }
+  /v1/my/shops/{slug}/suppliers:
+    get:
+      summary: List suppliers for a shop
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+    post:
+      summary: Create a supplier
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                contactEmail: { type: string }
+                phone: { type: string }
+                notes: { type: string }
+      responses:
+        '200': { description: ok }
+        '409': { description: conflict }
+  /v1/my/shops/{slug}/purchase-orders:
+    get:
+      summary: List purchase orders for a shop
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+    post:
+      summary: Create a purchase order
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                supplierUuid: { type: string }
+                supplierName: { type: string }
+                contactEmail: { type: string }
+                phone: { type: string }
+                expectedAt: { type: string, format: date-time }
+                notes: { type: string }
+                status: { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      productUuid: { type: string }
+                      quantity: { type: integer }
+                      costCents: { type: integer }
+      responses:
+        '200': { description: ok }
+  /v1/my/shops/{slug}/purchase-orders/{id}/receive:
+    post:
+      summary: Record received items for a purchase order
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                locationUuid: { type: string }
+                note: { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      productUuid: { type: string }
+                      quantity: { type: integer }
+      responses:
+        '200': { description: ok }
+        '400': { description: invalid request }
+  /v1/my/shops/{slug}/transfers:
+    get:
+      summary: List transfers for a shop
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+    post:
+      summary: Create an inventory transfer
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourceLocationUuid: { type: string }
+                destinationLocationUuid: { type: string }
+                notes: { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      productUuid: { type: string }
+                      quantity: { type: integer }
+      responses:
+        '200': { description: ok }
+        '400': { description: invalid request }
+  /v1/my/shops/{slug}/transfers/{id}/commit:
+    post:
+      summary: Commit a transfer and adjust inventory
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string }
+      responses:
+        '200': { description: ok }
+        '400': { description: invalid request }
+        '404': { description: not found }
   /v1/my/shops/{slug}/collections/{id}/rebuild:
     post:
       summary: Rebuild an automatic collection

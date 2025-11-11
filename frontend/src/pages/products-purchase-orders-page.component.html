@@ -1,3 +1,372 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Purchase Orders</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for purchase orders.</p>
+<div class="space-y-4 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Purchase Orders</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Track inbound inventory, suppliers, and receiving activity across your locations.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="shopSlug()"
+        (ngModelChange)="changeShop($event)"
+        aria-label="Select shop"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+    </div>
+  </div>
 
+  <div class="flex flex-wrap gap-2">
+    <a routerLink="/dashboard/products/overview" class="chip-link">Products</a>
+    <a routerLink="/dashboard/products/collections" class="chip-link">Collections</a>
+    <a routerLink="/dashboard/products/inventory" class="chip-link">Inventory</a>
+    <a routerLink="/dashboard/products/purchase-orders" class="chip-link chip-link--active">Purchase orders</a>
+    <a routerLink="/dashboard/products/transfers" class="chip-link">Transfers</a>
+    <a routerLink="/dashboard/products/gift-cards" class="chip-link">Gift cards</a>
+  </div>
+
+  <div *ngIf="orderMessage()" class="notice success">{{ orderMessage() }}</div>
+  <div *ngIf="ordersError()" class="notice error">{{ ordersError() }}</div>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    <div class="space-y-4 lg:col-span-2">
+      <form class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70" (ngSubmit)="submitOrder()">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Create purchase order</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">Select a supplier or add a new one, then add the products you expect.</p>
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Supplier</span>
+            <select
+              class="form-input"
+              name="supplierUuid"
+              [ngModel]="orderForm().supplierUuid"
+              (ngModelChange)="onSupplierSelect($event)"
+            >
+              <option value="">Create new supplier&hellip;</option>
+              <option *ngFor="let supplier of suppliers()" [value]="supplier.uuid">
+                {{ supplier.name }}
+              </option>
+            </select>
+          </label>
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Status</span>
+            <select class="form-input" name="status" [(ngModel)]="orderForm().status">
+              <option value="pending">Pending</option>
+              <option value="submitted">Submitted</option>
+              <option value="draft">Draft</option>
+            </select>
+          </label>
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Supplier name</span>
+            <input
+              class="form-input"
+              name="supplierName"
+              [(ngModel)]="orderForm().supplierName"
+              placeholder="e.g. Acme Supply Co."
+            />
+          </label>
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Contact email</span>
+            <input
+              class="form-input"
+              type="email"
+              name="contactEmail"
+              [(ngModel)]="orderForm().contactEmail"
+              placeholder="supplier@example.com"
+            />
+          </label>
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Phone</span>
+            <input
+              class="form-input"
+              name="phone"
+              [(ngModel)]="orderForm().phone"
+              placeholder="Optional contact number"
+            />
+          </label>
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Expected arrival</span>
+            <input
+              class="form-input"
+              type="datetime-local"
+              name="expectedAt"
+              [(ngModel)]="orderForm().expectedAt"
+            />
+          </label>
+        </div>
+
+        <label class="mt-3 block text-sm text-slate-600 dark:text-slate-300">
+          <span class="block text-sm text-slate-600 dark:text-slate-300">Internal notes</span>
+          <textarea
+            class="form-input mt-1 min-h-[80px]"
+            name="notes"
+            [(ngModel)]="orderForm().notes"
+            placeholder="Optional notes for your team"
+          ></textarea>
+        </label>
+
+        <div class="mt-4 rounded-lg border border-blue-900/10 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Order items
+          </h3>
+          <div class="mt-3 grid gap-3 md:grid-cols-[2fr,1fr,1fr,auto]">
+            <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+              <span>Product UUID</span>
+              <input
+                class="form-input"
+                name="newItemProduct"
+                [(ngModel)]="newItem().productUuid"
+                placeholder="00000000-0000-0000-0000-000000000000"
+              />
+            </label>
+            <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+              <span>Quantity</span>
+              <input
+                class="form-input"
+                type="number"
+                min="1"
+                name="newItemQuantity"
+                [(ngModel)]="newItem().quantity"
+              />
+            </label>
+            <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+              <span>Cost (cents)</span>
+              <input
+                class="form-input"
+                type="number"
+                min="0"
+                name="newItemCost"
+                [(ngModel)]="newItem().costCents"
+              />
+            </label>
+            <div class="flex items-end">
+              <button type="button" class="btn btn-secondary rounded-full px-4 py-2" (click)="addItem()">
+                Add item
+              </button>
+            </div>
+          </div>
+          <div *ngIf="orderError()" class="mt-3 text-sm text-rose-500">{{ orderError() }}</div>
+          <ul *ngIf="orderItems().length > 0" class="mt-4 divide-y divide-blue-900/10 dark:divide-slate-800">
+            <li *ngFor="let item of orderItems(); let i = index" class="flex items-center justify-between py-2 text-sm">
+              <div>
+                <div class="font-medium text-blue-900 dark:text-white">{{ item.productUuid | slice: 0:8 }}&hellip;</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  Qty {{ item.quantity }} · Cost {{ item.costCents | number: '1.0-0' }}¢
+                </div>
+              </div>
+              <button type="button" class="text-xs text-rose-500 hover:underline" (click)="removeItem(i)">Remove</button>
+            </li>
+          </ul>
+          <div *ngIf="orderItems().length === 0" class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            No items added yet.
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="submit"
+            class="btn btn-primary rounded-full px-5 py-2"
+            [disabled]="submittingOrder() || orderItems().length === 0"
+          >
+            {{ submittingOrder() ? 'Creating…' : 'Create purchase order' }}
+          </button>
+          <button type="button" class="btn btn-secondary rounded-full px-5 py-2" (click)="resetOrderForm()">
+            Reset
+          </button>
+        </div>
+      </form>
+
+      <div class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Recent purchase orders</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              Monitor order status and receiving progress.
+            </p>
+          </div>
+          <button type="button" class="text-xs text-blue-600 hover:underline dark:text-blue-300" (click)="loadOrders()">
+            Refresh
+          </button>
+        </div>
+        <div
+          *ngIf="ordersLoading()"
+          class="mt-3 rounded-lg border border-blue-900/10 bg-white/70 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
+        >
+          Loading purchase orders&hellip;
+        </div>
+        <div *ngIf="!ordersLoading() && orders().length === 0" class="mt-3 text-sm text-slate-500 dark:text-slate-300">
+          No purchase orders for this shop yet.
+        </div>
+        <div class="mt-4 space-y-4" *ngIf="orders().length > 0">
+          <div
+            *ngFor="let order of orders()"
+            class="rounded-lg border border-blue-900/10 bg-white/90 p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {{ order.uuid | slice: 0:8 }}&hellip;
+                </div>
+                <div class="text-base font-semibold text-blue-900 dark:text-white">
+                  {{ order.supplierName || 'New supplier' }}
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="rounded-full px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                  [ngClass]="{
+                    'bg-blue-100 text-blue-800': order.status === 'pending',
+                    'bg-emerald-100 text-emerald-800': order.status === 'received',
+                    'bg-amber-100 text-amber-700': order.status === 'partial',
+                    'bg-slate-200 text-slate-600': order.status === 'draft' || order.status === 'submitted'
+                  }"
+                >
+                  {{ order.status }}
+                </span>
+                <button
+                  *ngIf="outstandingItems(order)"
+                  type="button"
+                  class="btn btn-secondary rounded-full px-3 py-1 text-xs"
+                  (click)="startReceive(order)"
+                >
+                  Receive items
+                </button>
+              </div>
+            </div>
+            <div class="mt-2 grid gap-2 text-xs text-slate-600 dark:text-slate-300 md:grid-cols-2">
+              <div>
+                <div *ngIf="order.contactEmail">Email: {{ order.supplierEmail }}</div>
+                <div *ngIf="order.supplierPhone">Phone: {{ order.supplierPhone }}</div>
+              </div>
+              <div>
+                <div>Created {{ order.createdAt | date: 'medium' }}</div>
+                <div *ngIf="order.expectedAt">Expected {{ order.expectedAt | date: 'medium' }}</div>
+              </div>
+            </div>
+            <ul class="mt-3 divide-y divide-blue-900/10 dark:divide-slate-800">
+              <li *ngFor="let item of order.items" class="py-2 text-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div class="font-medium text-blue-900 dark:text-white">{{ item.productTitle || item.productUuid | slice:0:8 }}</div>
+                    <div class="text-xs text-slate-500 dark:text-slate-400">
+                      Qty {{ item.quantity }} · Received {{ item.receivedQuantity }} · Cost {{ item.costCents | number:'1.0-0' }}¢
+                    </div>
+                  </div>
+                  <span *ngIf="pendingQuantity(item) > 0" class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
+                    Pending {{ pendingQuantity(item) }}
+                  </span>
+                </div>
+              </li>
+            </ul>
+            <div *ngIf="order.notes" class="mt-3 rounded-lg border border-blue-900/10 bg-blue-50/70 px-3 py-2 text-xs text-blue-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+              {{ order.notes }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Suppliers</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">Quick reference for existing suppliers.</p>
+          </div>
+          <button type="button" class="text-xs text-blue-600 hover:underline dark:text-blue-300" (click)="loadSuppliers()">
+            Refresh
+          </button>
+        </div>
+        <div *ngIf="suppliersLoading()" class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          Loading suppliers&hellip;
+        </div>
+        <ul *ngIf="suppliers().length > 0" class="mt-3 space-y-3 text-sm">
+          <li
+            *ngFor="let supplier of suppliers()"
+            class="rounded-lg border border-blue-900/10 bg-white/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-900/60"
+          >
+            <div class="font-medium text-blue-900 dark:text-white">{{ supplier.name }}</div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ supplier.contactEmail || 'No email' }}
+              <span *ngIf="supplier.phone"> · {{ supplier.phone }}</span>
+            </div>
+          </li>
+        </ul>
+        <div *ngIf="!suppliersLoading() && suppliers().length === 0" class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          No suppliers yet. Add one while creating a purchase order.
+        </div>
+      </div>
+
+      <div
+        *ngIf="receivingOrder()"
+        class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Receive items</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              Record quantities received for {{ receivingOrder()?.supplierName || 'supplier' }}.
+            </p>
+          </div>
+          <button type="button" class="text-xs text-blue-600 hover:underline dark:text-blue-300" (click)="cancelReceive()">
+            Close
+          </button>
+        </div>
+        <div class="mt-3 space-y-3 text-sm">
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Destination location</span>
+            <select class="form-input" name="receiveLocation" [(ngModel)]="receiveForm().locationUuid">
+              <option value="">Default location</option>
+              <option *ngFor="let location of locations()" [value]="location.uuid">
+                {{ location.name }} ({{ location.code }})
+              </option>
+            </select>
+          </label>
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Receiving note</span>
+            <textarea class="form-input min-h-[60px]" name="receiveNote" [(ngModel)]="receiveForm().note"></textarea>
+          </label>
+        </div>
+
+        <div class="mt-3 rounded-lg border border-blue-900/10 bg-white/80 px-3 py-2 text-xs dark:border-slate-800 dark:bg-slate-900/60">
+          <div class="grid grid-cols-[1fr,auto] gap-2 font-semibold text-slate-500 dark:text-slate-300">
+            <span>Product</span>
+            <span>Receive</span>
+          </div>
+          <div *ngFor="let item of receiveForm().items; let i = index" class="grid grid-cols-[1fr,auto] items-center gap-2 py-1 text-sm">
+            <div class="text-slate-600 dark:text-slate-200">{{ item.productUuid | slice: 0:8 }}&hellip;</div>
+            <input
+              class="form-input h-8 w-24 text-sm"
+              type="number"
+              min="0"
+              name="receiveQty{{ i }}"
+              [(ngModel)]="receiveForm().items[i].quantity"
+            />
+          </div>
+        </div>
+
+        <div *ngIf="receiveError()" class="mt-2 text-sm text-rose-500">{{ receiveError() }}</div>
+        <div class="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-primary rounded-full px-4 py-2"
+            (click)="completeReceive()"
+            [disabled]="receiveBusy()"
+          >
+            {{ receiveBusy() ? 'Recording…' : 'Mark received' }}
+          </button>
+          <button type="button" class="btn btn-secondary rounded-full px-4 py-2" (click)="cancelReceive()">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -471,6 +471,8 @@ CREATE TABLE order_items (
 - [x] Implement automatic collections rules builder and manual product selection UI
 - [x] Add discount redemption analytics dashboard
 - [x] Add gift card reporting and transaction viewer
+- [x] Build purchase order dashboard with creation and receiving workflows
+- [x] Build transfer workflow UI for moving inventory between locations
 
 ### Phase 7: User Experience
 - [x] Build user profile page

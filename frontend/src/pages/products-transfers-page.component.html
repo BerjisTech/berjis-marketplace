@@ -1,3 +1,282 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Transfers</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for transfers.</p>
 
+<div class="space-y-4 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Transfers</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Move inventory between locations and keep stock values accurate.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="shopSlug()"
+        (ngModelChange)="changeShop($event)"
+        aria-label="Select shop"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="flex flex-wrap gap-2">
+    <a routerLink="/dashboard/products/overview" class="chip-link">Products</a>
+    <a routerLink="/dashboard/products/collections" class="chip-link">Collections</a>
+    <a routerLink="/dashboard/products/inventory" class="chip-link">Inventory</a>
+    <a routerLink="/dashboard/products/purchase-orders" class="chip-link">Purchase orders</a>
+    <a routerLink="/dashboard/products/transfers" class="chip-link chip-link--active">Transfers</a>
+    <a routerLink="/dashboard/products/gift-cards" class="chip-link">Gift cards</a>
+  </div>
+
+  <div *ngIf="transferMessage()" class="notice success">{{ transferMessage() }}</div>
+  <div *ngIf="transfersError()" class="notice error">{{ transfersError() }}</div>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    <div class="space-y-4 lg:col-span-2">
+      <form
+        class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+        (ngSubmit)="submitTransfer()"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Create transfer</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              Choose source and destination locations, then add the products to move.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-4 grid gap-4 md:grid-cols-2">
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Source location</span>
+            <select class="form-input" name="sourceLocation" [(ngModel)]="transferForm().sourceLocationUuid">
+              <option value="">Default location</option>
+              <option *ngFor="let location of locations()" [value]="location.uuid">
+                {{ location.name }} ({{ location.code }})
+              </option>
+            </select>
+          </label>
+          <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+            <span>Destination location</span>
+            <select class="form-input" name="destinationLocation" [(ngModel)]="transferForm().destinationLocationUuid">
+              <option value="">Default location</option>
+              <option *ngFor="let location of locations()" [value]="location.uuid">
+                {{ location.name }} ({{ location.code }})
+              </option>
+            </select>
+          </label>
+        </div>
+
+        <label class="mt-3 block text-sm text-slate-600 dark:text-slate-300">
+          <span class="block text-sm text-slate-600 dark:text-slate-300">Notes</span>
+          <textarea
+            class="form-input mt-1 min-h-[80px]"
+            name="transferNotes"
+            [(ngModel)]="transferForm().notes"
+            placeholder="Optional instructions for receiving teams"
+          ></textarea>
+        </label>
+
+        <div class="mt-4 rounded-lg border border-blue-900/10 bg-white/70 p-3 dark:border-slate-800 dark:bg-slate-900/60">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            Transfer items
+          </h3>
+          <div class="mt-3 grid gap-3 md:grid-cols-[2fr,1fr,auto]">
+            <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+              <span>Product UUID</span>
+              <input
+                class="form-input"
+                name="transferProduct"
+                [(ngModel)]="newItem().productUuid"
+                placeholder="00000000-0000-0000-0000-000000000000"
+              />
+            </label>
+            <label class="grid gap-1 text-sm text-slate-600 dark:text-slate-300">
+              <span>Quantity</span>
+              <input
+                class="form-input"
+                type="number"
+                min="1"
+                name="transferQuantity"
+                [(ngModel)]="newItem().quantity"
+              />
+            </label>
+            <div class="flex items-end">
+              <button type="button" class="btn btn-secondary rounded-full px-4 py-2" (click)="addItem()">
+                Add item
+              </button>
+            </div>
+          </div>
+          <div *ngIf="transferError()" class="mt-3 text-sm text-rose-500">{{ transferError() }}</div>
+          <ul *ngIf="transferItems().length > 0" class="mt-3 divide-y divide-blue-900/10 dark:divide-slate-800">
+            <li *ngFor="let item of transferItems(); let i = index" class="flex items-center justify-between py-2 text-sm">
+              <div>
+                <div class="font-medium text-blue-900 dark:text-white">{{ item.productUuid | slice: 0:8 }}&hellip;</div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">Qty {{ item.quantity }}</div>
+              </div>
+              <button type="button" class="text-xs text-rose-500 hover:underline" (click)="removeItem(i)">Remove</button>
+            </li>
+          </ul>
+          <div *ngIf="transferItems().length === 0" class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            No products selected yet.
+          </div>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2">
+          <button
+            type="submit"
+            class="btn btn-primary rounded-full px-5 py-2"
+            [disabled]="submittingTransfer() || transferItems().length === 0"
+          >
+            {{ submittingTransfer() ? 'Creating…' : 'Create transfer' }}
+          </button>
+          <button type="button" class="btn btn-secondary rounded-full px-5 py-2" (click)="resetTransferForm()">
+            Reset
+          </button>
+        </div>
+      </form>
+
+      <div class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Transfers</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">Review draft and completed transfers.</p>
+          </div>
+          <button type="button" class="text-xs text-blue-600 hover:underline dark:text-blue-300" (click)="loadTransfers()">
+            Refresh
+          </button>
+        </div>
+        <div
+          *ngIf="transfersLoading()"
+          class="mt-3 rounded-lg border border-blue-900/10 bg-white/70 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
+        >
+          Loading transfers&hellip;
+        </div>
+        <div *ngIf="!transfersLoading() && transfers().length === 0" class="mt-3 text-sm text-slate-500 dark:text-slate-300">
+          No transfers recorded yet.
+        </div>
+        <div class="mt-4 space-y-4" *ngIf="transfers().length > 0">
+          <div
+            *ngFor="let transfer of transfers()"
+            class="rounded-lg border border-blue-900/10 bg-white/90 p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900/60"
+          >
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div class="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {{ transfer.uuid | slice: 0:8 }}&hellip;
+                </div>
+                <div class="text-base font-semibold text-blue-900 dark:text-white">
+                  {{ transfer.sourceLocationName || 'Default' }} → {{ transfer.destinationLocationName || 'Default' }}
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="rounded-full px-3 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
+                  [ngClass]="{
+                    'bg-blue-100 text-blue-800': transfer.status === 'draft',
+                    'bg-amber-100 text-amber-700': transfer.status === 'pending',
+                    'bg-emerald-100 text-emerald-800': transfer.status === 'completed'
+                  }"
+                >
+                  {{ transfer.status }}
+                </span>
+                <button
+                  *ngIf="transfer.status !== 'completed'"
+                  type="button"
+                  class="btn btn-secondary rounded-full px-3 py-1 text-xs"
+                  (click)="openCommit(transfer)"
+                >
+                  Commit transfer
+                </button>
+              </div>
+            </div>
+            <ul class="mt-3 divide-y divide-blue-900/10 dark:divide-slate-800">
+              <li *ngFor="let item of transfer.items" class="py-2 text-sm">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="font-medium text-blue-900 dark:text-white">{{ item.productTitle || item.productUuid | slice:0:8 }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    Qty {{ item.quantity }}
+                  </div>
+                </div>
+              </li>
+            </ul>
+            <div *ngIf="transfer.notes" class="mt-3 rounded-lg border border-blue-900/10 bg-blue-50/70 px-3 py-2 text-xs text-blue-900 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+              {{ transfer.notes }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Locations</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">Reference available locations for quick transfers.</p>
+          </div>
+          <button type="button" class="text-xs text-blue-600 hover:underline dark:text-blue-300" (click)="loadLocations()">
+            Refresh
+          </button>
+        </div>
+        <div *ngIf="locationLoading()" class="mt-3 text-xs text-slate-500 dark:text-slate-400">Loading locations&hellip;</div>
+        <ul *ngIf="locations().length > 0" class="mt-3 space-y-2 text-sm">
+          <li
+            *ngFor="let location of locations()"
+            class="rounded-lg border border-blue-900/10 bg-white/80 px-3 py-2 dark:border-slate-800 dark:bg-slate-900/60"
+          >
+            <div class="font-medium text-blue-900 dark:text-white">
+              {{ location.name }} <span class="text-xs text-slate-500 dark:text-slate-400">({{ location.code }})</span>
+            </div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+              {{ location.description || 'No description' }}
+            </div>
+          </li>
+        </ul>
+        <div *ngIf="!locationLoading() && locations().length === 0" class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          No custom locations yet.
+        </div>
+      </div>
+
+      <div
+        *ngIf="commitTarget()"
+        class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Commit transfer</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">
+              Finalize movement for {{ commitTarget()?.uuid | slice: 0:8 }}&hellip;
+            </p>
+          </div>
+          <button type="button" class="text-xs text-blue-600 hover:underline dark:text-blue-300" (click)="cancelCommit()">
+            Close
+          </button>
+        </div>
+        <label class="mt-3 block text-sm text-slate-600 dark:text-slate-300">
+          <span>Commit note</span>
+          <textarea
+            class="form-input mt-1 min-h-[60px]"
+            [ngModel]="commitNote()"
+            (ngModelChange)="commitNote.set($event)"
+            name="commitNote"
+          ></textarea>
+        </label>
+        <div *ngIf="commitError()" class="mt-2 text-sm text-rose-500">{{ commitError() }}</div>
+        <div class="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            class="btn btn-primary rounded-full px-4 py-2"
+            (click)="confirmCommit()"
+            [disabled]="commitBusy()"
+          >
+            {{ commitBusy() ? 'Committing…' : 'Commit transfer' }}
+          </button>
+          <button type="button" class="btn btn-secondary rounded-full px-4 py-2" (click)="cancelCommit()">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
