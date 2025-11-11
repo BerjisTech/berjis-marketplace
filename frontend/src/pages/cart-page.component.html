@@ -44,25 +44,68 @@
     </div>
     <aside class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
       <div class="text-lg font-semibold text-blue-900 dark:text-white">Summary</div>
-      <div class="mt-3 flex items-center justify-between text-sm">
+      <div *ngIf="previewLoading()" class="mt-2 text-xs text-blue-500">Updating totals…</div>
+      <div *ngIf="previewError()" class="mt-2 text-xs text-rose-500">{{ previewError() }}</div>
+
+      <div class="mt-4">
+        <label for="cart-discount-code" class="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Discount code</label>
+        <div class="mt-2 flex gap-2">
+          <input
+            id="cart-discount-code"
+            class="flex-1 rounded-full border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="SAVE10"
+            [(ngModel)]="discountInput"
+            (keyup.enter)="applyDiscount()" />
+          <button type="button" class="rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2" (click)="applyDiscount()">Apply</button>
+          <button *ngIf="discountCode()" type="button" class="rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm px-3 py-2" (click)="clearDiscount()">Clear</button>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label for="cart-gift-card" class="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Gift card</label>
+        <div class="mt-2 flex gap-2">
+          <input
+            id="cart-gift-card"
+            class="flex-1 rounded-full border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="GIFT-1234"
+            [(ngModel)]="giftCardInput"
+            (keyup.enter)="applyGiftCard()" />
+          <button type="button" class="rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2" (click)="applyGiftCard()">Apply</button>
+          <button *ngIf="giftCardCode()" type="button" class="rounded-full bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-sm px-3 py-2" (click)="clearGiftCard()">Clear</button>
+        </div>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between text-sm">
         <div>Subtotal</div>
-        <div>{{ (subtotalCents()/100) | number:'1.2-2' }} {{ items()[0]?.currency || 'USD' }}</div>
+        <div>{{ (subtotalCents()/100) | number:'1.2-2' }} {{ currency() }}</div>
+      </div>
+      <div
+        *ngIf="discountCode() || discountCents() > 0"
+        class="mt-2 flex items-center justify-between text-sm text-emerald-600 dark:text-emerald-400">
+        <div>Discount<span *ngIf="discountCode()"> ({{ discountCode() }})</span></div>
+        <div>-{{ (discountCents()/100) | number:'1.2-2' }} {{ currency() }}</div>
+      </div>
+      <div
+        *ngIf="giftCardCode() || giftCardCents() > 0"
+        class="mt-2 flex items-center justify-between text-sm text-emerald-600 dark:text-emerald-400">
+        <div>Gift card<span *ngIf="giftCardCode()"> ({{ giftCardCode() }})</span></div>
+        <div>-{{ (giftCardCents()/100) | number:'1.2-2' }} {{ currency() }}</div>
       </div>
       <div class="mt-2 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
         <div>Estimated tax</div>
-        <div>{{ (taxCents()/100) | number:'1.2-2' }} {{ items()[0]?.currency || 'USD' }}</div>
+        <div>{{ (taxCents()/100) | number:'1.2-2' }} {{ currency() }}</div>
       </div>
       <div class="mt-2 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
         <div>Shipping</div>
-        <div>{{ (shippingCents()/100) | number:'1.2-2' }} {{ items()[0]?.currency || 'USD' }}</div>
+        <div>{{ (shippingCents()/100) | number:'1.2-2' }} {{ currency() }}</div>
       </div>
       <div class="mt-3 pt-3 border-t border-blue-900/10 dark:border-slate-800 flex items-center justify-between text-base font-semibold text-blue-900 dark:text-white">
         <div>Total</div>
-        <div>{{ (totalCents()/100) | number:'1.2-2' }} {{ items()[0]?.currency || 'USD' }}</div>
+        <div>{{ (totalCents()/100) | number:'1.2-2' }} {{ currency() }}</div>
       </div>
       <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        Taxes calculated at {{ pricingConfig().taxRatePercent | number:'1.0-2' }}% and shipping estimated at
-        {{ (pricingConfig().shippingFlatCents/100) | number:'1.2-2' }} {{ items()[0]?.currency || 'USD' }}.
+        Taxes estimated at {{ pricingConfig().taxRatePercent | number:'1.0-2' }}% and flat shipping of
+        {{ (pricingConfig().shippingFlatCents/100) | number:'1.2-2' }} {{ currency() }} applied at checkout.
       </div>
       <a routerLink="/checkout" class="btn btn-primary rounded-full h-10 px-5 w-full mt-4 text-center grid place-items-center">Proceed to checkout</a>
     </aside>

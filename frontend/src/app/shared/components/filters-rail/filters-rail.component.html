@@ -21,6 +21,20 @@
         </select>
       </ng-container>
 
+      <ng-container *ngIf="collections?.length">
+        <label class="text-slate-600 dark:text-slate-400" for="filters-collection-select">Collection</label>
+        <select
+          id="filters-collection-select"
+          class="h-10 rounded-full border px-3"
+          [ngModel]="selectedCollection"
+          (ngModelChange)="selectedCollectionChange.emit($event)"
+          name="collection"
+        >
+          <option value="">All collections</option>
+          <option *ngFor="let col of collections" [value]="col.slug">{{ col.title }}</option>
+        </select>
+      </ng-container>
+
       <label class="text-slate-600 dark:text-slate-400" for="filters-min-price">Price</label>
       <div class="flex items-center gap-2">
         <input id="filters-min-price" aria-label="Min price" class="w-[120px] h-10 rounded-full border px-4" [ngModel]="minPrice" (ngModelChange)="minPriceChange.emit($event)" name="minPrice" placeholder="Min" />

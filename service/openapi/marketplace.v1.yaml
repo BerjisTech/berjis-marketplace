@@ -17,6 +17,21 @@ paths:
         - in: query
           name: q
           schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+        - in: query
+          name: minPrice
+          schema: { type: string }
+        - in: query
+          name: maxPrice
+          schema: { type: string }
+        - in: query
+          name: collection
+          schema: { type: string }
+        - in: query
+          name: shop
+          schema: { type: string }
       responses:
         '200': { description: ok }
   /v1/products/{id}:
@@ -58,4 +73,186 @@ paths:
           schema: { type: string }
       responses:
         '200': { description: ok }
-
+  /v1/shops/{slug}/collections:
+    get:
+      summary: List public collections for a shop
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+        '404': { description: not found }
+  /v1/my/shops/{slug}/inventory/{id}/history:
+    get:
+      summary: List inventory adjustments for a level
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        '200': { description: ok }
+        '404': { description: not found }
+  /v1/my/shops/{slug}/inventory/{id}/adjustments:
+    post:
+      summary: Create an inventory adjustment
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deltaQuantity: { type: integer }
+                deltaReserved: { type: integer }
+                reason: { type: string }
+                note: { type: string }
+      responses:
+        '200': { description: ok }
+        '400': { description: invalid request }
+        '404': { description: not found }
+  /v1/my/shops/{slug}/inventory/alerts:
+    get:
+      summary: List inventory alerts
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [open, resolved, all]
+      responses:
+        '200': { description: ok }
+  /v1/my/shops/{slug}/inventory/alerts/{id}/resolve:
+    post:
+      summary: Resolve a low stock alert
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string }
+      responses:
+        '200': { description: ok }
+        '404': { description: not found }
+  /v1/my/shops/{slug}/collections/{id}/rebuild:
+    post:
+      summary: Rebuild an automatic collection
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+        '400': { description: bad request }
+        '404': { description: not found }
+  /v1/my/shops/{slug}/collections/{id}/products:
+    get:
+      summary: List products in a collection
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+        '404': { description: not found }
+  /v1/cart/preview:
+    post:
+      summary: Preview cart totals with discount or gift card applied
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                discountCode: { type: string }
+                giftCardCode: { type: string }
+      responses:
+        '200': { description: ok }
+        '400': { description: bad request }
+  /v1/orders:
+    get:
+      summary: List customer orders
+      responses:
+        '200': { description: ok }
+    post:
+      summary: Create an order from the cart
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                discountCode: { type: string }
+                giftCardCode: { type: string }
+      responses:
+        '200': { description: ok }
+        '400': { description: bad request }
+  /v1/my/shops/{slug}/discounts/report:
+    get:
+      summary: Discount redemption report
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+        '403': { description: forbidden }
+        '404': { description: not found }
+  /v1/my/shops/{slug}/gift-cards/report:
+    get:
+      summary: Gift card balance report
+      parameters:
+        - in: path
+          name: slug
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: ok }
+        '403': { description: forbidden }
+        '404': { description: not found }

@@ -1,3 +1,348 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Collections</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for managing product collections.</p>
+<div class="space-y-4 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Collections</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Group products into curated listings. Build automatic rules or manage manual selections.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="shopSlug()"
+        (ngModelChange)="changeShop($event)"
+        aria-label="Select shop"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+      <button type="button" class="btn btn-primary rounded-full px-4 py-2" (click)="startCreate()">
+        New collection
+      </button>
+    </div>
+  </div>
 
+  <div class="flex flex-wrap gap-2">
+    <a routerLink="/dashboard/products/overview" class="chip-link">Products</a>
+    <a routerLink="/dashboard/products/collections" class="chip-link chip-link--active">Collections</a>
+    <a routerLink="/dashboard/products/inventory" class="chip-link">Inventory</a>
+    <a routerLink="/dashboard/products/purchase-orders" class="chip-link">Purchase orders</a>
+    <a routerLink="/dashboard/products/transfers" class="chip-link">Transfers</a>
+    <a routerLink="/dashboard/products/gift-cards" class="chip-link">Gift cards</a>
+  </div>
+
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    <div class="space-y-4 lg:col-span-2">
+      <div class="overflow-hidden rounded-xl border border-blue-900/15 bg-white/80 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="overflow-auto">
+          <table class="min-w-[760px] w-full text-sm">
+            <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+              <tr class="text-left">
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Collection</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Type</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Status</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Rules</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let collection of collections(); trackBy: trackCollectionBy"
+                class="border-t border-blue-900/10 bg-white/90 transition dark:border-slate-800 dark:bg-slate-950/60"
+              >
+                <td class="px-4 py-3 align-middle">
+                  <div class="font-medium text-blue-900 dark:text-white">{{ collection.title }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">{{ collection.slug }}</div>
+                </td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                    [ngClass]="collection.isAutomatic ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200'"
+                  >
+                    {{ collection.isAutomatic ? 'Automatic' : 'Manual' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">
+                  <span
+                    class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                    [ngClass]="collection.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-200' : 'bg-slate-200 text-slate-600 dark:bg-slate-900/60 dark:text-slate-300'"
+                  >
+                    {{ collection.isActive ? 'Active' : 'Hidden' }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">
+                  {{ collection.isAutomatic ? (collection.rules?.length || 0) : 'Manual' }}
+                </td>
+                <td class="px-4 py-3 align-middle">
+                  <div class="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      class="rounded-full border border-blue-900/25 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+                      (click)="openCollection(collection)"
+                    >
+                      Manage
+                    </button>
+                    <button
+                      *ngIf="collection.isAutomatic"
+                      type="button"
+                      class="rounded-full border border-indigo-400/30 px-3 py-1 text-sm text-indigo-700 transition hover:border-indigo-500 hover:text-indigo-600 dark:border-indigo-500/40 dark:text-indigo-200"
+                      (click)="selectedCollection() && selectedCollection()?.uuid === collection.uuid ? rebuildCollection() : openCollection(collection)"
+                    >
+                      {{ selectedCollection()?.uuid === collection.uuid ? 'Rebuild' : 'Review' }}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr *ngIf="loading()">
+                <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                  Loading collections…
+                </td>
+              </tr>
+              <tr *ngIf="!loading() && collections().length === 0">
+                <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                  No collections found for this shop.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div
+        *ngIf="creatingNew() || selectedCollection()"
+        class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+      >
+        <h2 class="text-lg font-semibold text-blue-900 dark:text-white">
+          {{ creatingNew() ? 'Create collection' : selectedCollection()?.title || 'Edit collection' }}
+        </h2>
+        <form class="mt-4 space-y-4" (ngSubmit)="saveCollection()">
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="grid gap-2">
+              <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="collection-title">Title</label>
+              <input
+                id="collection-title"
+                class="form-input"
+                name="title"
+                [(ngModel)]="collectionForm().title"
+                (blur)="maybeGenerateSlug()"
+                required
+              />
+            </div>
+            <div class="grid gap-2">
+              <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="collection-slug">Slug</label>
+              <input
+                id="collection-slug"
+                class="form-input"
+                name="slug"
+                [(ngModel)]="collectionForm().slug"
+                required
+              />
+            </div>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2">
+            <div class="grid gap-2">
+              <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="collection-sort">Sort order</label>
+              <input
+                id="collection-sort"
+                class="form-input"
+                type="number"
+                name="sortOrder"
+                [(ngModel)]="collectionForm().sortOrder"
+              />
+            </div>
+            <div class="flex items-center gap-2 pt-7">
+              <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  name="isActive"
+                  [(ngModel)]="collectionForm().isActive"
+                />
+                <span>Active</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="grid gap-2">
+            <label class="text-sm font-medium text-slate-600 dark:text-slate-300" for="collection-description">Description</label>
+            <textarea
+              id="collection-description"
+              class="form-input min-h-[80px]"
+              name="description"
+              [(ngModel)]="collectionForm().description"
+            ></textarea>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <label class="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <input
+                type="checkbox"
+                name="isAutomatic"
+                [ngModel]="collectionForm().isAutomatic"
+                (ngModelChange)="onAutomaticChange($event)"
+              />
+              <span>Automatic (rule-based)</span>
+            </label>
+          </div>
+
+          <div *ngIf="collectionForm().isAutomatic" class="space-y-3 rounded-lg border border-indigo-200/40 bg-indigo-50/60 p-4 dark:border-indigo-500/30 dark:bg-indigo-900/30">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-indigo-700 dark:text-indigo-200">
+                Rules
+              </h3>
+              <button type="button" class="btn btn-secondary rounded-full px-3 py-1 text-xs" (click)="addRule()">
+                Add rule
+              </button>
+            </div>
+            <div *ngIf="collectionForm().rules.length === 0" class="text-sm text-indigo-700 dark:text-indigo-200">
+              No rules yet. Add a rule to define the collection.
+            </div>
+            <div *ngFor="let rule of collectionForm().rules; let i = index" class="rounded-md border border-indigo-200/60 bg-white/80 p-3 dark:border-indigo-500/40 dark:bg-indigo-900/40">
+              <div class="flex flex-wrap items-center gap-3">
+                <select
+                  class="form-select min-w-[140px]"
+                  [ngModel]="rule.field"
+                  (ngModelChange)="updateRuleField(i, $event)"
+                >
+                  <option *ngFor="let field of ruleFields" [value]="field.field">{{ field.label }}</option>
+                </select>
+                <select
+                  class="form-select min-w-[120px]"
+                  [ngModel]="rule.operator"
+                  (ngModelChange)="updateRuleOperator(i, $event)"
+                >
+                  <option *ngFor="let operator of operatorOptions(rule)"
+                          [value]="operator?.value">
+                    {{ operator?.label }}
+                  </option>
+                </select>
+                <ng-container [ngSwitch]="getOperatorConfig(rule)?.input">
+                  <input
+                    *ngSwitchCase="'string'"
+                    class="form-input flex-1 min-w-[160px]"
+                    [ngModel]="rule.value ?? ''"
+                    (ngModelChange)="collectionForm().rules[i].value = $event"
+                    placeholder="value"
+                  />
+                  <input
+                    *ngSwitchCase="'number'"
+                    class="form-input w-32"
+                    type="number"
+                    [ngModel]="rule.value ?? 0"
+                    (ngModelChange)="collectionForm().rules[i].value = Number($event)"
+                  />
+                  <div *ngSwitchCase="'range'" class="flex items-center gap-2">
+                    <input
+                      class="form-input w-28"
+                      type="number"
+                      [ngModel]="rule.min ?? 0"
+                      (ngModelChange)="collectionForm().rules[i].min = Number($event)"
+                      placeholder="Min"
+                    />
+                    <span class="text-xs text-slate-500">to</span>
+                    <input
+                      class="form-input w-28"
+                      type="number"
+                      [ngModel]="rule.max ?? 0"
+                      (ngModelChange)="collectionForm().rules[i].max = Number($event)"
+                      placeholder="Max"
+                    />
+                  </div>
+                  <select
+                    *ngSwitchCase="'boolean'"
+                    class="form-select w-28"
+                    [ngModel]="rule.value ? 'true' : 'false'"
+                    (ngModelChange)="collectionForm().rules[i].value = ($event === 'true')"
+                  >
+                    <option value="true">True</option>
+                    <option value="false">False</option>
+                  </select>
+                </ng-container>
+                <button type="button" class="text-xs text-rose-600 hover:underline" (click)="removeRule(i)">
+                  Remove
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div *ngIf="!collectionForm().isAutomatic" class="space-y-3 rounded-lg border border-blue-200/60 bg-blue-50/70 p-4 dark:border-blue-500/40 dark:bg-blue-900/30">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-200">
+                Products
+              </h3>
+              <span class="text-xs text-blue-600 dark:text-blue-200">
+                {{ collectionForm().productUuids.length }} selected
+              </span>
+            </div>
+            <div *ngIf="productsLoading()" class="text-sm text-blue-700 dark:text-blue-200">
+              Loading products…
+            </div>
+            <div *ngIf="!productsLoading()" class="max-h-64 space-y-2 overflow-y-auto pr-2">
+              <label
+                *ngFor="let product of products(); trackBy: trackProductBy"
+                class="flex items-start gap-3 rounded-lg border border-blue-900/10 bg-white/80 p-3 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-200"
+              >
+                <input
+                  type="checkbox"
+                  [checked]="isProductSelected(product.uuid)"
+                  (change)="toggleProductSelection(product.uuid)"
+                />
+                <div class="flex-1">
+                  <div class="font-medium text-blue-900 dark:text-white">{{ product.title }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">
+                    Stock {{ product.stock ?? 0 }} · {{ (product.priceCents ?? 0) / 100 | currency:'USD':'symbol':'1.2-2' }}
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap justify-end gap-2 pt-2">
+            <button type="button" class="rounded-full border px-4 py-2 text-sm" (click)="closeEditor()">
+              Cancel
+            </button>
+            <button
+              type="button"
+              class="rounded-full border border-rose-400 px-4 py-2 text-sm text-rose-600 transition hover:bg-rose-50 dark:border-rose-500/50 dark:text-rose-200"
+              [disabled]="deleting()"
+              (click)="deleteCollection()"
+            >
+              {{ creatingNew() ? 'Reset' : (deleting() ? 'Deleting…' : 'Delete') }}
+            </button>
+            <button
+              *ngIf="selectedCollection()?.isAutomatic"
+              type="button"
+              class="rounded-full border border-indigo-400 px-4 py-2 text-sm text-indigo-700 transition hover:bg-indigo-50 dark:border-indigo-500/60 dark:text-indigo-200"
+              [disabled]="rebuilding()"
+              (click)="rebuildCollection()"
+            >
+              {{ rebuilding() ? 'Rebuilding…' : 'Rebuild products' }}
+            </button>
+            <button type="submit" class="btn btn-primary rounded-full px-5" [disabled]="saving()">
+              {{ saving() ? 'Saving…' : 'Save collection' }}
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">
+          Public collections
+        </h3>
+        <p *ngIf="publicCollections().length === 0" class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+          Publish a collection to make it available in the storefront filters.
+        </p>
+        <ul *ngIf="publicCollections().length > 0" class="mt-2 space-y-2">
+          <li *ngFor="let col of publicCollections()" class="rounded-lg border border-blue-900/10 bg-white/80 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-200">
+            <div class="font-medium text-blue-900 dark:text-white">{{ col.title }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">{{ col.productCount }} products</div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

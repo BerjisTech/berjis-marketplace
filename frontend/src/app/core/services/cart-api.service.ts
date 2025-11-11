@@ -28,6 +28,23 @@ export interface CartApiResponse {
   items?: CartItemResponse[];
 }
 
+export interface CartPreviewPayload {
+  discountCode?: string;
+  giftCardCode?: string;
+}
+
+export interface CartPreviewTotals {
+  subtotalCents: number;
+  discountAmountCents: number;
+  giftCardAmountCents: number;
+  totalCents: number;
+  currency: string;
+}
+
+export interface CartPreviewResponse {
+  data?: CartPreviewTotals;
+}
+
 @Injectable({ providedIn: 'root' })
 export class CartApiService {
   private readonly http = inject(HttpClient);
@@ -39,5 +56,11 @@ export class CartApiService {
 
   putCart(items: CartPayloadItem[]): Observable<unknown> {
     return this.http.put<unknown>(`${this.api}/v1/cart`, { items }, { withCredentials: true });
+  }
+
+  previewCart(body: CartPreviewPayload): Observable<CartPreviewResponse> {
+    return this.http.post<CartPreviewResponse>(`${this.api}/v1/cart/preview`, body, {
+      withCredentials: true,
+    });
   }
 }

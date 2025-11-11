@@ -33,7 +33,10 @@ export class FiltersRailComponent {
   @Input() selectedCategory = '';
   @Output() selectedCategoryChange = new EventEmitter<string>();
 
+  @Input() collections: { slug: string; title: string }[] = [];
+  @Input() selectedCollection = '';
+  @Output() selectedCollectionChange = new EventEmitter<string>();
+
   @Output() apply = new EventEmitter<void>();
   @Output() clear = new EventEmitter<void>();
 }
-

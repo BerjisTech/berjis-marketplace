@@ -1,3 +1,150 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Gift Cards</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for gift cards.</p>
+<div class="space-y-6">
+  <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-blue-900 dark:text-white">Gift Cards</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Track issued balances, outstanding liability, and redemption activity for your shop.
+      </p>
+    </div>
+    <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+      <div>
+        <label for="gift-cards-shop-select" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Shop</label>
+        <select
+          id="gift-cards-shop-select"
+          class="min-w-[14rem] rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          [value]="shopSlug()"
+          (change)="changeShop($any($event.target).value)"
+        >
+          <option *ngFor="let shop of shops(); trackBy: trackShopBy" [value]="shop.slug">{{ shop.name }}</option>
+        </select>
+        <p *ngIf="shopError()" class="mt-1 text-xs text-rose-500">{{ shopError() }}</p>
+      </div>
+      <button class="rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2" type="button" (click)="refresh()">
+        Refresh
+      </button>
+    </div>
+  </div>
 
+  <div class="grid gap-4 lg:grid-cols-4 md:grid-cols-2">
+    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
+      <div class="text-xs uppercase text-slate-500 dark:text-slate-400">Active cards</div>
+      <div class="mt-1 text-2xl font-semibold text-blue-900 dark:text-white">{{ activeCards() }}</div>
+      <div class="text-xs text-slate-500 dark:text-slate-400">of {{ totalCards() }} issued</div>
+    </div>
+    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
+      <div class="text-xs uppercase text-slate-500 dark:text-slate-400">Redeemed cards</div>
+      <div class="mt-1 text-2xl font-semibold text-blue-900 dark:text-white">{{ redeemedCards() }}</div>
+      <div class="text-xs text-slate-500 dark:text-slate-400">Fully redeemed gift cards</div>
+    </div>
+    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
+      <div class="text-xs uppercase text-slate-500 dark:text-slate-400">Outstanding value</div>
+      <div class="mt-1 text-2xl font-semibold text-blue-900 dark:text-white">
+        {{ (outstandingCents()/100) | number:'1.2-2' }} USD
+      </div>
+      <div class="text-xs text-slate-500 dark:text-slate-400">
+        Balance remaining — issued total {{ (totalIssuedCents()/100) | number:'1.2-2' }} USD
+      </div>
+    </div>
+    <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
+      <div class="text-xs uppercase text-slate-500 dark:text-slate-400">Redeemed value</div>
+      <div class="mt-1 text-2xl font-semibold text-blue-900 dark:text-white">
+        {{ (redeemedCents()/100) | number:'1.2-2' }} USD
+      </div>
+      <div class="text-xs text-slate-500 dark:text-slate-400">Value already redeemed</div>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70">
+    <div class="border-b border-blue-900/10 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
+      <div class="text-sm font-medium text-blue-900 dark:text-white">Issued gift cards</div>
+      <div *ngIf="loadingCards()" class="text-xs text-blue-500">Loading…</div>
+    </div>
+    <div *ngIf="cardsError()" class="px-4 py-3 text-sm text-rose-500">{{ cardsError() }}</div>
+    <div *ngIf="!loadingCards() && !cardsError() && !hasCards()" class="px-4 py-6 text-sm text-slate-500 dark:text-slate-300">
+      No gift cards issued for this shop yet.
+    </div>
+    <div *ngIf="hasCards()" class="overflow-x-auto">
+      <table class="min-w-full text-sm text-slate-700 dark:text-slate-200">
+        <thead class="bg-blue-50/70 dark:bg-slate-900/60 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <tr>
+            <th class="px-4 py-2 text-left">Code</th>
+            <th class="px-4 py-2 text-right">Balance</th>
+            <th class="px-4 py-2 text-left">Status</th>
+            <th class="px-4 py-2 text-left">Issued to</th>
+            <th class="px-4 py-2 text-left">Expires</th>
+            <th class="px-4 py-2 text-left">Issued</th>
+            <th class="px-4 py-2 text-left">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let card of cards(); trackBy: trackCardBy" class="border-t border-blue-900/10 dark:border-slate-800">
+            <td class="px-4 py-2 font-medium text-blue-900 dark:text-white uppercase">{{ card.code }}</td>
+            <td class="px-4 py-2 text-right">
+              <div>{{ (card.balanceCents/100) | number:'1.2-2' }} / {{ (card.originalBalanceCents/100) | number:'1.2-2' }} USD</div>
+            </td>
+            <td class="px-4 py-2">
+              <span
+                class="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium"
+                [class.bg-emerald-100]="card.status === 'active'"
+                [class.text-emerald-700]="card.status === 'active'"
+                [class.bg-slate-200]="card.status !== 'active'"
+                [class.text-slate-600]="card.status !== 'active'"
+              >
+                {{ card.status || 'unknown' }}
+              </span>
+            </td>
+            <td class="px-4 py-2 text-slate-600 dark:text-slate-300">
+              {{ card.issuedToEmail || '—' }}
+            </td>
+            <td class="px-4 py-2 text-xs text-slate-500 dark:text-slate-300">
+              {{ card.expiresAt ? (card.expiresAt | date:'MMM d, y') : 'No expiry' }}
+            </td>
+            <td class="px-4 py-2 text-xs text-slate-500 dark:text-slate-300">
+              {{ card.issuedAt | date:'MMM d, y' }}
+            </td>
+            <td class="px-4 py-2">
+              <button class="text-sm text-blue-600 hover:text-blue-700" type="button" (click)="viewTransactions(card)">
+                View transactions
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div *ngIf="selectedCard()" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4">
+    <div class="flex items-center justify-between mb-3">
+      <div>
+        <div class="text-sm font-medium text-blue-900 dark:text-white">Transactions for {{ selectedCard()?.code }}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-300">Running balance shown in USD.</div>
+      </div>
+      <button class="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-300" type="button" (click)="clearSelection()">
+        Close
+      </button>
+    </div>
+    <div *ngIf="transactionsError()" class="text-sm text-rose-500">{{ transactionsError() }}</div>
+    <div *ngIf="loadingTransactions()" class="text-sm text-blue-500">Loading transactions…</div>
+    <div *ngIf="!loadingTransactions() && !transactionsError() && transactions().length === 0" class="text-sm text-slate-500 dark:text-slate-300">
+      No transactions recorded for this card yet.
+    </div>
+    <div *ngIf="transactions().length > 0" class="overflow-x-auto">
+      <table class="min-w-full text-sm text-slate-700 dark:text-slate-200">
+        <thead class="bg-blue-50/70 dark:bg-slate-900/60 text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <tr>
+            <th class="px-4 py-2 text-left">Date</th>
+            <th class="px-4 py-2 text-left">Reason</th>
+            <th class="px-4 py-2 text-right">Change (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let tx of transactions(); trackBy: trackTransactionBy" class="border-t border-blue-900/10 dark:border-slate-800">
+            <td class="px-4 py-2 text-xs text-slate-500 dark:text-slate-300">{{ tx.createdAt | date:'MMM d, y, h:mm a' }}</td>
+            <td class="px-4 py-2">{{ tx.reason }}</td>
+            <td class="px-4 py-2 text-right">{{ (tx.changeCents/100) | number:'1.2-2' }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

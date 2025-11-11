@@ -1,3 +1,341 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Inventory</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for inventory management.</p>
+<div class="space-y-4 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Inventory</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Monitor stock, record adjustments, and keep an eye on low-stock alerts.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="shopSlug()"
+        (ngModelChange)="changeShop($event)"
+        aria-label="Select shop"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+    </div>
+  </div>
 
+  <div class="flex flex-wrap gap-2">
+    <a routerLink="/dashboard/products/overview" class="chip-link">Products</a>
+    <a routerLink="/dashboard/products/collections" class="chip-link">Collections</a>
+    <a routerLink="/dashboard/products/inventory" class="chip-link chip-link--active">Inventory</a>
+    <a routerLink="/dashboard/products/purchase-orders" class="chip-link">Purchase orders</a>
+    <a routerLink="/dashboard/products/transfers" class="chip-link">Transfers</a>
+    <a routerLink="/dashboard/products/gift-cards" class="chip-link">Gift cards</a>
+  </div>
+
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    <div class="space-y-4 lg:col-span-2">
+      <div class="overflow-hidden rounded-xl border border-blue-900/15 bg-white/80 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="overflow-auto">
+          <table class="min-w-[760px] w-full text-sm">
+            <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+              <tr class="text-left">
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Product</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Location</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">On hand</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Reserved</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Available</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Safety stock</th>
+                <th class="px-4 py-3 font-medium text-slate-600 dark:text-slate-300">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let entry of inventory()"
+                class="border-t border-blue-900/10 transition dark:border-slate-800"
+                [ngClass]="{
+                  'bg-amber-50/70 dark:bg-amber-900/20': isLowStock(entry),
+                  'bg-blue-50/40 dark:bg-slate-900/50': selectedLevel()?.uuid === entry.uuid
+                }"
+              >
+                <td class="px-4 py-3 align-middle">
+                  <div class="font-medium text-blue-900 dark:text-white">{{ entry.productTitle }}</div>
+                  <div class="text-xs text-slate-500 dark:text-slate-400">SKU: {{ entry.productUuid | slice: 0:8 }}</div>
+                  <div
+                    *ngIf="isLowStock(entry)"
+                    class="mt-1 inline-flex items-center rounded-full bg-amber-200 px-2 py-0.5 text-[11px] font-medium text-amber-900 dark:bg-amber-900/60 dark:text-amber-100"
+                  >
+                    Low stock
+                  </div>
+                </td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">
+                  {{ entry.locationName || 'Default' }}
+                  <span *ngIf="entry.locationCode" class="ml-1 text-xs text-slate-500 dark:text-slate-400">
+                    ({{ entry.locationCode }})
+                  </span>
+                </td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">{{ entry.quantity }}</td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">{{ entry.reserved }}</td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">{{ availableUnits(entry) }}</td>
+                <td class="px-4 py-3 align-middle text-sm text-slate-700 dark:text-slate-200">{{ entry.safetyStock }}</td>
+                <td class="px-4 py-3 align-middle">
+                  <button
+                    type="button"
+                    class="rounded-full border border-blue-900/25 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+                    (click)="openLevel(entry)"
+                  >
+                    Manage
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="loading()">
+                <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                  Loading inventory&hellip;
+                </td>
+              </tr>
+              <tr *ngIf="!loading() && inventory().length === 0">
+                <td colspan="7" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+                  No inventory levels found for this shop.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div *ngIf="selectedLevel()" class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">
+              {{ selectedLevel()?.productTitle }}
+            </h2>
+            <p class="text-sm text-slate-600 dark:text-slate-300">
+              {{ selectedLevel()?.locationName || 'Default location' }}
+              <span *ngIf="selectedLevel()?.locationCode">({{ selectedLevel()?.locationCode }})</span>
+            </p>
+          </div>
+          <div class="grid grid-cols-3 gap-4 text-sm text-slate-600 dark:text-slate-300">
+            <div>
+              <div class="text-xs uppercase text-slate-500 dark:text-slate-400">On hand</div>
+              <div class="text-lg font-semibold text-blue-900 dark:text-white">{{ selectedLevel()?.quantity ?? 0 }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase text-slate-500 dark:text-slate-400">Reserved</div>
+              <div class="text-lg font-semibold text-blue-900 dark:text-white">{{ selectedLevel()?.reserved ?? 0 }}</div>
+            </div>
+            <div>
+              <div class="text-xs uppercase text-slate-500 dark:text-slate-400">Available</div>
+              <div class="text-lg font-semibold text-blue-900 dark:text-white">{{ availableUnits(selectedLevel()!) }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-6 grid gap-6 md:grid-cols-2">
+          <form class="space-y-3" (ngSubmit)="submitSafetyStock()">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Safety stock
+            </h3>
+            <label class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span>Units to keep on hand</span>
+              <input
+                class="form-input"
+                type="number"
+                min="0"
+                step="1"
+                [(ngModel)]="safetyForm().safetyStock"
+                name="safetyStock"
+              />
+            </label>
+            <button
+              type="submit"
+              class="btn btn-secondary w-full rounded-full"
+              [disabled]="safetyBusy()"
+            >
+              Save safety stock
+            </button>
+            <p *ngIf="safetyBusy()" class="text-xs text-slate-500 dark:text-slate-400">Saving&hellip;</p>
+          </form>
+
+          <form class="space-y-3" (ngSubmit)="submitAdjustment()">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Record adjustment
+            </h3>
+            <div class="grid gap-3 md:grid-cols-2">
+              <label class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span>Delta quantity</span>
+                <input
+                  class="form-input"
+                  type="number"
+                  name="deltaQuantity"
+                  [(ngModel)]="adjustmentForm().deltaQuantity"
+                />
+              </label>
+              <label class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+                <span>Delta reserved</span>
+                <input
+                  class="form-input"
+                  type="number"
+                  name="deltaReserved"
+                  [(ngModel)]="adjustmentForm().deltaReserved"
+                />
+              </label>
+            </div>
+            <label class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span>Reason</span>
+              <input
+                class="form-input"
+                name="reason"
+                [(ngModel)]="adjustmentForm().reason"
+                placeholder="e.g. cycle count"
+              />
+            </label>
+            <label class="grid gap-2 text-sm text-slate-600 dark:text-slate-300">
+              <span>Note (optional)</span>
+              <textarea
+                class="form-input min-h-[80px]"
+                name="note"
+                [(ngModel)]="adjustmentForm().note"
+              ></textarea>
+            </label>
+            <button
+              type="submit"
+              class="btn btn-primary w-full rounded-full"
+              [disabled]="adjustmentBusy()"
+            >
+              Save adjustment
+            </button>
+            <p *ngIf="adjustmentBusy()" class="text-xs text-slate-500 dark:text-slate-400">Saving&hellip;</p>
+          </form>
+        </div>
+
+        <div class="mt-6">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Adjustment history
+            </h3>
+            <button
+              class="text-xs text-blue-600 hover:underline dark:text-blue-300"
+              type="button"
+              (click)="loadHistory(selectedLevel())"
+            >
+              Refresh
+            </button>
+          </div>
+          <div *ngIf="historyError()" class="notice error mt-3">{{ historyError() }}</div>
+          <div
+            *ngIf="historyLoading()"
+            class="mt-3 rounded-lg border border-blue-900/10 bg-white/70 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
+          >
+            Loading history&hellip;
+          </div>
+          <ul *ngIf="!historyLoading() && history().length > 0" class="mt-3 space-y-3">
+            <li
+              *ngFor="let item of history()"
+              class="rounded-lg border border-blue-900/10 bg-white/80 px-4 py-3 text-sm dark:border-slate-800 dark:bg-slate-900/60"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-medium text-blue-900 dark:text-white">
+                  Δ Qty {{ deltaLabel(item.deltaQuantity) }},
+                  Δ Reserved {{ deltaLabel(item.deltaReserved) }}
+                </div>
+                <div class="text-xs text-slate-500 dark:text-slate-400">
+                  {{ item.createdAt | date: 'medium' }}
+                </div>
+              </div>
+              <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Resulting: {{ item.resultingQuantity }} on hand / {{ item.resultingReserved }} reserved
+              </div>
+              <div class="mt-1 text-xs uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                {{ item.reason || 'manual' }}
+              </div>
+              <div *ngIf="item.note" class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                {{ item.note }}
+              </div>
+            </li>
+          </ul>
+          <div *ngIf="!historyLoading() && history().length === 0" class="mt-3 text-sm text-slate-500 dark:text-slate-300">
+            No adjustments recorded yet.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div class="rounded-xl border border-blue-900/15 bg-white/80 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Low stock alerts</h2>
+            <p class="text-xs text-slate-600 dark:text-slate-300">Track and resolve low inventory notifications.</p>
+          </div>
+          <div class="flex gap-1">
+            <button
+              type="button"
+              class="chip-toggle"
+              [class.chip-toggle--active]="alertStatus() === 'open'"
+              (click)="changeAlertStatus('open')"
+            >
+              Open
+            </button>
+            <button
+              type="button"
+              class="chip-toggle"
+              [class.chip-toggle--active]="alertStatus() === 'resolved'"
+              (click)="changeAlertStatus('resolved')"
+            >
+              Resolved
+            </button>
+            <button
+              type="button"
+              class="chip-toggle"
+              [class.chip-toggle--active]="alertStatus() === 'all'"
+              (click)="changeAlertStatus('all')"
+            >
+              All
+            </button>
+          </div>
+        </div>
+
+        <div *ngIf="alertError()" class="notice error mt-3">{{ alertError() }}</div>
+
+        <ul *ngIf="!alertLoading() && alerts().length > 0" class="mt-3 space-y-3">
+          <li
+            *ngFor="let alert of alerts()"
+            class="rounded-lg border border-amber-200/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/40 dark:bg-amber-900/30 dark:text-amber-100"
+          >
+            <div class="font-semibold">{{ alert.productTitle }}</div>
+            <div class="mt-1 text-xs">
+              {{ alert.locationName || 'Default location' }}
+              <span *ngIf="alert.locationCode">({{ alert.locationCode }})</span>
+            </div>
+            <div class="mt-2 text-xs">
+              Qty {{ alert.quantity }} / Safety stock {{ alert.safetyStock }}
+            </div>
+            <div class="mt-1 text-xs">
+              Triggered {{ alert.triggeredAt | date: 'medium' }}
+              <span *ngIf="alert.resolvedAt"> · Resolved {{ alert.resolvedAt | date: 'medium' }}</span>
+            </div>
+            <div *ngIf="alert.note" class="mt-1 text-sm">
+              {{ alert.note }}
+            </div>
+            <div *ngIf="alert.status === 'open'" class="mt-3">
+              <button
+                type="button"
+                class="btn btn-primary rounded-full px-4 py-1 text-sm"
+                (click)="resolveAlert(alert)"
+                [disabled]="alertLoading()"
+              >
+                Mark resolved
+              </button>
+            </div>
+          </li>
+        </ul>
+        <div
+          *ngIf="alertLoading()"
+          class="mt-3 rounded-lg border border-blue-900/15 bg-white/70 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-300"
+        >
+          Loading alerts&hellip;
+        </div>
+        <div *ngIf="!alertLoading() && alerts().length === 0" class="mt-3 text-sm text-slate-500 dark:text-slate-300">
+          No alerts for this filter.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

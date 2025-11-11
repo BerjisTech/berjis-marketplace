@@ -422,6 +422,8 @@ CREATE TABLE order_items (
 - [x] Build product detail page
 - [x] Create categories table with management endpoints (Go)
 - [x] Add inventory locations/levels tables with API syncing to product stock
+- [x] Implement low stock alert triggers, listing, and resolution endpoints (Go)
+- [x] Record inventory adjustment history with auditable APIs (Go)
 - [x] Implement collections table with product assignment APIs (Go)
 - [x] Implement discounts table with product targeting endpoints (Go)
 - [x] Support product variants with automatic SKU generation and editable variant syncing (Go)
@@ -465,6 +467,10 @@ CREATE TABLE order_items (
 - [x] Build order management interface
 - [x] Implement user management table
 - [x] Add user role management
+- [x] Build inventory management console with alerts, safety stock, and adjustment history UI
+- [x] Implement automatic collections rules builder and manual product selection UI
+- [x] Add discount redemption analytics dashboard
+- [x] Add gift card reporting and transaction viewer
 
 ### Phase 7: User Experience
 - [x] Build user profile page

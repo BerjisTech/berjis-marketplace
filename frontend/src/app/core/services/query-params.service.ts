@@ -4,6 +4,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 export interface ListingParams {
   q?: string | null;
   category?: string | null;
+  shop?: string | null;
+  collection?: string | null;
   minPrice?: string | null;
   maxPrice?: string | null;
   sort?: string | null;
@@ -19,6 +21,8 @@ export class QueryParamsService {
     return {
       q: qp.get('q'),
       category: qp.get('category'),
+      shop: qp.get('shop'),
+      collection: qp.get('collection'),
       minPrice: qp.get('minPrice'),
       maxPrice: qp.get('maxPrice'),
       sort: qp.get('sort'),
@@ -33,7 +37,18 @@ export class QueryParamsService {
   }
 
   clear(router: Router, route: ActivatedRoute){
-    return this.merge(router, route, { q: null, minPrice: null, maxPrice: null, category: null, sort: null, page: 1, limit: null, filters: null });
+    return this.merge(router, route, {
+      q: null,
+      minPrice: null,
+      maxPrice: null,
+      category: null,
+      shop: null,
+      collection: null,
+      sort: null,
+      page: 1,
+      limit: null,
+      filters: null,
+    });
   }
 
   toggleFilters(router: Router, route: ActivatedRoute, open: boolean){

@@ -3,7 +3,7 @@
 <app-filters-rail
   [open]="showFilters()" (openChange)="onOpenChange($event)"
   title="Filters"
-  [shopName]="null"
+  [shopName]="currentShopName()"
   [q]="q()" (qChange)="q.set($event)"
   [minPrice]="minPrice()" (minPriceChange)="minPrice.set($event)"
   [maxPrice]="maxPrice()" (maxPriceChange)="maxPrice.set($event)"
@@ -11,6 +11,8 @@
   [showCategory]="true"
   [categories]="categories()"
   [selectedCategory]="selectedCategory()" (selectedCategoryChange)="selectedCategory.set($event)"
+  [collections]="collections()"
+  [selectedCollection]="selectedCollection()" (selectedCollectionChange)="onCollectionChange($event)"
   (apply)="applyFilters()"
   (clear)="clearAllFilters()"
 ></app-filters-rail>
@@ -45,8 +47,18 @@
         </div>
       </div>
     </div>
-    <div class="mb-2 flex items-end justify-between">
-      <h2 class="text-xl font-semibold text-blue-900 dark:text-white">All Products</h2>
+    <div class="mb-2 flex flex-wrap items-end justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <h2 class="text-xl font-semibold text-blue-900 dark:text-white">All Products</h2>
+        <select
+          class="h-9 rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100"
+          [ngModel]="selectedShop()"
+          (ngModelChange)="selectShop($event)"
+        >
+          <option value="">All shops</option>
+          <option *ngFor="let s of shops()" [value]="s.slug">{{ s.name }}</option>
+        </select>
+      </div>
       <div class="text-xs text-slate-600 dark:text-slate-400" *ngIf="total() !== null">Showing {{ ((page()-1)*perPage())+1 }}-{{ Math.min(page()*perPage(), total()||0) }} of {{ total() }}</div>
     </div>
     <div class="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">

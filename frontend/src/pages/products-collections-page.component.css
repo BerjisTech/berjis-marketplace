@@ -1,2 +1,102 @@
-/* skeleton */
+:host {
+  display: block;
+}
 
+.chip-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.8rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(15, 76, 129, 0.18);
+  font-size: 0.75rem;
+  color: #0f172a;
+  background: rgba(248, 250, 252, 0.9);
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.chip-link:hover {
+  border-color: rgba(59, 130, 246, 0.45);
+  color: #2563eb;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
+}
+
+.chip-link--active {
+  border-color: rgba(37, 99, 235, 0.55);
+  color: #1d4ed8;
+  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.25);
+}
+
+:host-context(.dark) .chip-link {
+  border-color: rgba(148, 163, 184, 0.25);
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.65);
+}
+
+:host-context(.dark) .chip-link--active {
+  border-color: rgba(96, 165, 250, 0.45);
+  color: #bfdbfe;
+  box-shadow: 0 0 0 1px rgba(96, 165, 250, 0.35);
+}
+
+.notice {
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.notice.success {
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  background: rgba(236, 253, 245, 0.8);
+  color: #047857;
+}
+
+.notice.error {
+  border: 1px solid rgba(244, 63, 94, 0.25);
+  background: rgba(254, 242, 242, 0.85);
+  color: #b91c1c;
+}
+
+:host-context(.dark) .notice.success {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(6, 95, 70, 0.35);
+  color: #bbf7d0;
+}
+
+:host-context(.dark) .notice.error {
+  border-color: rgba(248, 113, 113, 0.3);
+  background: rgba(127, 29, 29, 0.35);
+  color: #fecaca;
+}
+
+.form-input,
+.form-select {
+  appearance: none;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(15, 76, 129, 0.18);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 0.55rem 0.9rem;
+  font-size: 0.875rem;
+  color: #0f172a;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-input:focus,
+.form-select:focus {
+  outline: none;
+  border-color: rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+:host-context(.dark) .form-input,
+:host-context(.dark) .form-select {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(15, 23, 42, 0.75);
+  color: #e2e8f0;
+}
+
+:host-context(.dark) .form-input:focus,
+:host-context(.dark) .form-select:focus {
+  border-color: rgba(96, 165, 250, 0.6);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25);
+}

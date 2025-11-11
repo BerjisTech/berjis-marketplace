@@ -61,24 +61,24 @@
 
 ### Inventory Management
 - [x] Stock tracking
-- [ ] Low stock alerts
-- [ ] Inventory adjustments
-- [ ] Inventory history/audit log
+- [x] Low stock alerts
+- [x] Inventory adjustments
+- [x] Inventory history/audit log
 - [ ] Multi-location inventory (if needed)
 - [ ] Purchase orders system
 - [ ] Transfer system between locations
 
 ### Collections
-- [ ] Collection creation
-- [ ] Manual product selection
-- [ ] Automatic collections (rules-based)
-- [ ] Collection sorting options
+- [x] Collection creation
+- [x] Manual product selection
+- [x] Automatic collections (rules-based)
+- [x] Collection sorting options
 
 ### Gift Cards
 - [ ] Gift card creation
 - [ ] Gift card code generation
-- [ ] Gift card balance tracking
-- [ ] Gift card redemption
+- [x] Gift card balance tracking
+- [x] Gift card redemption
 
 ---
 
