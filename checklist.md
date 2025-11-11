@@ -34,15 +34,15 @@
 - [x] Collections table
 - [x] Discounts table
 - [x] Gift_cards table
-- [ ] Blog_posts table
-- [ ] Files/Media table
-- [ ] Menus table
-- [ ] Markets/Catalogs table
-- [ ] Customer_segments table
-- [ ] Marketing_campaigns table
-- [ ] Analytics_events table
-- [ ] Transfers table
-- [ ] Purchase_orders table
+- [x] Blog_posts table
+- [x] Files/Media table
+- [x] Menus table
+- [x] Markets/Catalogs table
+- [x] Customer_segments table
+- [x] Marketing_campaigns table
+- [x] Analytics_events table
+- [x] Transfers table
+- [x] Purchase_orders table
 
 ---
 
@@ -50,13 +50,13 @@
 
 ### Product CRUD
 - [x] Create product form (title, description, pricing, images)
-- [ ] Product variants (size, color, etc.)
-- [ ] SKU generation and management
+- [x] Product variants (size, color, etc.)
+- [x] SKU generation and management
 - [x] Product image upload and management
-- [ ] Product editing
+- [x] Product editing
 - [x] Product deletion (soft delete)
-- [ ] Bulk product import (CSV)
-- [ ] Bulk product export
+- [x] Bulk product import (CSV)
+- [x] Bulk product export
 - [x] Product search and filtering
 
 ### Inventory Management

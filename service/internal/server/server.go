@@ -1,10 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"database/sql"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/mail"
@@ -48,26 +51,41 @@ type Shop struct {
 }
 
 type Product struct {
-	UUID         uuid.UUID  `db:"uuid" json:"uuid"`
-	ShopUUID     uuid.UUID  `db:"shop_uuid" json:"shopUuid"`
-	Title        string     `db:"title" json:"title"`
-	Slug         string     `db:"slug" json:"slug"`
-	Summary      string     `db:"summary" json:"summary"`
-	PriceCents   int64      `db:"price_cents" json:"priceCents"`
-	Currency     string     `db:"currency" json:"currency"`
-	Stock        int64      `db:"stock" json:"stock"`
-	ImageURL     *string    `db:"image_url" json:"imageUrl,omitempty"`
-	Category     string     `db:"category" json:"category"`
-	CategoryUUID *uuid.UUID `db:"category_uuid" json:"categoryUuid,omitempty"`
-	Images       []string   `db:"images" json:"images"`
-	Rating       float32    `db:"rating" json:"rating"`
-	ReviewCount  int64      `db:"review_count" json:"reviewCount"`
-	CreatedAt    time.Time  `db:"created_at" json:"createdAt"`
-	UpdatedAt    time.Time  `db:"updated_at" json:"updatedAt"`
-	DeletedAt    *time.Time `db:"deleted_at" json:"-"`
-	Published    bool       `db:"published" json:"published"`
-	ShopName     string     `db:"shop_name" json:"shopName"`
-	ShopSlug     string     `db:"shop_slug" json:"shopSlug"`
+	UUID         uuid.UUID        `db:"uuid" json:"uuid"`
+	ShopUUID     uuid.UUID        `db:"shop_uuid" json:"shopUuid"`
+	Title        string           `db:"title" json:"title"`
+	Slug         string           `db:"slug" json:"slug"`
+	Summary      string           `db:"summary" json:"summary"`
+	PriceCents   int64            `db:"price_cents" json:"priceCents"`
+	Currency     string           `db:"currency" json:"currency"`
+	Stock        int64            `db:"stock" json:"stock"`
+	ImageURL     *string          `db:"image_url" json:"imageUrl,omitempty"`
+	Category     string           `db:"category" json:"category"`
+	CategoryUUID *uuid.UUID       `db:"category_uuid" json:"categoryUuid,omitempty"`
+	Images       []string         `db:"images" json:"images"`
+	Rating       float32          `db:"rating" json:"rating"`
+	ReviewCount  int64            `db:"review_count" json:"reviewCount"`
+	CreatedAt    time.Time        `db:"created_at" json:"createdAt"`
+	UpdatedAt    time.Time        `db:"updated_at" json:"updatedAt"`
+	DeletedAt    *time.Time       `db:"deleted_at" json:"-"`
+	Published    bool             `db:"published" json:"published"`
+	ShopName     string           `db:"shop_name" json:"shopName"`
+	ShopSlug     string           `db:"shop_slug" json:"shopSlug"`
+	Variants     []ProductVariant `db:"-" json:"variants"`
+}
+
+type ProductVariant struct {
+	UUID           uuid.UUID       `db:"uuid" json:"uuid"`
+	ProductUUID    uuid.UUID       `db:"product_uuid" json:"productUuid"`
+	SKU            string          `db:"sku" json:"sku"`
+	Title          string          `db:"title" json:"title"`
+	OptionValues   json.RawMessage `db:"option_values" json:"optionValues,omitempty"`
+	PriceCents     int64           `db:"price_cents" json:"priceCents"`
+	CompareAtCents *int64          `db:"compare_at_cents" json:"compareAtCents,omitempty"`
+	Stock          int64           `db:"stock" json:"stock"`
+	Barcode        *string         `db:"barcode" json:"barcode,omitempty"`
+	CreatedAt      time.Time       `db:"created_at" json:"createdAt"`
+	UpdatedAt      time.Time       `db:"updated_at" json:"updatedAt"`
 }
 
 type Category struct {
@@ -171,6 +189,33 @@ type GiftCardTransaction struct {
 	ChangeCents  int64     `db:"change_cents" json:"changeCents"`
 	Reason       string    `db:"reason" json:"reason"`
 	CreatedAt    time.Time `db:"created_at" json:"createdAt"`
+}
+
+type VariantPayload struct {
+	UUID           string         `json:"uuid"`
+	SKU            string         `json:"sku"`
+	Title          string         `json:"title"`
+	OptionValues   map[string]any `json:"optionValues"`
+	PriceCents     *int64         `json:"priceCents"`
+	CompareAtCents *int64         `json:"compareAtCents"`
+	Stock          *int64         `json:"stock"`
+	Barcode        string         `json:"barcode"`
+	Deleted        bool           `json:"deleted"`
+}
+
+type ProductCreateInput struct {
+	Title        string
+	Slug         string
+	Summary      string
+	PriceCents   int64
+	Currency     string
+	Stock        int64
+	ImageURL     *string
+	Published    bool
+	Category     string
+	CategoryUUID string
+	Images       []string
+	Variants     []VariantPayload
 }
 
 type StoreUser struct {
@@ -410,6 +455,9 @@ func New(opts Options) *fiber.App {
 		if err := opts.DB.Select(&items, base, args...); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
+		if err := attachVariantsList(opts.DB, items); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
 		return c.JSON(fiber.Map{"success": true, "data": items})
 	})
 	// Search alias handled by same /v1/products with query params (no separate handler needed)
@@ -426,6 +474,9 @@ func New(opts Options) *fiber.App {
                                   WHERE p.uuid=$1 AND p.deleted_at IS NULL`, id)
 		if err != nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "not found"})
+		}
+		if err := attachVariantsSingle(opts.DB, &item); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 		return c.JSON(fiber.Map{"success": true, "data": item})
 	})
@@ -486,6 +537,9 @@ func New(opts Options) *fiber.App {
                                        WHERE s.slug=$1 AND p.published=true AND p.deleted_at IS NULL
                                        ORDER BY p.created_at DESC`, slug)
 		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if err := attachVariantsList(opts.DB, items); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 		return c.JSON(fiber.Map{"success": true, "data": items})
@@ -557,24 +611,22 @@ func New(opts Options) *fiber.App {
 
 	app.Post("/v1/products", requireAuth, func(c *fiber.Ctx) error {
 		var body struct {
-			ShopSlug     string   `json:"shopSlug"`
-			Title        string   `json:"title"`
-			Slug         string   `json:"slug"`
-			Summary      string   `json:"summary"`
-			PriceCents   int64    `json:"priceCents"`
-			Currency     string   `json:"currency"`
-			Stock        int64    `json:"stock"`
-			ImageURL     *string  `json:"imageUrl"`
-			Published    bool     `json:"published"`
-			Category     string   `json:"category"`
-			CategoryUUID string   `json:"categoryUuid"`
-			Images       []string `json:"images"`
+			ShopSlug     string           `json:"shopSlug"`
+			Title        string           `json:"title"`
+			Slug         string           `json:"slug"`
+			Summary      string           `json:"summary"`
+			PriceCents   int64            `json:"priceCents"`
+			Currency     string           `json:"currency"`
+			Stock        int64            `json:"stock"`
+			ImageURL     *string          `json:"imageUrl"`
+			Published    bool             `json:"published"`
+			Category     string           `json:"category"`
+			CategoryUUID string           `json:"categoryUuid"`
+			Images       []string         `json:"images"`
+			Variants     []VariantPayload `json:"variants"`
 		}
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
-		}
-		if body.Title == "" || body.Slug == "" || body.ShopSlug == "" || body.PriceCents < 0 || body.Currency == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "missing fields"})
 		}
 		shop, role, err := ensureShopAccess(c, opts.DB, body.ShopSlug)
 		if err != nil {
@@ -583,60 +635,43 @@ func New(opts Options) *fiber.App {
 		if !teamRoleAllowsManagement(role) {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
 		}
-		if body.Stock < 0 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "stock cannot be negative"})
-		}
-		categoryValue := strings.TrimSpace(body.Category)
-		var categoryUUID *uuid.UUID
-		if strings.TrimSpace(body.CategoryUUID) != "" {
-			categoryID, err := uuid.Parse(strings.TrimSpace(body.CategoryUUID))
-			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid category uuid"})
-			}
-			var cat struct {
-				UUID uuid.UUID `db:"uuid"`
-				Slug string    `db:"slug"`
-				Name string    `db:"name"`
-			}
-			if err := opts.DB.Get(&cat, `SELECT uuid, slug, name FROM categories WHERE uuid=$1 AND shop_uuid=$2 AND is_active=true`, categoryID, shop.UUID); err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "category not found for shop"})
-			}
-			categoryUUID = &cat.UUID
-			if categoryValue == "" {
-				categoryValue = cat.Slug
-			}
-		}
-		id := uuid.New()
-		var categoryUUIDParam any
-		if categoryUUID != nil {
-			categoryUUIDParam = *categoryUUID
-		}
-		_, err = opts.DB.Exec(`INSERT INTO products(uuid,shop_uuid,title,slug,summary,price_cents,currency,stock,image_url,published,category,category_uuid,images) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-			id, shop.UUID, strings.TrimSpace(body.Title), strings.ToLower(strings.TrimSpace(body.Slug)), strings.TrimSpace(body.Summary), body.PriceCents, strings.ToUpper(body.Currency), body.Stock, body.ImageURL, body.Published, categoryValue, categoryUUIDParam, pqStringArray(body.Images),
-		)
+		productID, _, err := createProductWithVariants(opts.DB, shop, ProductCreateInput{
+			Title:        body.Title,
+			Slug:         body.Slug,
+			Summary:      body.Summary,
+			PriceCents:   body.PriceCents,
+			Currency:     body.Currency,
+			Stock:        body.Stock,
+			ImageURL:     body.ImageURL,
+			Published:    body.Published,
+			Category:     body.Category,
+			CategoryUUID: body.CategoryUUID,
+			Images:       body.Images,
+			Variants:     body.Variants,
+		})
 		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+			return writeErrorResponse(c, err)
 		}
-		if categoryUUID != nil {
-			if _, err := opts.DB.Exec(`INSERT INTO category_products(category_uuid, product_uuid, is_primary)
-				VALUES($1,$2,true)
-				ON CONFLICT (category_uuid, product_uuid) DO UPDATE SET is_primary=EXCLUDED.is_primary, created_at=category_products.created_at`,
-				*categoryUUID, id); err != nil {
-				log.Printf("category_products upsert error: %v", err)
-			}
-		}
-		if err := upsertDefaultInventory(opts.DB, shop.UUID, id, body.Stock); err != nil {
-			log.Printf("inventory upsert error: %v", err)
-		}
-		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"uuid": id}})
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"uuid": productID}})
 	})
 
 	app.Patch("/v1/products/:id", requireAuth, func(c *fiber.Ctx) error {
 		id := strings.TrimSpace(c.Params("id"))
-		var meta struct {
-			ShopSlug string `db:"slug"`
+		productUUID, err := uuid.Parse(id)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid product id"})
 		}
-		if err := opts.DB.Get(&meta, `SELECT s.slug FROM products p JOIN shops s ON s.uuid=p.shop_uuid WHERE p.uuid=$1 AND p.deleted_at IS NULL`, id); err != nil {
+		var meta struct {
+			ShopSlug    string `db:"shop_slug"`
+			ProductSlug string `db:"product_slug"`
+			Title       string `db:"title"`
+			PriceCents  int64  `db:"price_cents"`
+			Stock       int64  `db:"stock"`
+		}
+		if err := opts.DB.Get(&meta, `SELECT s.slug AS shop_slug, p.slug AS product_slug, p.title, p.price_cents, p.stock
+                                       FROM products p
+                                       JOIN shops s ON s.uuid=p.shop_uuid
+                                       WHERE p.uuid=$1 AND p.deleted_at IS NULL`, productUUID); err != nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "not found"})
 		}
 		shop, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
@@ -650,48 +685,75 @@ func New(opts Options) *fiber.App {
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
 		}
-		sets := make([]string, 0, 8)
-		args := make([]any, 0, 8)
+		var variantPayloads []VariantPayload
+		if raw, ok := body["variants"]; ok {
+			b, err := json.Marshal(raw)
+			if err != nil {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid variants"})
+			}
+			if err := json.Unmarshal(b, &variantPayloads); err != nil {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid variants"})
+			}
+			delete(body, "variants")
+		}
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+		sets := make([]string, 0, 12)
+		args := make([]any, 0, 12)
 		add := func(col string, v any) { sets = append(sets, col+"=$"+itoa(len(args)+1)); args = append(args, v) }
+		currentTitle := meta.Title
+		currentPrice := meta.PriceCents
+		currentStock := meta.Stock
 		if v, ok := body["title"].(string); ok {
-			add("title", strings.TrimSpace(v))
+			title := strings.TrimSpace(v)
+			if title != "" {
+				add("title", title)
+				currentTitle = title
+			}
 		}
 		if v, ok := body["slug"].(string); ok {
-			add("slug", strings.ToLower(strings.TrimSpace(v)))
+			newSlug := strings.ToLower(strings.TrimSpace(v))
+			if newSlug != "" {
+				add("slug", newSlug)
+				meta.ProductSlug = newSlug
+			}
 		}
 		if v, ok := body["summary"].(string); ok {
 			add("summary", strings.TrimSpace(v))
 		}
 		if v, ok := body["priceCents"].(float64); ok {
-			add("price_cents", int64(v))
+			val := int64(v)
+			add("price_cents", val)
+			currentPrice = val
 		}
 		if v, ok := body["currency"].(string); ok {
 			add("currency", strings.ToUpper(v))
 		}
-		var stockOverride *int64
 		if raw, ok := body["stock"]; ok {
-			switch v := raw.(type) {
+			switch val := raw.(type) {
 			case float64:
-				qty := int64(v)
-				if qty < 0 {
+				q := int64(val)
+				if q < 0 {
 					return c.Status(400).JSON(fiber.Map{"success": false, "message": "stock cannot be negative"})
 				}
-				stockOverride = &qty
-				add("stock", qty)
+				add("stock", q)
+				currentStock = q
 			case int:
-				qty := int64(v)
-				if qty < 0 {
+				q := int64(val)
+				if q < 0 {
 					return c.Status(400).JSON(fiber.Map{"success": false, "message": "stock cannot be negative"})
 				}
-				stockOverride = &qty
-				add("stock", qty)
+				add("stock", q)
+				currentStock = q
 			case int64:
-				if v < 0 {
+				if val < 0 {
 					return c.Status(400).JSON(fiber.Map{"success": false, "message": "stock cannot be negative"})
 				}
-				val := v
-				stockOverride = &val
 				add("stock", val)
+				currentStock = val
 			default:
 				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid stock value"})
 			}
@@ -702,20 +764,13 @@ func New(opts Options) *fiber.App {
 		if v, ok := body["published"].(bool); ok {
 			add("published", v)
 		}
-		var categoryOverrideValue string
-		var categoryOverrideSet bool
 		var categoryUUIDOverride *uuid.UUID
-		var categoryUUIDOverrideSet bool
+		categoryUpdated := false
 		if raw, ok := body["categoryUuid"]; ok {
-			categoryUUIDOverrideSet = true
-			switch v := raw.(type) {
+			switch val := raw.(type) {
 			case string:
-				trimmed := strings.TrimSpace(v)
-				if trimmed == "" {
-					categoryUUIDOverride = nil
-					categoryOverrideValue = ""
-					categoryOverrideSet = true
-				} else {
+				trimmed := strings.TrimSpace(val)
+				if trimmed != "" {
 					categoryID, err := uuid.Parse(trimmed)
 					if err != nil {
 						return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid category uuid"})
@@ -728,72 +783,76 @@ func New(opts Options) *fiber.App {
 						return c.Status(400).JSON(fiber.Map{"success": false, "message": "category not found for shop"})
 					}
 					categoryUUIDOverride = &cat.UUID
-					categoryOverrideValue = cat.Slug
-					categoryOverrideSet = true
+					add("category_uuid", cat.UUID)
+					add("category", cat.Slug)
+					categoryUpdated = true
+				} else {
+					categoryUUIDOverride = nil
+					add("category_uuid", nil)
+					add("category", "")
+					categoryUpdated = true
 				}
 			case nil:
 				categoryUUIDOverride = nil
-				categoryOverrideValue = ""
-				categoryOverrideSet = true
+				add("category_uuid", nil)
+				add("category", "")
+				categoryUpdated = true
 			default:
 				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid category uuid"})
 			}
-		}
-		if v, ok := body["category"].(string); ok {
-			categoryOverrideValue = strings.TrimSpace(v)
-			categoryOverrideSet = true
-		}
-		if categoryUUIDOverrideSet {
-			if categoryUUIDOverride != nil {
-				add("category_uuid", *categoryUUIDOverride)
-			} else {
-				add("category_uuid", nil)
-			}
-		}
-		if categoryOverrideSet {
-			add("category", categoryOverrideValue)
+		} else if v, ok := body["category"].(string); ok {
+			add("category", strings.TrimSpace(v))
+			categoryUpdated = true
 		}
 		if v, ok := body["images"].([]any); ok {
 			arr := make([]string, 0, len(v))
-			for _, e := range v {
-				if s, ok := e.(string); ok {
+			for _, item := range v {
+				if s, ok := item.(string); ok {
 					arr = append(arr, s)
 				}
 			}
 			add("images", pq.Array(arr))
 		}
-		if len(sets) == 0 {
-			return c.JSON(fiber.Map{"success": true})
+		if len(sets) > 0 {
+			sets = append(sets, "updated_at=now()")
+			args = append(args, productUUID)
+			query := "UPDATE products SET " + strings.Join(sets, ", ") + " WHERE uuid=$" + itoa(len(args)) + " AND deleted_at IS NULL"
+			res, err := tx.Exec(query, args...)
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+			if affected, _ := res.RowsAffected(); affected == 0 {
+				return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
+			}
 		}
-		sets = append(sets, "updated_at=now()")
-		args = append(args, id)
-		query := "UPDATE products SET " + strings.Join(sets, ", ") + " WHERE uuid=$" + itoa(len(args)) + " AND deleted_at IS NULL"
-		res, err := opts.DB.Exec(query, args...)
-		if err != nil {
-			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		if variantPayloads != nil {
+			totalStock, err := replaceProductVariantsTx(tx, productUUID, meta.ProductSlug, currentTitle, currentPrice, currentStock, variantPayloads)
+			if err != nil {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": err.Error()})
+			}
+			currentStock = totalStock
+			if _, err := tx.Exec(`UPDATE products SET stock=$1, updated_at=now() WHERE uuid=$2`, totalStock, productUUID); err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
 		}
-		if affected, _ := res.RowsAffected(); affected == 0 {
-			return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
-		}
-		if categoryUUIDOverrideSet {
+		if categoryUpdated {
 			if categoryUUIDOverride != nil {
-				if _, err := opts.DB.Exec(`INSERT INTO category_products(category_uuid, product_uuid, is_primary)
+				if _, err := tx.Exec(`INSERT INTO category_products(category_uuid, product_uuid, is_primary)
 					VALUES($1,$2,true)
-					ON CONFLICT (category_uuid, product_uuid) DO UPDATE SET is_primary=EXCLUDED.is_primary`, *categoryUUIDOverride, id); err != nil {
-					log.Printf("category_products upsert error: %v", err)
+					ON CONFLICT (category_uuid, product_uuid) DO UPDATE SET is_primary=EXCLUDED.is_primary`, *categoryUUIDOverride, productUUID); err != nil {
+					return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 				}
 			} else {
-				if _, err := opts.DB.Exec(`DELETE FROM category_products WHERE product_uuid=$1`, id); err != nil {
-					log.Printf("category_products delete error: %v", err)
+				if _, err := tx.Exec(`DELETE FROM category_products WHERE product_uuid=$1`, productUUID); err != nil {
+					return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 				}
 			}
 		}
-		if stockOverride != nil {
-			if productUUID, err := uuid.Parse(id); err == nil {
-				if err := upsertDefaultInventory(opts.DB, shop.UUID, productUUID, *stockOverride); err != nil {
-					log.Printf("inventory upsert error: %v", err)
-				}
-			}
+		if err := tx.Commit(); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if err := upsertDefaultInventory(opts.DB, shop.UUID, productUUID, currentStock); err != nil {
+			log.Printf("inventory upsert error: %v", err)
 		}
 		return c.JSON(fiber.Map{"success": true})
 	})
@@ -883,7 +942,179 @@ func New(opts Options) *fiber.App {
                                        ORDER BY p.created_at DESC`, shop.UUID); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
+		if err := attachVariantsList(opts.DB, items); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
 		return c.JSON(fiber.Map{"success": true, "data": items})
+	})
+
+	app.Get("/v1/my/shops/:slug/products/export", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var products []Product
+		if err := opts.DB.Select(&products, `SELECT p.uuid, p.shop_uuid, p.title, p.slug, p.summary, p.price_cents, p.currency, p.stock, p.image_url,
+		                                      p.category, p.category_uuid, p.images, COALESCE(p.rating,0) AS rating, COALESCE(p.review_count,0) AS review_count,
+		                                      p.created_at, p.updated_at, p.deleted_at, p.published,
+		                                      s.name AS shop_name, s.slug AS shop_slug
+		                               FROM products p
+		                               JOIN shops s ON s.uuid=p.shop_uuid
+		                               WHERE s.uuid=$1 AND p.deleted_at IS NULL
+		                               ORDER BY p.created_at DESC`, shop.UUID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if err := attachVariantsList(opts.DB, products); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		var buf bytes.Buffer
+		writer := csv.NewWriter(&buf)
+		header := []string{"title", "slug", "summary", "price_cents", "currency", "stock", "category", "category_uuid", "image_url", "published", "images", "variants"}
+		if err := writer.Write(header); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "csv error"})
+		}
+		for _, product := range products {
+			var variantsJSON string
+			if len(product.Variants) > 0 {
+				if encoded, err := json.Marshal(product.Variants); err == nil {
+					variantsJSON = string(encoded)
+				}
+			}
+			imageURL := ""
+			if product.ImageURL != nil {
+				imageURL = *product.ImageURL
+			}
+			row := []string{
+				product.Title,
+				product.Slug,
+				product.Summary,
+				strconv.FormatInt(product.PriceCents, 10),
+				product.Currency,
+				strconv.FormatInt(product.Stock, 10),
+				product.Category,
+				func() string {
+					if product.CategoryUUID != nil {
+						return product.CategoryUUID.String()
+					}
+					return ""
+				}(),
+				imageURL,
+				strconv.FormatBool(product.Published),
+				joinCSVList(product.Images),
+				variantsJSON,
+			}
+			if err := writer.Write(row); err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "csv error"})
+			}
+		}
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "csv error"})
+		}
+		filename := fmt.Sprintf("%s-products.csv", slug)
+		c.Set(fiber.HeaderContentType, "text/csv")
+		c.Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+		return c.Send(buf.Bytes())
+	})
+
+	app.Post("/v1/my/shops/:slug/products/import", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		reader, cleanup, err := csvReaderFromRequest(c)
+		if err != nil {
+			return writeErrorResponse(c, err)
+		}
+		defer cleanup()
+		header, err := reader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "empty csv"})
+			}
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid csv"})
+		}
+		index := make(map[string]int)
+		for i, col := range header {
+			index[strings.ToLower(strings.TrimSpace(col))] = i
+		}
+		get := func(row []string, key string) string {
+			if idx, ok := index[key]; ok && idx >= 0 && idx < len(row) {
+				return row[idx]
+			}
+			return ""
+		}
+		created := make([]string, 0)
+		rowNumber := 1
+		for {
+			record, err := reader.Read()
+			if err == io.EOF {
+				break
+			}
+			rowNumber++
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("row %d: %v", rowNumber, err)})
+			}
+			title := get(record, "title")
+			if strings.TrimSpace(title) == "" {
+				continue
+			}
+			slugValue := get(record, "slug")
+			price, err := parseCSVInt(get(record, "price_cents"), 0)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("row %d: invalid price_cents", rowNumber)})
+			}
+			stock, err := parseCSVInt(get(record, "stock"), 0)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("row %d: invalid stock", rowNumber)})
+			}
+			currency := get(record, "currency")
+			imageURL := strings.TrimSpace(get(record, "image_url"))
+			var imagePtr *string
+			if imageURL != "" {
+				imagePtr = &imageURL
+			}
+			images := splitCSVList(get(record, "images"))
+			var variants []VariantPayload
+			if variantsRaw := get(record, "variants"); strings.TrimSpace(variantsRaw) != "" {
+				if err := json.Unmarshal([]byte(variantsRaw), &variants); err != nil {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("row %d: invalid variants json", rowNumber)})
+				}
+			}
+			productID, _, err := createProductWithVariants(opts.DB, shop, ProductCreateInput{
+				Title:        title,
+				Slug:         slugValue,
+				Summary:      get(record, "summary"),
+				PriceCents:   price,
+				Currency:     currency,
+				Stock:        stock,
+				ImageURL:     imagePtr,
+				Published:    parseCSVBool(get(record, "published")),
+				Category:     get(record, "category"),
+				CategoryUUID: get(record, "category_uuid"),
+				Images:       images,
+				Variants:     variants,
+			})
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("row %d: %s", rowNumber, errorMessage(err))})
+			}
+			created = append(created, productID.String())
+		}
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
+			"created":     len(created),
+			"productIds":  created,
+			"shopUuid":    shop.UUID.String(),
+			"shopSlug":    shop.Slug,
+			"importedCsv": true,
+		}})
 	})
 
 	app.Get("/v1/my/shops/:slug/categories", requireAuth, func(c *fiber.Ctx) error {
@@ -2753,6 +2984,9 @@ func New(opts Options) *fiber.App {
                                           ORDER BY p.updated_at DESC LIMIT 10`, owner, like); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
+		if err := attachVariantsList(opts.DB, prods); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
 		// Orders for products owned by this user (join via order_items -> products -> shops)
 		type OrderRow struct {
 			UUID            uuid.UUID `db:"uuid" json:"uuid"`
@@ -3729,32 +3963,6 @@ func setCollectionProducts(db *sqlx.DB, collection uuid.UUID, shop uuid.UUID, pr
 	return tx.Commit()
 }
 
-func setDiscountProducts(db *sqlx.DB, discount uuid.UUID, shop uuid.UUID, productIDs []uuid.UUID) error {
-	tx, err := db.Beginx()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-	if _, err := tx.Exec(`DELETE FROM discount_products WHERE discount_uuid=$1`, discount); err != nil {
-		return err
-	}
-	if len(productIDs) > 0 {
-		var count int
-		if err := tx.Get(&count, `SELECT COUNT(1) FROM products WHERE uuid = ANY($1) AND shop_uuid=$2 AND deleted_at IS NULL`, pq.Array(productIDs), shop); err != nil {
-			return err
-		}
-		if count != len(productIDs) {
-			return fmt.Errorf("one or more products do not belong to this shop")
-		}
-		for _, pid := range productIDs {
-			if _, err := tx.Exec(`INSERT INTO discount_products(discount_uuid, product_uuid) VALUES($1,$2)`, discount, pid); err != nil {
-				return err
-			}
-		}
-	}
-	return tx.Commit()
-}
-
 func normalizeDiscountStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "active":
@@ -3790,6 +3998,452 @@ func addGiftCardTransaction(db *sqlx.DB, card uuid.UUID, change int64, reason st
 	_, err := db.Exec(`INSERT INTO gift_card_transactions(uuid, gift_card_uuid, change_cents, reason) VALUES($1,$2,$3,$4)`,
 		uuid.New(), card, change, reason)
 	return err
+}
+
+func attachVariants(db *sqlx.DB, products []*Product) error {
+	if len(products) == 0 {
+		return nil
+	}
+	ids := make([]uuid.UUID, 0, len(products))
+	index := make(map[uuid.UUID]*Product, len(products))
+	for _, product := range products {
+		if product == nil {
+			continue
+		}
+		ids = append(ids, product.UUID)
+		index[product.UUID] = product
+		product.Variants = product.Variants[:0]
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	var variants []ProductVariant
+	if err := db.Select(&variants, `SELECT uuid, product_uuid, sku, title, option_values, price_cents, compare_at_cents, stock, barcode, created_at, updated_at
+                                     FROM product_variants
+                                     WHERE product_uuid = ANY($1)
+                                     ORDER BY created_at ASC`, pq.Array(ids)); err != nil {
+		return err
+	}
+	for _, variant := range variants {
+		if product, ok := index[variant.ProductUUID]; ok {
+			product.Variants = append(product.Variants, variant)
+		}
+	}
+	return nil
+}
+
+func attachVariantsList(db *sqlx.DB, products []Product) error {
+	ptrs := make([]*Product, 0, len(products))
+	for i := range products {
+		ptrs = append(ptrs, &products[i])
+	}
+	return attachVariants(db, ptrs)
+}
+
+func attachVariantsSingle(db *sqlx.DB, product *Product) error {
+	if product == nil {
+		return nil
+	}
+	return attachVariants(db, []*Product{product})
+}
+
+func writeErrorResponse(c *fiber.Ctx, err error) error {
+	if err == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "unknown error"})
+	}
+	if ferr, ok := err.(*fiber.Error); ok {
+		return c.Status(ferr.Code).JSON(fiber.Map{"success": false, "message": ferr.Message})
+	}
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "server error"})
+}
+
+func errorMessage(err error) string {
+	if err == nil {
+		return ""
+	}
+	if ferr, ok := err.(*fiber.Error); ok {
+		return ferr.Message
+	}
+	return err.Error()
+}
+
+func createProductWithVariants(db *sqlx.DB, shop Shop, input ProductCreateInput) (uuid.UUID, int64, error) {
+	title := strings.TrimSpace(input.Title)
+	if title == "" {
+		return uuid.Nil, 0, fiber.NewError(fiber.StatusBadRequest, "title is required")
+	}
+	if input.PriceCents < 0 {
+		return uuid.Nil, 0, fiber.NewError(fiber.StatusBadRequest, "priceCents cannot be negative")
+	}
+	if input.Stock < 0 {
+		return uuid.Nil, 0, fiber.NewError(fiber.StatusBadRequest, "stock cannot be negative")
+	}
+	currency := strings.ToUpper(strings.TrimSpace(input.Currency))
+	if currency == "" {
+		currency = "USD"
+	}
+	desiredSlug := strings.TrimSpace(input.Slug)
+	if desiredSlug == "" {
+		desiredSlug = generateProductSlug(title)
+	} else {
+		desiredSlug = generateProductSlug(desiredSlug)
+	}
+	categoryValue := strings.TrimSpace(input.Category)
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return uuid.Nil, 0, err
+	}
+	defer tx.Rollback()
+
+	slug, err := ensureUniqueProductSlugTx(tx, shop.UUID, desiredSlug)
+	if err != nil {
+		return uuid.Nil, 0, err
+	}
+
+	var categoryUUID *uuid.UUID
+	if trimmed := strings.TrimSpace(input.CategoryUUID); trimmed != "" {
+		categoryID, err := uuid.Parse(trimmed)
+		if err != nil {
+			return uuid.Nil, 0, fiber.NewError(fiber.StatusBadRequest, "invalid category uuid")
+		}
+		var cat struct {
+			UUID uuid.UUID `db:"uuid"`
+			Slug string    `db:"slug"`
+		}
+		if err := tx.Get(&cat, `SELECT uuid, slug FROM categories WHERE uuid=$1 AND shop_uuid=$2 AND is_active=true`, categoryID, shop.UUID); err != nil {
+			return uuid.Nil, 0, fiber.NewError(fiber.StatusBadRequest, "category not found for shop")
+		}
+		categoryUUID = &cat.UUID
+		if categoryValue == "" {
+			categoryValue = cat.Slug
+		}
+	}
+
+	productID := uuid.New()
+	images := input.Images
+	if len(images) == 0 {
+		images = []string{}
+	}
+	if _, err := tx.Exec(`INSERT INTO products(uuid,shop_uuid,title,slug,summary,price_cents,currency,stock,image_url,published,category,category_uuid,images)
+                               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+		productID,
+		shop.UUID,
+		title,
+		slug,
+		strings.TrimSpace(input.Summary),
+		input.PriceCents,
+		currency,
+		input.Stock,
+		input.ImageURL,
+		input.Published,
+		categoryValue,
+		categoryUUID,
+		pqStringArray(images),
+	); err != nil {
+		return uuid.Nil, 0, err
+	}
+	if categoryUUID != nil {
+		if _, err := tx.Exec(`INSERT INTO category_products(category_uuid, product_uuid, is_primary)
+				VALUES($1,$2,true)
+				ON CONFLICT (category_uuid, product_uuid) DO UPDATE SET is_primary=EXCLUDED.is_primary, created_at=category_products.created_at`,
+			*categoryUUID, productID); err != nil {
+			return uuid.Nil, 0, err
+		}
+	}
+	totalStock, err := replaceProductVariantsTx(tx, productID, slug, title, input.PriceCents, input.Stock, input.Variants)
+	if err != nil {
+		return uuid.Nil, 0, err
+	}
+	if _, err := tx.Exec(`UPDATE products SET stock=$1, updated_at=now() WHERE uuid=$2`, totalStock, productID); err != nil {
+		return uuid.Nil, 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return uuid.Nil, 0, err
+	}
+	if err := upsertDefaultInventory(db, shop.UUID, productID, totalStock); err != nil {
+		return uuid.Nil, 0, err
+	}
+	return productID, totalStock, nil
+}
+
+func ensureUniqueProductSlugTx(tx *sqlx.Tx, shop uuid.UUID, base string) (string, error) {
+	slug := base
+	if slug == "" {
+		slug = fmt.Sprintf("product-%s", uuid.New().String())
+	}
+	for attempt := 0; attempt < 100; attempt++ {
+		var exists int
+		if err := tx.Get(&exists, `SELECT COUNT(1) FROM products WHERE shop_uuid=$1 AND slug=$2`, shop, slug); err != nil {
+			return "", err
+		}
+		if exists == 0 {
+			return slug, nil
+		}
+		slug = fmt.Sprintf("%s-%d", base, attempt+1)
+	}
+	return "", fiber.NewError(fiber.StatusBadRequest, "could not generate unique slug")
+}
+
+func generateProductSlug(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	raw = strings.ToLower(raw)
+	var builder strings.Builder
+	lastHyphen := false
+	for _, r := range raw {
+		switch {
+		case r >= 'a' && r <= 'z':
+			builder.WriteRune(r)
+			lastHyphen = false
+		case r >= '0' && r <= '9':
+			builder.WriteRune(r)
+			lastHyphen = false
+		case r == ' ' || r == '-' || r == '_':
+			if !lastHyphen {
+				builder.WriteRune('-')
+				lastHyphen = true
+			}
+		}
+	}
+	slug := strings.Trim(builder.String(), "-")
+	if slug == "" {
+		return "product"
+	}
+	return slug
+}
+
+func csvReaderFromRequest(c *fiber.Ctx) (*csv.Reader, func(), error) {
+	if fileHeader, err := c.FormFile("file"); err == nil && fileHeader != nil {
+		f, err := fileHeader.Open()
+		if err != nil {
+			return nil, nil, fiber.NewError(fiber.StatusBadRequest, "could not open uploaded file")
+		}
+		reader := csv.NewReader(f)
+		reader.FieldsPerRecord = -1
+		return reader, func() { _ = f.Close() }, nil
+	}
+	body := c.Body()
+	if len(body) == 0 {
+		return nil, nil, fiber.NewError(fiber.StatusBadRequest, "empty body")
+	}
+	buf := bytes.NewReader(body)
+	reader := csv.NewReader(buf)
+	reader.FieldsPerRecord = -1
+	return reader, func() {}, nil
+}
+
+func parseCSVInt(value string, fallback int64) (int64, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback, nil
+	}
+	num, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return num, nil
+}
+
+func parseCSVBool(value string) bool {
+	value = strings.TrimSpace(strings.ToLower(value))
+	if value == "" {
+		return false
+	}
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		return value == "1" || value == "yes" || value == "y" || value == "true"
+	}
+	return b
+}
+
+func splitCSVList(value string) []string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return []string{}
+	}
+	parts := strings.Split(value, "|")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		p := strings.TrimSpace(part)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+func joinCSVList(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+	return strings.Join(values, "|")
+}
+
+func replaceProductVariantsTx(tx *sqlx.Tx, product uuid.UUID, slug string, title string, basePrice int64, fallbackStock int64, variants []VariantPayload) (int64, error) {
+	if _, err := tx.Exec(`DELETE FROM product_variants WHERE product_uuid=$1`, product); err != nil {
+		return 0, err
+	}
+	usableSeed := slug
+	if usableSeed == "" {
+		usableSeed = title
+	}
+	counter := 0
+	used := make(map[string]struct{})
+	totalStock := int64(0)
+	defaultStock := int64(0)
+	activeVariants := make([]VariantPayload, 0, len(variants))
+	for _, variant := range variants {
+		if variant.Deleted {
+			continue
+		}
+		activeVariants = append(activeVariants, variant)
+	}
+	if fallbackStock > 0 && len(activeVariants) > 0 {
+		defaultStock = fallbackStock / int64(len(activeVariants))
+	}
+	for i, variant := range activeVariants {
+		sku := strings.ToUpper(strings.TrimSpace(variant.SKU))
+		if sku == "" {
+			sku = makeSKU(usableSeed, &counter, used)
+		} else {
+			sku = sanitizeSKUSeed(sku)
+			if sku == "" {
+				sku = makeSKU(usableSeed, &counter, used)
+			} else {
+				if _, exists := used[sku]; exists {
+					sku = makeSKU(sku, &counter, used)
+				} else {
+					used[sku] = struct{}{}
+				}
+			}
+		}
+		name := strings.TrimSpace(variant.Title)
+		if name == "" {
+			name = title
+		}
+		optionValues, err := marshalOptionValues(variant.OptionValues)
+		if err != nil {
+			return 0, err
+		}
+		price := basePrice
+		if variant.PriceCents != nil {
+			price = *variant.PriceCents
+		}
+		var compare interface{} = nil
+		if variant.CompareAtCents != nil {
+			compare = *variant.CompareAtCents
+		}
+		stock := defaultStock
+		if variant.Stock != nil {
+			stock = *variant.Stock
+		} else if defaultStock == 0 && fallbackStock > 0 && len(activeVariants) == 1 {
+			stock = fallbackStock
+		}
+		// distribute remainder to last variant
+		if defaultStock > 0 && variant.Stock == nil && i == len(activeVariants)-1 {
+			calculated := int64(len(activeVariants)) * defaultStock
+			if calculated < fallbackStock {
+				stock += fallbackStock - calculated
+			}
+		}
+		if stock < 0 {
+			stock = 0
+		}
+		totalStock += stock
+		var barcode interface{} = nil
+		if strings.TrimSpace(variant.Barcode) != "" {
+			barcode = strings.TrimSpace(variant.Barcode)
+		}
+		if _, err := tx.Exec(`INSERT INTO product_variants(uuid, product_uuid, sku, title, option_values, price_cents, compare_at_cents, stock, barcode)
+                               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			uuid.New(), product, sku, name, optionValues, price, compare, stock, barcode); err != nil {
+			return 0, err
+		}
+	}
+	if len(activeVariants) == 0 {
+		sku := makeSKU(usableSeed, &counter, used)
+		stock := fallbackStock
+		totalStock = stock
+		if _, err := tx.Exec(`INSERT INTO product_variants(uuid, product_uuid, sku, title, option_values, price_cents, compare_at_cents, stock, barcode)
+                               VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+			uuid.New(), product, sku, title, json.RawMessage(`{}`), basePrice, nil, stock, nil); err != nil {
+			return 0, err
+		}
+	}
+	return totalStock, nil
+}
+
+func marshalOptionValues(values map[string]any) (json.RawMessage, error) {
+	if len(values) == 0 {
+		return json.RawMessage(`{}`), nil
+	}
+	b, err := json.Marshal(values)
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(b), nil
+}
+
+func sanitizeSKUSeed(seed string) string {
+	if seed == "" {
+		seed = "SKU"
+	}
+	upper := strings.ToUpper(seed)
+	var builder strings.Builder
+	for _, r := range upper {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			builder.WriteRune(r)
+		}
+	}
+	result := builder.String()
+	if result == "" {
+		result = "SKU"
+	}
+	if len(result) > 10 {
+		result = result[:10]
+	}
+	return result
+}
+
+func makeSKU(seed string, counter *int, used map[string]struct{}) string {
+	base := sanitizeSKUSeed(seed)
+	for {
+		sku := fmt.Sprintf("%s-%03d", base, *counter+1)
+		*counter++
+		if _, exists := used[sku]; !exists {
+			used[sku] = struct{}{}
+			return sku
+		}
+	}
+}
+
+func setDiscountProducts(db *sqlx.DB, discount uuid.UUID, shop uuid.UUID, productIDs []uuid.UUID) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM discount_products WHERE discount_uuid=$1`, discount); err != nil {
+		return err
+	}
+	if len(productIDs) > 0 {
+		var count int
+		if err := tx.Get(&count, `SELECT COUNT(1) FROM products WHERE uuid = ANY($1) AND shop_uuid=$2 AND deleted_at IS NULL`, pq.Array(productIDs), shop); err != nil {
+			return err
+		}
+		if count != len(productIDs) {
+			return fmt.Errorf("one or more products do not belong to this shop")
+		}
+		for _, pid := range productIDs {
+			if _, err := tx.Exec(`INSERT INTO discount_products(discount_uuid, product_uuid) VALUES($1,$2)`, discount, pid); err != nil {
+				return err
+			}
+		}
+	}
+	return tx.Commit()
 }
 
 type customerMeta struct {

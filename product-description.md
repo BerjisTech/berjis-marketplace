@@ -424,6 +424,8 @@ CREATE TABLE order_items (
 - [x] Add inventory locations/levels tables with API syncing to product stock
 - [x] Implement collections table with product assignment APIs (Go)
 - [x] Implement discounts table with product targeting endpoints (Go)
+- [x] Support product variants with automatic SKU generation and editable variant syncing (Go)
+- [x] Build CSV export/import endpoints for bulk product management (Go)
 
 ### Phase 4: Shopping Cart
 - [x] Create cart models and repository (Go)
@@ -448,6 +450,7 @@ CREATE TABLE order_items (
 - [x] Build order history page
 - [x] Implement order tracking
 - [x] Implement gift card tables with balance/transaction APIs (Go)
+- [x] Add blog, media, menus, markets, segments, campaigns, analytics, transfers, and purchase order migrations
 
 ### Phase 6: Admin Dashboard
 - [x] Create admin route guard
