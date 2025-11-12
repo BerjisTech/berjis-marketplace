@@ -1,3 +1,304 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Returns</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton UI for managing returns.</p>
+<div class="space-y-5 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Returns</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Manage return requests, track statuses, and restock approved items.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[200px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="selectedShopSlug()"
+        (ngModelChange)="changeShop($event)"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+      <button
+        type="button"
+        class="rounded-full border border-blue-900/30 px-4 py-2 text-sm text-blue-700 transition hover:border-blue-500 hover:text-blue-800 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
+        (click)="reloadAll()"
+      >
+        Refresh
+      </button>
+    </div>
+  </div>
 
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <section class="grid gap-3 rounded-xl border border-blue-900/15 bg-white/85 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70 md:grid-cols-2">
+    <div class="metric-card">
+      <p class="metric-label">Open returns</p>
+      <p class="metric-value">{{ openReturns() }}</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Total returns</p>
+      <p class="metric-value">{{ returns().length }}</p>
+    </div>
+  </section>
+
+  <section class="rounded-xl border border-blue-900/15 bg-white/85 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+    <h2 class="text-lg font-semibold text-blue-900 dark:text-white">Create return</h2>
+    <form class="grid gap-4 pt-3" (ngSubmit)="submitReturn()">
+      <div class="grid gap-2 md:grid-cols-2">
+        <div class="grid gap-2">
+          <label class="form-label" for="return-order">Order</label>
+          <select
+            id="return-order"
+            class="form-input"
+            [ngModel]="selectedOrderUuid()"
+            (ngModelChange)="selectOrder($event)"
+            name="returnOrder"
+          >
+            <option value="">Select an order</option>
+            <option *ngFor="let order of orders()" [value]="order.uuid">
+              {{ order.uuid | slice:0:12 }} · {{ order.status | titlecase }} ·
+              {{ formatCurrency(order.totalCents, order.currency) }}
+            </option>
+          </select>
+        </div>
+        <div class="flex items-center gap-2 pt-6 md:pt-0">
+          <label class="form-label mb-0" for="return-restock">Restock returned items</label>
+          <input
+            id="return-restock"
+            type="checkbox"
+            class="h-4 w-4 rounded border border-blue-900/30"
+            [checked]="returnForm().restock"
+            (change)="updateReturnRestock($event.target.checked)"
+          />
+        </div>
+      </div>
+
+      <div class="grid gap-2 md:grid-cols-2">
+        <div class="grid gap-2">
+          <label class="form-label" for="return-reason">Return reason</label>
+          <input
+            id="return-reason"
+            class="form-input"
+            [ngModel]="returnForm().reason"
+            (ngModelChange)="updateReturnReason($event)"
+            name="returnReason"
+            placeholder="Optional summary reason"
+          />
+        </div>
+        <div class="grid gap-2">
+          <label class="form-label" for="return-refund">Refund amount (optional)</label>
+          <input
+            id="return-refund"
+            class="form-input"
+            [ngModel]="returnForm().refundAmount"
+            (ngModelChange)="updateReturnRefund($event)"
+            name="returnRefund"
+            placeholder="e.g. 49.99"
+          />
+        </div>
+      </div>
+
+      <div class="grid gap-2">
+        <label class="form-label" for="return-notes">Notes</label>
+        <textarea
+          id="return-notes"
+          class="form-input"
+          rows="2"
+          [ngModel]="returnForm().notes"
+          (ngModelChange)="updateReturnNotes($event)"
+          name="returnNotes"
+          placeholder="Internal notes for staff (optional)"
+        ></textarea>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="form-label">Line items</span>
+          <span class="text-xs text-slate-500 dark:text-slate-400">Select the products and quantities to return.</span>
+        </div>
+        <div
+          *ngIf="formItems().length === 0"
+          class="rounded-lg border border-dashed border-blue-900/20 px-3 py-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-300"
+        >
+          Select an order to choose return items.
+        </div>
+        <div
+          *ngFor="let item of formItems(); let i = index; trackBy: trackFormItem"
+          class="rounded-lg border border-blue-900/15 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-950/70"
+        >
+          <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div class="flex items-start gap-3">
+              <input
+                type="checkbox"
+                class="mt-1 h-4 w-4 rounded border border-blue-900/30"
+                [checked]="item.selected"
+                (change)="toggleItem(i, $event.target.checked)"
+              />
+              <div>
+                <p class="font-semibold text-blue-900 dark:text-white">{{ item.title }}</p>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  SKU {{ item.productUuid | slice:0:12 }} · Ordered {{ item.quantity }}
+                </p>
+              </div>
+            </div>
+            <div class="grid gap-2 md:grid-cols-3 md:items-center md:gap-3">
+              <label class="form-label" [for]="'return-qty-' + i">Qty</label>
+              <input
+                class="form-input"
+                type="number"
+                min="1"
+                [max]="item.maxQuantity"
+                [id]="'return-qty-' + i"
+                [ngModel]="item.returnQuantity"
+                (ngModelChange)="updateItemQuantity(i, $event)"
+                [disabled]="!item.selected"
+              />
+              <span class="text-xs text-slate-500 dark:text-slate-400">of {{ item.maxQuantity }}</span>
+            </div>
+          </div>
+          <div class="mt-3 grid gap-3 md:grid-cols-2">
+            <div class="grid gap-2">
+              <label class="form-label" [for]="'return-reason-' + i">Line reason</label>
+              <input
+                class="form-input"
+                [id]="'return-reason-' + i"
+                [ngModel]="item.reason"
+                (ngModelChange)="updateItemReason(i, $event)"
+                [disabled]="!item.selected"
+                placeholder="Optional"
+              />
+            </div>
+            <div class="grid gap-2">
+              <label class="form-label" [for]="'return-condition-' + i">Condition</label>
+              <input
+                class="form-input"
+                [id]="'return-condition-' + i"
+                [ngModel]="item.condition"
+                (ngModelChange)="updateItemCondition(i, $event)"
+                [disabled]="!item.selected"
+                placeholder="e.g. Unopened"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" class="rounded-full border px-4 py-2 text-sm" (click)="resetFormState()">Reset</button>
+        <button
+          type="submit"
+          class="btn btn-primary rounded-full px-5"
+          [disabled]="createBusy()"
+        >
+          {{ createBusy() ? 'Submitting…' : 'Submit return' }}
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section
+    class="overflow-hidden rounded-xl border border-blue-900/15 bg-white/85 shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+  >
+    <div class="flex items-center justify-between border-b border-blue-900/10 px-4 py-3 text-sm dark:border-slate-800">
+      <span *ngIf="returns().length === 0" class="text-slate-500 dark:text-slate-400">No returns recorded yet.</span>
+      <span *ngIf="returns().length > 0" class="text-slate-500 dark:text-slate-400">
+        Showing {{ returns().length }} return{{ returns().length === 1 ? '' : 's' }}.
+      </span>
+    </div>
+    <div *ngIf="returns().length > 0" class="overflow-auto">
+      <table class="min-w-[960px] w-full text-sm">
+        <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+          <tr class="text-left text-slate-600 dark:text-slate-300">
+            <th class="px-4 py-3 font-medium">Return</th>
+            <th class="px-4 py-3 font-medium">Order</th>
+            <th class="px-4 py-3 font-medium">Items</th>
+            <th class="px-4 py-3 font-medium">Refund</th>
+            <th class="px-4 py-3 font-medium">Restock</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Updated</th>
+            <th class="px-4 py-3 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let ret of returns(); trackBy: trackReturn"
+            class="border-t border-blue-900/10 bg-white/90 dark:border-slate-800 dark:bg-slate-950/60"
+          >
+            <td class="px-4 py-3 align-middle text-blue-900 dark:text-white">
+              <div class="font-semibold">{{ ret.uuid | slice:0:12 }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">Requested {{ formatDate(ret.createdAt) }}</div>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              <div>{{ ret.orderUuid | slice:0:12 }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                Customer {{ ret.customerUuid ? (ret.customerUuid | slice:0:12) : 'N/A' }}
+              </div>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              <ul class="space-y-1 text-xs text-slate-600 dark:text-slate-400">
+                <li *ngFor="let item of ret.items">
+                  {{ item.quantity }} × {{ item.productUuid | slice:0:8 }} · Returned {{ item.restockedQuantity }}
+                </li>
+              </ul>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              {{ formatCurrency(ret.refundAmountCents ?? 0, 'USD') }}
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              <label class="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                <input
+                  type="checkbox"
+                  class="h-4 w-4 rounded border border-blue-900/30"
+                  [checked]="ret.restock"
+                  (change)="toggleReturnRestock(ret, $event.target.checked)"
+                  [disabled]="updatingReturn() === ret.uuid"
+                />
+                Restock
+              </label>
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <select
+                class="form-input text-xs"
+                [ngModel]="ret.status"
+                (ngModelChange)="setReturnStatus(ret, $event)"
+                [disabled]="updatingReturn() === ret.uuid"
+              >
+                <option *ngFor="let status of returnStatuses" [value]="status">
+                  {{ status | titlecase }}
+                </option>
+              </select>
+            </td>
+            <td class="px-4 py-3 align-middle text-xs text-slate-500 dark:text-slate-400">
+              {{ formatDate(ret.updatedAt) }}
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-full border border-blue-900/20 px-3 py-1 text-xs text-blue-700 transition hover:border-blue-500 hover:text-blue-800 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
+                  (click)="setReturnStatus(ret, 'approved')"
+                  [disabled]="updatingReturn() === ret.uuid || ret.status === 'approved'"
+                >
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-amber-400/40 px-3 py-1 text-xs text-amber-600 transition hover:border-amber-500 hover:text-amber-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-300/40 dark:text-amber-200"
+                  (click)="setReturnStatus(ret, 'received')"
+                  [disabled]="updatingReturn() === ret.uuid || ret.status === 'received'"
+                >
+                  Mark received
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-emerald-500/50 px-3 py-1 text-xs text-emerald-600 transition hover:border-emerald-500 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/40 dark:text-emerald-300"
+                  (click)="setReturnStatus(ret, 'restocked')"
+                  [disabled]="updatingReturn() === ret.uuid || ret.status === 'restocked' || !ret.restock"
+                >
+                  Restock
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

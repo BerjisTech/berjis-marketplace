@@ -104,6 +104,22 @@
                 >
                   Copy email
                 </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-emerald-500/40 px-3 py-1 text-xs text-emerald-600 transition hover:border-emerald-500 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/40 dark:text-emerald-300"
+                  (click)="generateRecovery(checkout)"
+                  [disabled]="recoveryBusy() === checkout.cartUuid"
+                >
+                  {{ recoveryBusy() === checkout.cartUuid ? 'Generating…' : 'Generate link' }}
+                </button>
+                <button
+                  *ngIf="recoveryLinkFor(checkout)"
+                  type="button"
+                  class="rounded-full border border-slate-400/40 px-3 py-1 text-xs text-slate-600 transition hover:border-blue-500 hover:text-blue-700 dark:border-slate-700 dark:text-slate-200"
+                  (click)="copyRecoveryLink(checkout)"
+                >
+                  Copy link
+                </button>
                 <a
                   *ngIf="checkout.customerUuid"
                   class="rounded-full border border-slate-400/40 px-3 py-1 text-xs text-slate-600 transition hover:border-blue-500 hover:text-blue-700 dark:border-slate-700 dark:text-slate-200"
@@ -111,6 +127,13 @@
                 >
                   View customer
                 </a>
+              </div>
+              <div
+                *ngIf="recoveryLinkFor(checkout)"
+                class="mt-2 text-[11px] uppercase tracking-wide text-slate-500 dark:text-slate-400"
+              >
+                Token {{ recoveryLinkFor(checkout)?.token | slice:0:8 }}… · Expires
+                {{ formatDate(recoveryLinkFor(checkout)?.expiresAt) }}
               </div>
             </td>
           </tr>

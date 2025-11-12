@@ -5,6 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
   AbandonedCheckout,
+  CheckoutRecoveryResponse,
   OrderService,
 } from '../app/core/services/order.service';
 import { ApiResponse } from '../app/core/services/product.service';
@@ -34,6 +35,8 @@ export class OrdersAbandonedCheckoutsPageComponent implements OnInit {
   readonly loading = signal<boolean>(false);
   readonly error = signal<string>('');
   readonly message = signal<string>('');
+  readonly recoveryBusy = signal<string>('');
+  readonly recoveryLinks = signal<Record<string, CheckoutRecoveryResponse>>({});
 
   readonly totalPotential = computed(() =>
     this.abandonedCheckouts().reduce((acc, checkout) => acc + (checkout.subtotalCents ?? 0), 0),
@@ -88,6 +91,10 @@ export class OrdersAbandonedCheckoutsPageComponent implements OnInit {
 
   refresh(): void {
     this.loadAbandoned();
+  }
+
+  recoveryLinkFor(checkout: AbandonedCheckout): CheckoutRecoveryResponse | undefined {
+    return this.recoveryLinks()[checkout.cartUuid];
   }
 
   loadAbandoned(): void {
@@ -169,18 +176,7 @@ export class OrdersAbandonedCheckoutsPageComponent implements OnInit {
     if (!email) {
       return;
     }
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard
-        .writeText(email)
-        .then(() => {
-          this.message.set('Email copied to clipboard.');
-          setTimeout(() => this.message.set(''), 2000);
-        })
-        .catch(() => {
-          this.error.set('Unable to copy email.');
-          setTimeout(() => this.error.set(''), 2000);
-        });
-    }
+    this.copyText(email, 'Email copied to clipboard.');
   }
 
   checkoutContact(checkout: AbandonedCheckout): string {
@@ -191,5 +187,59 @@ export class OrdersAbandonedCheckoutsPageComponent implements OnInit {
       return checkout.customerName;
     }
     return checkout.userUuid.slice(0, 8);
+  }
+
+  generateRecovery(checkout: AbandonedCheckout): void {
+    const slug = this.selectedShopSlug();
+    if (!slug || this.recoveryBusy() === checkout.cartUuid) {
+      return;
+    }
+    this.recoveryBusy.set(checkout.cartUuid);
+    const payload = checkout.customerEmail
+      ? { email: checkout.customerEmail }
+      : undefined;
+    this.ordersService.createCheckoutRecovery(slug, checkout.cartUuid, payload).subscribe({
+      next: (response: ApiResponse<CheckoutRecoveryResponse>) => {
+        const data = response?.data;
+        if (data) {
+          const current = { ...this.recoveryLinks() };
+          current[checkout.cartUuid] = data;
+          this.recoveryLinks.set(current);
+          this.message.set('Recovery link generated.');
+          setTimeout(() => this.message.set(''), 2000);
+        }
+        this.recoveryBusy.set('');
+      },
+      error: () => {
+        this.recoveryBusy.set('');
+        this.error.set('Could not generate recovery link.');
+        setTimeout(() => this.error.set(''), 3000);
+      },
+    });
+  }
+
+  copyRecoveryLink(checkout: AbandonedCheckout): void {
+    const recovery = this.recoveryLinkFor(checkout);
+    if (!recovery) {
+      return;
+    }
+    const value = recovery.recoveryUrl || recovery.token;
+    this.copyText(value, 'Recovery link copied.');
+  }
+
+  private copyText(value: string, successMessage: string): void {
+    if (!navigator?.clipboard?.writeText) {
+      return;
+    }
+    navigator.clipboard
+      .writeText(value)
+      .then(() => {
+        this.message.set(successMessage);
+        setTimeout(() => this.message.set(''), 2000);
+      })
+      .catch(() => {
+        this.error.set('Unable to copy text.');
+        setTimeout(() => this.error.set(''), 2000);
+      });
   }
 }

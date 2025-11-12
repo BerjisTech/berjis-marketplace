@@ -97,11 +97,11 @@
 ### Order Features
 - [x] Draft orders
 - [x] Abandoned checkout tracking
-- [ ] Abandoned cart recovery
-- [ ] Returns management system
-- [ ] Return requests
-- [ ] Return status tracking
-- [ ] Restocking returned items
+- [x] Abandoned cart recovery
+- [x] Returns management system
+- [x] Return requests
+- [x] Return status tracking
+- [x] Restocking returned items
 
 ### Fulfillment
 - [ ] Fulfillment status tracking

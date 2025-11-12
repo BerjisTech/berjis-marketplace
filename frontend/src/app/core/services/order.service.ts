@@ -109,6 +109,63 @@ export interface AbandonedCheckout {
   lastActivityAt: string;
 }
 
+export interface OrderItemSummary {
+  uuid: string;
+  productUuid: string;
+  title: string;
+  quantity: number;
+  priceCents: number;
+}
+
+export interface OrderReturnItem {
+  uuid: string;
+  returnUuid: string;
+  orderItemUuid: string;
+  productUuid: string;
+  quantity: number;
+  reason?: string;
+  condition?: string;
+  restockedQuantity: number;
+}
+
+export interface OrderReturn {
+  uuid: string;
+  orderUuid: string;
+  shopUuid: string;
+  customerUuid?: string;
+  status: string;
+  reason?: string;
+  notes?: string;
+  requestedBy?: string;
+  processedBy?: string;
+  restock: boolean;
+  restockedAt?: string;
+  refundAmountCents: number;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderReturnItem[];
+}
+
+export interface CreateReturnPayload {
+  items: {
+    orderItemUuid: string;
+    quantity: number;
+    reason?: string;
+    condition?: string;
+  }[];
+  reason?: string;
+  notes?: string;
+  refundAmountCents?: number;
+  restock?: boolean;
+}
+
+export interface UpdateReturnPayload {
+  status?: string;
+  notes?: string;
+  refundAmountCents?: number;
+  restock?: boolean;
+}
+
 export interface DraftOrderItem {
   uuid: string;
   draftUuid: string;
@@ -193,6 +250,12 @@ export interface CommitDraftOrderResponse {
   currency: string;
 }
 
+export interface CheckoutRecoveryResponse {
+  token: string;
+  recoveryUrl?: string;
+  expiresAt: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class OrderService {
   private readonly api = environment.apiBase;
@@ -219,6 +282,25 @@ export class OrderService {
   listAbandonedCheckouts(shopSlug: string): Observable<ApiResponse<AbandonedCheckout[]>> {
     return this.http.get<ApiResponse<AbandonedCheckout[]>>(
       `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/checkouts/abandoned`,
+      { withCredentials: true },
+    );
+  }
+
+  createCheckoutRecovery(
+    shopSlug: string,
+    cartUuid: string,
+    payload?: { email?: string; expiresInHours?: number },
+  ): Observable<ApiResponse<CheckoutRecoveryResponse>> {
+    return this.http.post<ApiResponse<CheckoutRecoveryResponse>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/checkouts/${encodeURIComponent(cartUuid)}/recoveries`,
+      payload ?? {},
+      { withCredentials: true },
+    );
+  }
+
+  getOrderItems(orderUuid: string): Observable<ApiResponse<OrderItemSummary[]>> {
+    return this.http.get<ApiResponse<OrderItemSummary[]>>(
+      `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/items`,
       { withCredentials: true },
     );
   }
@@ -266,6 +348,29 @@ export class OrderService {
     return this.http.post<ApiResponse<CommitDraftOrderResponse>>(
       `${this.api}/v1/orders/drafts/${encodeURIComponent(draftUuid)}/commit`,
       payload ?? {},
+      { withCredentials: true },
+    );
+  }
+
+  listReturns(shopSlug: string): Observable<ApiResponse<OrderReturn[]>> {
+    return this.http.get<ApiResponse<OrderReturn[]>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/returns`,
+      { withCredentials: true },
+    );
+  }
+
+  createReturn(orderUuid: string, payload: CreateReturnPayload): Observable<ApiResponse<OrderReturn>> {
+    return this.http.post<ApiResponse<OrderReturn>>(
+      `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/returns`,
+      payload,
+      { withCredentials: true },
+    );
+  }
+
+  updateReturn(returnUuid: string, payload: UpdateReturnPayload): Observable<ApiResponse<OrderReturn>> {
+    return this.http.patch<ApiResponse<OrderReturn>>(
+      `${this.api}/v1/returns/${encodeURIComponent(returnUuid)}`,
+      payload,
       { withCredentials: true },
     );
   }

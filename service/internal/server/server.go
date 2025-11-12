@@ -452,6 +452,63 @@ type AbandonedCheckout struct {
 	LastActivityAt time.Time  `db:"last_activity_at" json:"lastActivityAt"`
 }
 
+type CartRecovery struct {
+	UUID               uuid.UUID  `db:"uuid" json:"uuid"`
+	CartUUID           uuid.UUID  `db:"cart_uuid" json:"cartUuid"`
+	ShopUUID           uuid.UUID  `db:"shop_uuid" json:"shopUuid"`
+	UserUUID           uuid.UUID  `db:"user_uuid" json:"userUuid"`
+	CustomerUUID       *uuid.UUID `db:"customer_uuid" json:"customerUuid,omitempty"`
+	CustomerEmail      string     `db:"customer_email" json:"customerEmail"`
+	Token              string     `db:"token" json:"token"`
+	Status             string     `db:"status" json:"status"`
+	RecoveryURL        *string    `db:"recovery_url" json:"recoveryUrl,omitempty"`
+	SentAt             *time.Time `db:"sent_at" json:"sentAt,omitempty"`
+	ClickedAt          *time.Time `db:"clicked_at" json:"clickedAt,omitempty"`
+	ConvertedOrderUUID *uuid.UUID `db:"converted_order_uuid" json:"convertedOrderUuid,omitempty"`
+	CreatedBy          *uuid.UUID `db:"created_by" json:"createdBy,omitempty"`
+	CreatedAt          time.Time  `db:"created_at" json:"createdAt"`
+	UpdatedAt          time.Time  `db:"updated_at" json:"updatedAt"`
+}
+
+type OrderReturn struct {
+	UUID              uuid.UUID         `db:"uuid" json:"uuid"`
+	OrderUUID         uuid.UUID         `db:"order_uuid" json:"orderUuid"`
+	ShopUUID          uuid.UUID         `db:"shop_uuid" json:"shopUuid"`
+	CustomerUUID      *uuid.UUID        `db:"customer_uuid" json:"customerUuid,omitempty"`
+	Status            string            `db:"status" json:"status"`
+	Reason            *string           `db:"reason" json:"reason,omitempty"`
+	Notes             *string           `db:"notes" json:"notes,omitempty"`
+	RequestedBy       *uuid.UUID        `db:"requested_by" json:"requestedBy,omitempty"`
+	ProcessedBy       *uuid.UUID        `db:"processed_by" json:"processedBy,omitempty"`
+	Restock           bool              `db:"restock" json:"restock"`
+	RestockedAt       *time.Time        `db:"restocked_at" json:"restockedAt,omitempty"`
+	RefundAmountCents int64             `db:"refund_amount_cents" json:"refundAmountCents"`
+	CreatedAt         time.Time         `db:"created_at" json:"createdAt"`
+	UpdatedAt         time.Time         `db:"updated_at" json:"updatedAt"`
+	Items             []OrderReturnItem `db:"-" json:"items"`
+}
+
+type OrderReturnItem struct {
+	UUID              uuid.UUID `db:"uuid" json:"uuid"`
+	ReturnUUID        uuid.UUID `db:"return_uuid" json:"returnUuid"`
+	OrderItemUUID     uuid.UUID `db:"order_item_uuid" json:"orderItemUuid"`
+	ProductUUID       uuid.UUID `db:"product_uuid" json:"productUuid"`
+	Quantity          int       `db:"quantity" json:"quantity"`
+	Reason            *string   `db:"reason" json:"reason,omitempty"`
+	Condition         *string   `db:"condition" json:"condition,omitempty"`
+	RestockedQuantity int       `db:"restocked_quantity" json:"restockedQuantity"`
+	CreatedAt         time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt         time.Time `db:"updated_at" json:"updatedAt"`
+}
+
+type OrderLineItem struct {
+	UUID        uuid.UUID `db:"uuid" json:"uuid"`
+	ProductUUID uuid.UUID `db:"product_uuid" json:"productUuid"`
+	Title       string    `db:"title" json:"title"`
+	Quantity    int       `db:"quantity" json:"quantity"`
+	PriceCents  int64     `db:"price_cents" json:"priceCents"`
+}
+
 type SalesPoint struct {
 	Date       string `json:"date"`
 	TotalCents int64  `json:"totalCents"`
@@ -5062,6 +5119,123 @@ func New(opts Options) *fiber.App {
 		return c.JSON(fiber.Map{"success": true, "data": rows})
 	})
 
+	app.Post("/v1/my/shops/:slug/checkouts/:id/recoveries", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		cartParam := strings.TrimSpace(c.Params("id"))
+		if cartParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid cart id"})
+		}
+		cartID, err := uuid.Parse(cartParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid cart id"})
+		}
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			Email          string `json:"email"`
+			ExpiresInHours int    `json:"expiresInHours"`
+		}
+		if err := c.BodyParser(&body); err != nil && err != io.EOF {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		if body.ExpiresInHours <= 0 {
+			body.ExpiresInHours = 72
+		}
+
+		const singleCartQuery = `WITH cart_summary AS (
+                                   SELECT
+                                     c.uuid AS cart_uuid,
+                                     c.user_uuid,
+                                     p.shop_uuid,
+                                     SUM(ci.quantity) AS item_count,
+                                     SUM(ci.quantity * p.price_cents) AS subtotal_cents,
+                                     MIN(ci.added_at) AS first_added_at,
+                                     MAX(ci.added_at) AS last_added_at,
+                                     GREATEST(c.updated_at, COALESCE(MAX(ci.added_at), c.updated_at)) AS last_activity_at,
+                                     MIN(p.currency) AS currency
+                                   FROM carts c
+                                   JOIN cart_items ci ON ci.cart_uuid = c.uuid
+                                   JOIN products p ON p.uuid = ci.product_uuid AND p.deleted_at IS NULL
+                                   GROUP BY c.uuid, c.user_uuid, p.shop_uuid, c.updated_at
+                                   HAVING SUM(ci.quantity) > 0
+                                      AND COUNT(DISTINCT p.currency) = 1
+                                 )
+                                 SELECT
+                                   cs.cart_uuid,
+                                   cs.user_uuid,
+                                   cs.shop_uuid,
+                                   cs.item_count,
+                                   cs.subtotal_cents,
+                                   cs.currency,
+                                   cs.first_added_at,
+                                   cs.last_added_at,
+                                   cs.last_activity_at,
+                                   cust.uuid AS customer_uuid,
+                                   COALESCE(cust.email, up.email, '') AS customer_email,
+                                   COALESCE(NULLIF(TRIM(COALESCE(cust.first_name,'') || ' ' || COALESCE(cust.last_name,'')), ''), up.display_name, '') AS customer_name
+                                 FROM cart_summary cs
+                                 LEFT JOIN customers cust ON cust.shop_uuid = cs.shop_uuid AND cust.user_uuid = cs.user_uuid
+                                 LEFT JOIN user_profiles up ON up.user_uuid = cs.user_uuid
+                                 WHERE cs.shop_uuid=$1
+                                   AND cs.cart_uuid=$2
+                                   AND cs.subtotal_cents > 0
+                                 LIMIT 1`
+
+		var checkout AbandonedCheckout
+		if err := opts.DB.Get(&checkout, singleCartQuery, shop.UUID, cartID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "cart not eligible for recovery"})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		contactEmail := strings.TrimSpace(body.Email)
+		if contactEmail == "" {
+			contactEmail = strings.TrimSpace(checkout.CustomerEmail)
+		}
+		token := uuid.NewString()
+		recoveryURL := ""
+		if base := strings.TrimSpace(strings.Split(opts.AllowedOrigins, ",")[0]); base != "" && base != "*" {
+			recoveryURL = strings.TrimSuffix(base, "/") + "/checkout/recover?token=" + token
+		}
+		expiresAt := time.Now().Add(time.Duration(body.ExpiresInHours) * time.Hour)
+		recoveryID := uuid.New()
+		createdBy := uuidPtrFromString(srvAuth.UserID(c))
+
+		var customerUUIDValue any
+		if checkout.CustomerUUID != nil {
+			customerUUIDValue = *checkout.CustomerUUID
+		}
+		var recoveryURLValue any
+		if recoveryURL != "" {
+			recoveryURLValue = recoveryURL
+		}
+		var createdByValue any
+		if createdBy != nil {
+			createdByValue = *createdBy
+		}
+
+		if _, err := opts.DB.Exec(`INSERT INTO cart_recoveries(uuid, cart_uuid, shop_uuid, user_uuid, customer_uuid, customer_email, token, status, recovery_url, sent_at, clicked_at, converted_order_uuid, expires_at, created_by)
+                                   VALUES($1,$2,$3,$4,$5,$6,$7,'pending',$8,NULL,NULL,NULL,$9,$10)`,
+			recoveryID, checkout.CartUUID, checkout.ShopUUID, checkout.UserUUID, customerUUIDValue, contactEmail, token, recoveryURLValue, expiresAt, createdByValue); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		response := fiber.Map{
+			"token":     token,
+			"expiresAt": expiresAt,
+		}
+		if recoveryURL != "" {
+			response["recoveryUrl"] = recoveryURL
+		}
+		return c.JSON(fiber.Map{"success": true, "data": response})
+	})
+
 	app.Get("/v1/my/shops/:slug/orders", requireAuth, func(c *fiber.Ctx) error {
 		slug := c.Params("slug")
 		shop, role, err := ensureShopAccess(c, opts.DB, slug)
@@ -5610,6 +5784,479 @@ func New(opts Options) *fiber.App {
 		}
 
 		return c.JSON(fiber.Map{"success": true, "data": event})
+	})
+
+	app.Get("/v1/orders/:id/items", requireAuth, func(c *fiber.Ctx) error {
+		orderParam := strings.TrimSpace(c.Params("id"))
+		if orderParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		orderID, err := uuid.Parse(orderParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var items []OrderLineItem
+		if err := opts.DB.Select(&items, `SELECT oi.uuid,
+                                                 oi.product_uuid,
+                                                 p.title,
+                                                 oi.quantity,
+                                                 oi.price_cents
+                                          FROM order_items oi
+                                          JOIN products p ON p.uuid=oi.product_uuid
+                                          WHERE oi.order_uuid=$1
+                                          ORDER BY oi.created_at ASC`, orderID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": items})
+	})
+
+	app.Get("/v1/my/shops/:slug/returns", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var returns []OrderReturn
+		if err := opts.DB.Select(&returns, `SELECT uuid,
+                                                   order_uuid,
+                                                   shop_uuid,
+                                                   customer_uuid,
+                                                   status,
+                                                   reason,
+                                                   notes,
+                                                   requested_by,
+                                                   processed_by,
+                                                   restock,
+                                                   restocked_at,
+                                                   refund_amount_cents,
+                                                   created_at,
+                                                   updated_at
+                                            FROM order_returns
+                                            WHERE shop_uuid=$1
+                                            ORDER BY created_at DESC
+                                            LIMIT 200`, shop.UUID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if len(returns) > 0 {
+			ids := make([]uuid.UUID, 0, len(returns))
+			for _, ret := range returns {
+				ids = append(ids, ret.UUID)
+			}
+			itemsMap, err := loadOrderReturnItems(opts.DB, ids)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+			for i := range returns {
+				if items, ok := itemsMap[returns[i].UUID]; ok {
+					returns[i].Items = items
+				} else {
+					returns[i].Items = []OrderReturnItem{}
+				}
+			}
+		}
+		return c.JSON(fiber.Map{"success": true, "data": returns})
+	})
+
+	app.Post("/v1/orders/:id/returns", requireAuth, func(c *fiber.Ctx) error {
+		orderParam := strings.TrimSpace(c.Params("id"))
+		if orderParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		orderID, err := uuid.Parse(orderParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			Items []struct {
+				OrderItemUUID string `json:"orderItemUuid"`
+				Quantity      int    `json:"quantity"`
+				Reason        string `json:"reason"`
+				Condition     string `json:"condition"`
+			} `json:"items"`
+			Reason            string `json:"reason"`
+			Notes             string `json:"notes"`
+			RefundAmountCents int64  `json:"refundAmountCents"`
+			Restock           bool   `json:"restock"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		if len(body.Items) == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "at least one return item is required"})
+		}
+
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+
+		var orderRow struct {
+			ShopUUID uuid.UUID `db:"shop_uuid"`
+			UserUUID uuid.UUID `db:"user_uuid"`
+		}
+		if err := tx.Get(&orderRow, `SELECT shop_uuid, user_uuid FROM orders WHERE uuid=$1 FOR UPDATE`, orderID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "order not found"})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if orderRow.ShopUUID != meta.ShopUUID {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+
+		var orderItems []struct {
+			UUID        uuid.UUID `db:"uuid"`
+			ProductUUID uuid.UUID `db:"product_uuid"`
+			Quantity    int       `db:"quantity"`
+		}
+		if err := tx.Select(&orderItems, `SELECT uuid, product_uuid, quantity FROM order_items WHERE order_uuid=$1`, orderID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if len(orderItems) == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "order has no items"})
+		}
+		orderItemMap := make(map[uuid.UUID]struct {
+			Product  uuid.UUID
+			Quantity int
+		}, len(orderItems))
+		for _, itm := range orderItems {
+			orderItemMap[itm.UUID] = struct {
+				Product  uuid.UUID
+				Quantity int
+			}{
+				Product:  itm.ProductUUID,
+				Quantity: itm.Quantity,
+			}
+		}
+		existingReturns := make(map[uuid.UUID]int)
+		var existingRows []struct {
+			OrderItemUUID uuid.UUID `db:"order_item_uuid"`
+			Quantity      int       `db:"quantity"`
+		}
+		if err := tx.Select(&existingRows, `SELECT ri.order_item_uuid, SUM(ri.quantity) AS quantity
+                                              FROM order_return_items ri
+                                              JOIN order_returns r ON r.uuid=ri.return_uuid
+                                              WHERE r.order_uuid=$1 AND r.status <> 'rejected'
+                                              GROUP BY ri.order_item_uuid`, orderID); err == nil {
+			for _, row := range existingRows {
+				existingReturns[row.OrderItemUUID] = row.Quantity
+			}
+		}
+
+		type preparedReturnItem struct {
+			OrderItemUUID uuid.UUID
+			ProductUUID   uuid.UUID
+			Quantity      int
+			Reason        string
+			Condition     string
+		}
+		preparedItems := make([]preparedReturnItem, 0, len(body.Items))
+		for idx, raw := range body.Items {
+			itemID, err := uuid.Parse(strings.TrimSpace(raw.OrderItemUUID))
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("invalid orderItemUuid at position %d", idx)})
+			}
+			entry, ok := orderItemMap[itemID]
+			if !ok {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("order item not found (%s)", itemID)})
+			}
+			if raw.Quantity <= 0 {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "return quantities must be greater than zero"})
+			}
+			already := existingReturns[itemID]
+			if already+raw.Quantity > entry.Quantity {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "return quantity exceeds original quantity"})
+			}
+			reason := strings.TrimSpace(raw.Reason)
+			condition := strings.TrimSpace(raw.Condition)
+			preparedItems = append(preparedItems, preparedReturnItem{
+				OrderItemUUID: itemID,
+				ProductUUID:   entry.Product,
+				Quantity:      raw.Quantity,
+				Reason:        reason,
+				Condition:     condition,
+			})
+		}
+
+		var customerUUID *uuid.UUID
+		if err := tx.Get(&customerUUID, `SELECT uuid FROM customers WHERE shop_uuid=$1 AND user_uuid=$2 LIMIT 1`, orderRow.ShopUUID, orderRow.UserUUID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		returnID := uuid.New()
+		reason := strings.TrimSpace(body.Reason)
+		notes := strings.TrimSpace(body.Notes)
+		refundAmount := body.RefundAmountCents
+		if refundAmount < 0 {
+			refundAmount = 0
+		}
+		var reasonValue any
+		if reason != "" {
+			reasonValue = reason
+		}
+		var notesValue any
+		if notes != "" {
+			notesValue = notes
+		}
+		var customerValue any
+		if customerUUID != nil {
+			customerValue = *customerUUID
+		}
+		requestedBy := uuidPtrFromString(srvAuth.UserID(c))
+		var requestedByValue any
+		if requestedBy != nil {
+			requestedByValue = *requestedBy
+		}
+
+		if _, err := tx.Exec(`INSERT INTO order_returns(uuid, order_uuid, shop_uuid, customer_uuid, status, reason, notes, requested_by, restock, refund_amount_cents)
+                               VALUES($1,$2,$3,$4,'requested',$5,$6,$7,$8,$9)`,
+			returnID, orderID, orderRow.ShopUUID, customerValue, reasonValue, notesValue, requestedByValue, body.Restock, refundAmount); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		for _, item := range preparedItems {
+			var reasonValue any
+			if item.Reason != "" {
+				reasonValue = item.Reason
+			}
+			var conditionValue any
+			if item.Condition != "" {
+				conditionValue = item.Condition
+			}
+			if _, err := tx.Exec(`INSERT INTO order_return_items(uuid, return_uuid, order_item_uuid, product_uuid, quantity, reason, condition)
+                                   VALUES($1,$2,$3,$4,$5,$6,$7)`,
+				uuid.New(), returnID, item.OrderItemUUID, item.ProductUUID, item.Quantity, reasonValue, conditionValue); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+		}
+
+		eventMeta := map[string]any{
+			"returnUuid": returnID.String(),
+			"items":      len(preparedItems),
+			"restock":    body.Restock,
+		}
+		if refundAmount > 0 {
+			eventMeta["refundAmountCents"] = refundAmount
+		}
+		if reason != "" {
+			eventMeta["reason"] = reason
+		}
+		if _, err := recordOrderEvent(tx, orderID, "order.return_requested", fmt.Sprintf("Return requested (%d items)", len(preparedItems)), requestedBy, eventMeta); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "failed to record order event"})
+		}
+
+		if err := tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		ret, err := loadOrderReturn(opts.DB, returnID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": ret})
+	})
+
+	app.Patch("/v1/returns/:id", requireAuth, func(c *fiber.Ctx) error {
+		returnParam := strings.TrimSpace(c.Params("id"))
+		if returnParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid return id"})
+		}
+		returnID, err := uuid.Parse(returnParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid return id"})
+		}
+		var body struct {
+			Status            string  `json:"status"`
+			Notes             *string `json:"notes"`
+			RefundAmountCents *int64  `json:"refundAmountCents"`
+			Restock           *bool   `json:"restock"`
+		}
+		if err := c.BodyParser(&body); err != nil && err != io.EOF {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+
+		var retRow struct {
+			OrderReturn
+			ShopSlug string `db:"slug"`
+		}
+		if err := tx.Get(&retRow, `SELECT r.uuid,
+                                           r.order_uuid,
+                                           r.shop_uuid,
+                                           r.customer_uuid,
+                                           r.status,
+                                           r.reason,
+                                           r.notes,
+                                           r.requested_by,
+                                           r.processed_by,
+                                           r.restock,
+                                           r.restocked_at,
+                                           r.refund_amount_cents,
+                                           r.created_at,
+                                           r.updated_at,
+                                           s.slug
+                                    FROM order_returns r
+                                    JOIN shops s ON s.uuid=r.shop_uuid
+                                    WHERE r.uuid=$1
+                                    FOR UPDATE`, returnID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "return not found"})
+			}
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		_, role, err := ensureShopAccess(c, opts.DB, retRow.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+
+		sets := []string{"updated_at=now()"}
+		args := []any{returnID}
+		argPos := 2
+		statusChanged := false
+		if strings.TrimSpace(body.Status) != "" {
+			normalized := normalizeReturnStatus(body.Status)
+			if normalized != retRow.Status {
+				sets = append(sets, fmt.Sprintf("status=$%d", argPos))
+				args = append(args, normalized)
+				argPos++
+				statusChanged = true
+				if normalized == "restocked" {
+					sets = append(sets, "restocked_at=now()")
+				}
+				if retRow.ProcessedBy == nil {
+					if processed := uuidPtrFromString(srvAuth.UserID(c)); processed != nil {
+						sets = append(sets, fmt.Sprintf("processed_by=$%d", argPos))
+						args = append(args, *processed)
+						argPos++
+					}
+				}
+			}
+		}
+		if body.Notes != nil {
+			note := strings.TrimSpace(*body.Notes)
+			if note == "" {
+				sets = append(sets, "notes=NULL")
+			} else {
+				sets = append(sets, fmt.Sprintf("notes=$%d", argPos))
+				args = append(args, note)
+				argPos++
+			}
+		}
+		if body.RefundAmountCents != nil {
+			value := *body.RefundAmountCents
+			if value < 0 {
+				value = 0
+			}
+			sets = append(sets, fmt.Sprintf("refund_amount_cents=$%d", argPos))
+			args = append(args, value)
+			argPos++
+		}
+		if body.Restock != nil {
+			sets = append(sets, fmt.Sprintf("restock=$%d", argPos))
+			args = append(args, *body.Restock)
+			argPos++
+		}
+
+		if len(sets) == 1 {
+			return c.JSON(fiber.Map{"success": true, "data": retRow.OrderReturn})
+		}
+
+		query := fmt.Sprintf("UPDATE order_returns SET %s WHERE uuid=$1", strings.Join(sets, ", "))
+		if _, err := tx.Exec(query, args...); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		updatedReturn, err := loadOrderReturn(tx, returnID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		var restockedProducts []uuid.UUID
+		if updatedReturn.Status == "restocked" && updatedReturn.Restock {
+			var touched []uuid.UUID
+			var restocked OrderReturn
+			restocked, touched, err = restockReturnTx(tx, updatedReturn, srvAuth.UserID(c))
+			if err != nil {
+				return respondWithError(c, err)
+			}
+			updatedReturn = restocked
+			restockedProducts = touched
+		}
+
+		eventMeta := map[string]any{
+			"returnUuid": updatedReturn.UUID.String(),
+			"status":     updatedReturn.Status,
+		}
+		if body.RefundAmountCents != nil {
+			eventMeta["refundAmountCents"] = *body.RefundAmountCents
+		}
+		if body.Restock != nil {
+			eventMeta["restock"] = *body.Restock
+		}
+		if body.Notes != nil {
+			eventMeta["notes"] = strings.TrimSpace(*body.Notes)
+		}
+		if statusChanged {
+			eventMeta["previousStatus"] = retRow.Status
+		}
+		eventType := "order.return_updated"
+		eventMessage := fmt.Sprintf("Return updated (%s)", strings.ReplaceAll(updatedReturn.Status, "_", " "))
+		if _, err := recordOrderEvent(tx, updatedReturn.OrderUUID, eventType, eventMessage, uuidPtrFromString(srvAuth.UserID(c)), eventMeta); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "failed to record order event"})
+		}
+
+		if err := tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		if len(restockedProducts) > 0 {
+			for _, productID := range restockedProducts {
+				if syncErr := syncProductStockFromInventory(opts.DB, productID); syncErr != nil {
+					log.Printf("sync product stock failed for %s: %v", productID, syncErr)
+				}
+			}
+		}
+
+		finalReturn, err := loadOrderReturn(opts.DB, updatedReturn.UUID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": finalReturn})
 	})
 
 	app.Get("/v1/invitations/:token", func(c *fiber.Ctx) error {
@@ -6780,6 +7427,11 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 	if _, err := tx.Exec(`UPDATE carts SET updated_at=now() WHERE uuid=$1`, cartID); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
+	if _, err := tx.Exec(`UPDATE cart_recoveries
+                          SET status='converted', converted_order_uuid=$2, updated_at=now()
+                          WHERE cart_uuid=$1 AND status<>'converted'`, cartID, orderID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
 	if err := tx.Commit(); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
@@ -7896,6 +8548,15 @@ func generateGiftCardCodeSegment(length int) (string, error) {
 	return builder.String(), nil
 }
 
+var allowedReturnStatuses = map[string]string{
+	"requested": "requested",
+	"approved":  "approved",
+	"received":  "received",
+	"restocked": "restocked",
+	"rejected":  "rejected",
+	"refunded":  "refunded",
+}
+
 var allowedOrderStatuses = map[string]string{
 	"draft":              "draft",
 	"pending":            "pending",
@@ -7913,6 +8574,14 @@ func normalizeOrderStatus(status string) string {
 		return value
 	}
 	return "pending"
+}
+
+func normalizeReturnStatus(status string) string {
+	normalized := strings.ToLower(strings.TrimSpace(status))
+	if value, ok := allowedReturnStatuses[normalized]; ok {
+		return value
+	}
+	return "requested"
 }
 
 func normalizeGiftCardStatus(status string) string {
@@ -8830,6 +9499,121 @@ func loadDraftItems(q sqlx.Queryer, draftIDs []uuid.UUID) (map[uuid.UUID][]Draft
 		result[item.DraftUUID] = append(result[item.DraftUUID], item)
 	}
 	return result, nil
+}
+
+func loadOrderReturn(db sqlx.Queryer, returnUUID uuid.UUID) (OrderReturn, error) {
+	var ret OrderReturn
+	if err := sqlx.Get(db, &ret, `SELECT uuid,
+                                         order_uuid,
+                                         shop_uuid,
+                                         customer_uuid,
+                                         status,
+                                         reason,
+                                         notes,
+                                         requested_by,
+                                         processed_by,
+                                         restock,
+                                         restocked_at,
+                                         refund_amount_cents,
+                                         created_at,
+                                         updated_at
+                                  FROM order_returns
+                                  WHERE uuid=$1`, returnUUID); err != nil {
+		return OrderReturn{}, err
+	}
+	itemsMap, err := loadOrderReturnItems(db, []uuid.UUID{returnUUID})
+	if err != nil {
+		return OrderReturn{}, err
+	}
+	if items, ok := itemsMap[returnUUID]; ok {
+		ret.Items = items
+	} else {
+		ret.Items = []OrderReturnItem{}
+	}
+	return ret, nil
+}
+
+func loadOrderReturnItems(db sqlx.Queryer, returnUUIDs []uuid.UUID) (map[uuid.UUID][]OrderReturnItem, error) {
+	result := make(map[uuid.UUID][]OrderReturnItem, len(returnUUIDs))
+	if len(returnUUIDs) == 0 {
+		return result, nil
+	}
+	var rows []OrderReturnItem
+	if err := sqlx.Select(db, &rows, `SELECT uuid,
+                                            return_uuid,
+                                            order_item_uuid,
+                                            product_uuid,
+                                            quantity,
+                                            reason,
+                                            condition,
+                                            restocked_quantity,
+                                            created_at,
+                                            updated_at
+                                     FROM order_return_items
+                                     WHERE return_uuid = ANY($1)
+                                     ORDER BY created_at ASC`, pq.Array(returnUUIDs)); err != nil {
+		return nil, err
+	}
+	for _, id := range returnUUIDs {
+		result[id] = []OrderReturnItem{}
+	}
+	for _, item := range rows {
+		result[item.ReturnUUID] = append(result[item.ReturnUUID], item)
+	}
+	return result, nil
+}
+
+func restockReturnTx(tx *sqlx.Tx, ret OrderReturn, userID string) (OrderReturn, []uuid.UUID, error) {
+	itemsMap, err := loadOrderReturnItems(tx, []uuid.UUID{ret.UUID})
+	if err != nil {
+		return ret, nil, err
+	}
+	items := itemsMap[ret.UUID]
+	if len(items) == 0 {
+		return ret, nil, nil
+	}
+	touched := make(map[uuid.UUID]struct{})
+	restockedAny := false
+	now := time.Now()
+	for _, item := range items {
+		remaining := item.Quantity - item.RestockedQuantity
+		if remaining <= 0 {
+			continue
+		}
+		level, err := ensureInventoryLevelTx(tx, ret.ShopUUID, item.ProductUUID, nil)
+		if err != nil {
+			return ret, nil, err
+		}
+		newQuantity := level.Quantity + int64(remaining)
+		if _, err := tx.Exec(`UPDATE inventory_levels SET quantity=$1, updated_at=now() WHERE uuid=$2`, newQuantity, level.UUID); err != nil {
+			return ret, nil, err
+		}
+		note := fmt.Sprintf("Return %s restock", ret.UUID.String())
+		if _, err := recordInventoryAdjustmentTx(tx, level, newQuantity, level.Reserved, int64(remaining), 0, userID, "return_restock", "order_return", note); err != nil {
+			return ret, nil, err
+		}
+		if _, err := tx.Exec(`UPDATE order_return_items SET restocked_quantity=restocked_quantity+$1, updated_at=now() WHERE uuid=$2`, remaining, item.UUID); err != nil {
+			return ret, nil, err
+		}
+		touched[item.ProductUUID] = struct{}{}
+		restockedAny = true
+	}
+	if restockedAny {
+		if _, err := tx.Exec(`UPDATE order_returns SET restocked_at=COALESCE(restocked_at, now()), updated_at=now() WHERE uuid=$1`, ret.UUID); err != nil {
+			return ret, nil, err
+		}
+		ret.RestockedAt = &now
+	}
+	updatedItemsMap, err := loadOrderReturnItems(tx, []uuid.UUID{ret.UUID})
+	if err != nil {
+		return ret, nil, err
+	}
+	ret.Items = updatedItemsMap[ret.UUID]
+	touchedList := make([]uuid.UUID, 0, len(touched))
+	for productID := range touched {
+		touchedList = append(touchedList, productID)
+	}
+	return ret, touchedList, nil
 }
 
 func formatCents(amount int64) string {
