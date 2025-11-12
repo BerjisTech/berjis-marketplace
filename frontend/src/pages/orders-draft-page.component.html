@@ -1,3 +1,333 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Draft Orders</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton table for draft orders goes here.</p>
+<div class="space-y-5 py-4">
+  <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Draft Orders</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Create and manage draft orders before converting them into live orders.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <select
+        class="h-10 min-w-[200px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
+        [ngModel]="selectedShopSlug()"
+        (ngModelChange)="changeShop($event)"
+      >
+        <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+      </select>
+      <button
+        type="button"
+        class="rounded-full border border-blue-900/30 px-4 py-2 text-sm text-blue-700 transition hover:border-blue-500 hover:text-blue-800 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
+        (click)="refresh()"
+        [disabled]="loading()"
+      >
+        Refresh
+      </button>
+      <button
+        type="button"
+        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        (click)="openCreateModal()"
+        [disabled]="!selectedShopSlug() || dependenciesLoading()"
+      >
+        Create draft
+      </button>
+    </div>
+  </div>
 
+  <div *ngIf="message()" class="notice success">{{ message() }}</div>
+  <div *ngIf="error()" class="notice error">{{ error() }}</div>
+
+  <section
+    class="overflow-hidden rounded-xl border border-blue-900/15 bg-white/85 shadow-sm dark:border-slate-800 dark:bg-slate-950/70"
+  >
+    <div class="flex items-center justify-between border-b border-blue-900/10 px-4 py-3 text-sm dark:border-slate-800">
+      <span *ngIf="loading()" class="text-blue-500">Loading drafts…</span>
+      <span *ngIf="dependenciesLoading()" class="text-slate-500 dark:text-slate-400">Fetching customers and products…</span>
+      <span *ngIf="!loading() && !filteredDrafts().length" class="text-slate-500 dark:text-slate-400">
+        No draft orders yet.
+      </span>
+    </div>
+    <div *ngIf="filteredDrafts().length > 0" class="overflow-auto">
+      <table class="min-w-[960px] w-full text-sm">
+        <thead class="bg-blue-50/70 dark:bg-slate-900/70">
+          <tr class="text-left text-slate-600 dark:text-slate-300">
+            <th class="px-4 py-3 font-medium">Draft</th>
+            <th class="px-4 py-3 font-medium">Customer</th>
+            <th class="px-4 py-3 font-medium">Subtotal</th>
+            <th class="px-4 py-3 font-medium">Status</th>
+            <th class="px-4 py-3 font-medium">Updated</th>
+            <th class="px-4 py-3 font-medium">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            *ngFor="let draft of filteredDrafts(); trackBy: trackDraftBy"
+            class="border-t border-blue-900/10 bg-white/90 dark:border-slate-800 dark:bg-slate-950/60"
+          >
+            <td class="px-4 py-3 align-middle">
+              <div class="font-medium text-blue-900 dark:text-white">{{ draft.uuid | slice:0:12 }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">
+                {{ draft.items.length }} item{{ draft.items.length === 1 ? '' : 's' }}
+              </div>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              <div>{{ draft.customerEmail || '-' }}</div>
+              <div class="text-xs text-slate-500 dark:text-slate-400">{{ draft.customerName || 'Unassigned' }}</div>
+            </td>
+            <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
+              {{ formatCurrency(draft.subtotalCents ?? 0, draft.currency ?? 'USD') }}
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <span class="status-pill">{{ draft.status | titlecase }}</span>
+            </td>
+            <td class="px-4 py-3 align-middle text-xs text-slate-500 dark:text-slate-400">
+              {{ formatDate(draft.updatedAt) }}
+            </td>
+            <td class="px-4 py-3 align-middle">
+              <div class="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="rounded-full border border-blue-900/20 px-3 py-1 text-xs text-blue-700 transition hover:border-blue-500 hover:text-blue-800 dark:border-slate-700 dark:text-slate-200 dark:hover:border-slate-500"
+                  (click)="openEditModal(draft)"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-emerald-500/50 px-3 py-1 text-xs text-emerald-600 transition hover:border-emerald-500 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-400/40 dark:text-emerald-300"
+                  (click)="commitDraft(draft)"
+                  [disabled]="!canCommitDraft(draft)"
+                  [title]="canCommitDraft(draft) ? 'Convert draft into an order' : 'Link a customer before converting'"
+                >
+                  Convert
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full border border-rose-400/60 px-3 py-1 text-xs text-rose-500 transition hover:border-rose-500 hover:text-rose-600"
+                  (click)="deleteDraft(draft)"
+                >
+                  Delete
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<app-modal
+  [open]="draftModalOpen()"
+  [title]="selectedDraft() ? ('Edit draft ' + (selectedDraft()?.uuid | slice:0:12)) : 'Create draft order'"
+  maxWidth="720px"
+  (closed)="closeDraftModal()"
+>
+  <form class="space-y-4" (ngSubmit)="submitDraft()">
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-customer">Linked customer</label>
+        <select
+          id="draft-customer"
+          class="form-input"
+          [ngModel]="draftForm().customerUuid"
+          (ngModelChange)="updateDraftCustomer($event)"
+          name="draftCustomer"
+        >
+          <option value="">No linked customer</option>
+          <option *ngFor="let customer of draftCustomers()" [value]="customer.uuid">
+            {{ customer.customerName || customer.email || customer.uuid }}
+          </option>
+        </select>
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-status">Draft status</label>
+        <select
+          id="draft-status"
+          class="form-input capitalize"
+          [ngModel]="draftForm().status"
+          (ngModelChange)="updateDraftStatus($event)"
+          name="draftStatus"
+        >
+          <option *ngFor="let status of draftStatuses" [value]="status">{{ status | titlecase }}</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-customer-email">Contact email</label>
+        <input
+          id="draft-customer-email"
+          class="form-input"
+          [ngModel]="draftForm().customerEmail"
+          (ngModelChange)="updateDraftCustomerEmail($event)"
+          name="draftCustomerEmail"
+          placeholder="Optional email for this draft"
+        />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-customer-name">Contact name</label>
+        <input
+          id="draft-customer-name"
+          class="form-input"
+          [ngModel]="draftForm().customerName"
+          (ngModelChange)="updateDraftCustomerName($event)"
+          name="draftCustomerName"
+          placeholder="Optional contact name"
+        />
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="form-label">Items</span>
+        <button type="button" class="text-sm text-blue-600 hover:text-blue-700" (click)="addDraftItem()">
+          + Add product
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div
+          *ngFor="let item of draftForm().items; let i = index; trackBy: trackItemBy"
+          class="rounded-lg border border-blue-900/15 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-950/70"
+        >
+          <div class="grid gap-3 md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] md:items-end">
+            <div class="grid gap-2">
+              <label class="form-label" [for]="'draft-product-' + i">Product</label>
+              <select
+                class="form-input"
+                [id]="'draft-product-' + i"
+                [ngModel]="item.productUuid"
+                (ngModelChange)="updateDraftItemProduct(i, $event)"
+                [name]="'draftProduct' + i"
+              >
+                <option value="">Select a product</option>
+                <option *ngFor="let product of draftProducts()" [value]="product.uuid">
+                  {{ product.title }} &middot; {{ formatCurrency(product.priceCents ?? 0, product.currency ?? 'USD') }}
+                </option>
+              </select>
+            </div>
+            <div class="grid gap-2">
+              <label class="form-label" [for]="'draft-quantity-' + i">Quantity</label>
+              <input
+                type="number"
+                min="1"
+                class="form-input"
+                [id]="'draft-quantity-' + i"
+                [ngModel]="item.quantity"
+                (ngModelChange)="updateDraftItemQuantity(i, $event)"
+                [name]="'draftQuantity' + i"
+              />
+            </div>
+            <div class="flex items-center justify-end pt-5 md:pt-0">
+              <button
+                type="button"
+                class="text-xs text-rose-500 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                (click)="removeDraftItem(i)"
+                [disabled]="draftForm().items.length === 1"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-2">
+      <label class="form-label" for="draft-notes">Internal notes</label>
+      <textarea
+        id="draft-notes"
+        class="form-input"
+        rows="2"
+        [ngModel]="draftForm().notes"
+        (ngModelChange)="updateDraftNotes($event)"
+        name="draftNotes"
+        placeholder="Optional notes for staff"
+      ></textarea>
+    </div>
+
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-discount">Discount code</label>
+        <input
+          id="draft-discount"
+          class="form-input uppercase"
+          [ngModel]="draftForm().discountCode"
+          (ngModelChange)="updateDraftDiscountCode($event)"
+          name="draftDiscount"
+          placeholder="Optional"
+        />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-gift-card">Gift card code</label>
+        <input
+          id="draft-gift-card"
+          class="form-input uppercase"
+          [ngModel]="draftForm().giftCardCode"
+          (ngModelChange)="updateDraftGiftCardCode($event)"
+          name="draftGiftCard"
+          placeholder="Optional"
+        />
+      </div>
+    </div>
+
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-shipping-address">Shipping address</label>
+        <textarea
+          id="draft-shipping-address"
+          class="form-input"
+          rows="2"
+          [ngModel]="draftForm().shippingAddress"
+          (ngModelChange)="updateDraftShippingAddress($event)"
+          name="draftShippingAddress"
+          placeholder="Optional shipping details"
+        ></textarea>
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-payment-method">Payment method</label>
+        <input
+          id="draft-payment-method"
+          class="form-input"
+          [ngModel]="draftForm().paymentMethod"
+          (ngModelChange)="updateDraftPaymentMethod($event)"
+          name="draftPaymentMethod"
+          placeholder="e.g. Cash, Manual invoice"
+        />
+      </div>
+    </div>
+
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="draft-expires-at">Expires on</label>
+        <input
+          id="draft-expires-at"
+          type="date"
+          class="form-input"
+          [ngModel]="draftForm().expiresAt"
+          (ngModelChange)="updateDraftExpiresAt($event)"
+          name="draftExpiresAt"
+        />
+      </div>
+      <div class="rounded-lg bg-blue-50/70 px-3 py-2 text-sm text-blue-900 dark:bg-slate-900/60 dark:text-slate-200">
+        Estimated subtotal:
+        <strong>
+          {{ formatCurrency(draftSummary().subtotalCents ?? 0, draftSummary().currency || 'USD') }}
+        </strong>
+      </div>
+    </div>
+
+    <div *ngIf="draftError()" class="notice error">{{ draftError() }}</div>
+
+    <div class="flex items-center justify-end gap-2 pt-2">
+      <button type="button" class="rounded-full border px-4 py-2 text-sm" (click)="closeDraftModal()">Cancel</button>
+      <button
+        type="submit"
+        class="btn btn-primary rounded-full px-5"
+        [disabled]="draftBusy()"
+      >
+        {{ draftBusy() ? (selectedDraft() ? 'Saving…' : 'Creating…') : (selectedDraft() ? 'Save draft' : 'Create draft') }}
+      </button>
+    </div>
+  </form>
+</app-modal>

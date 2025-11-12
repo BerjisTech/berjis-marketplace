@@ -63,6 +63,7 @@ export interface ShopOrder {
   cancelledAt?: string;
   refundedAt?: string;
   refundTotalCents: number;
+  draftSourceUuid?: string;
   customerUuid?: string;
   customerEmail: string;
   customerName: string;
@@ -73,7 +74,7 @@ export interface OrderTimelineEvent {
   orderUuid: string;
   eventType: string;
   message: string;
-  metadata?: unknown;
+  metadata?: Record<string, unknown> | null;
   createdBy?: string;
   createdAt: string;
 }
@@ -91,6 +92,90 @@ export interface ShopMetrics {
   averageOrderValueCents: number;
   customersCount: number;
   salesSeries: { date: string; totalCents: number }[];
+}
+
+export interface DraftOrderItem {
+  uuid: string;
+  draftUuid: string;
+  productUuid: string;
+  quantity: number;
+  priceCents: number;
+  lineTotalCents: number;
+  currency: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DraftOrder {
+  uuid: string;
+  shopUuid: string;
+  customerUuid?: string;
+  customerEmail?: string;
+  customerName?: string;
+  currency: string;
+  subtotalCents: number;
+  discountCode?: string;
+  discountAmountCents: number;
+  giftCardCode?: string;
+  giftCardAmountCents: number;
+  shippingAddress?: string;
+  paymentMethod?: string;
+  notes?: string;
+  status: string;
+  expiresAt?: string;
+  createdBy?: string;
+  updatedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  items: DraftOrderItem[];
+}
+
+export interface CreateDraftOrderPayload {
+  customerUuid?: string;
+  customerEmail?: string;
+  customerName?: string;
+  notes?: string;
+  discountCode?: string;
+  giftCardCode?: string;
+  shippingAddress?: string;
+  paymentMethod?: string;
+  status?: string;
+  expiresAt?: string;
+  items: ManualOrderItemPayload[];
+}
+
+export interface UpdateDraftOrderPayload {
+  customerUuid?: string;
+  customerEmail?: string;
+  customerName?: string;
+  notes?: string;
+  discountCode?: string;
+  giftCardCode?: string;
+  shippingAddress?: string;
+  paymentMethod?: string;
+  status?: string;
+  expiresAt?: string;
+  items?: ManualOrderItemPayload[];
+}
+
+export interface CommitDraftOrderPayload {
+  status?: string;
+  discountCode?: string;
+  giftCardCode?: string;
+  shippingAddress?: string;
+  paymentMethod?: string;
+}
+
+export interface CommitDraftOrderResponse {
+  orderUuid: string;
+  draftUuid: string;
+  status: string;
+  subtotalCents: number;
+  discountAmountCents: number;
+  giftCardAmountCents: number;
+  totalCents: number;
+  currency: string;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -112,6 +197,53 @@ export class OrderService {
   listShopOrders(shopSlug: string): Observable<ApiResponse<ShopOrder[]>> {
     return this.http.get<ApiResponse<ShopOrder[]>>(
       `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/orders`,
+      { withCredentials: true },
+    );
+  }
+
+  listDraftOrders(shopSlug: string): Observable<ApiResponse<DraftOrder[]>> {
+    return this.http.get<ApiResponse<DraftOrder[]>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/orders/drafts`,
+      { withCredentials: true },
+    );
+  }
+
+  createDraftOrder(
+    shopSlug: string,
+    payload: CreateDraftOrderPayload,
+  ): Observable<ApiResponse<DraftOrder>> {
+    return this.http.post<ApiResponse<DraftOrder>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/orders/drafts`,
+      payload,
+      { withCredentials: true },
+    );
+  }
+
+  updateDraftOrder(
+    draftUuid: string,
+    payload: UpdateDraftOrderPayload,
+  ): Observable<ApiResponse<DraftOrder>> {
+    return this.http.patch<ApiResponse<DraftOrder>>(
+      `${this.api}/v1/orders/drafts/${encodeURIComponent(draftUuid)}`,
+      payload,
+      { withCredentials: true },
+    );
+  }
+
+  deleteDraftOrder(draftUuid: string): Observable<ApiResponse<unknown>> {
+    return this.http.delete<ApiResponse<unknown>>(
+      `${this.api}/v1/orders/drafts/${encodeURIComponent(draftUuid)}`,
+      { withCredentials: true },
+    );
+  }
+
+  commitDraftOrder(
+    draftUuid: string,
+    payload?: CommitDraftOrderPayload,
+  ): Observable<ApiResponse<CommitDraftOrderResponse>> {
+    return this.http.post<ApiResponse<CommitDraftOrderResponse>>(
+      `${this.api}/v1/orders/drafts/${encodeURIComponent(draftUuid)}/commit`,
+      payload ?? {},
       { withCredentials: true },
     );
   }

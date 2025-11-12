@@ -331,9 +331,10 @@ export class ProductsGiftCardsPageComponent implements OnInit {
 
   private generateRandomGiftCardCode(): string {
     const segments: string[] = [];
-    for (let i = 0; i < GIFT_CARD_CODE_SEGMENTS; i += 1) {
+    const segmentCount = Math.max(0, GIFT_CARD_CODE_SEGMENTS);
+    Array.from({ length: segmentCount }).forEach(() => {
       segments.push(this.randomCodeSegment(GIFT_CARD_CODE_SEGMENT_LENGTH));
-    }
+    });
     return segments.join('-');
   }
 
@@ -346,16 +347,17 @@ export class ProductsGiftCardsPageComponent implements OnInit {
     if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
       const buffer = new Uint32Array(length);
       crypto.getRandomValues(buffer);
-      for (let i = 0; i < buffer.length; i += 1) {
-        const index = buffer[i] % alphabetLength;
+      for (const value of buffer) {
+        const index = value % alphabetLength;
         result += GIFT_CARD_ALPHABET[index];
       }
       return result;
     }
-    for (let i = 0; i < length; i += 1) {
+    const segmentLength = Math.max(0, length);
+    Array.from({ length: segmentLength }).forEach(() => {
       const index = Math.floor(Math.random() * alphabetLength);
       result += GIFT_CARD_ALPHABET[index];
-    }
+    });
     return result;
   }
 

@@ -89,6 +89,12 @@
             <td class="px-4 py-3 align-middle">
               <div class="font-medium text-blue-900 dark:text-white">{{ order.uuid | slice:0:12 }}</div>
               <div class="text-xs text-slate-500 dark:text-slate-400">Placed {{ formatDate(order.createdAt) }}</div>
+              <div
+                *ngIf="order.draftSourceUuid"
+                class="text-[10px] uppercase tracking-wide text-blue-500 dark:text-blue-300"
+              >
+                From draft {{ order.draftSourceUuid | slice:0:8 }}
+              </div>
             </td>
             <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">
               <div>{{ order.customerEmail || '—' }}</div>
@@ -104,10 +110,10 @@
                 [class.text-emerald-700]="order.status?.toLowerCase() === 'delivered'"
                 [class.bg-rose-100]="order.status?.toLowerCase() === 'cancelled'"
                 [class.text-rose-700]="order.status?.toLowerCase() === 'cancelled'"
-                [class.bg-amber-100]="order.status?.toLowerCase() === 'refunded'"
-                [class.text-amber-700]="order.status?.toLowerCase() === 'refunded'"
+                [class.bg-amber-100]="isRefundedStatus(order.status)"
+                [class.text-amber-700]="isRefundedStatus(order.status)"
               >
-                {{ order.status | titlecase }}
+                {{ formatStatus(order.status) }}
               </span>
               <div *ngIf="order.cancelledAt" class="text-[10px] uppercase text-rose-500 dark:text-rose-300">
                 Cancelled {{ formatDate(order.cancelledAt) }}
@@ -247,7 +253,7 @@
 
     <div class="space-y-2">
       <div class="flex items-center justify-between">
-        <label class="form-label">Items</label>
+        <span class="form-label">Items</span>
         <button type="button" class="text-sm text-blue-600 hover:text-blue-700" (click)="addManualItem()">
           + Add product
         </button>
@@ -383,10 +389,20 @@
         class="rounded-lg border border-blue-900/15 bg-white/90 p-3 text-sm dark:border-slate-800 dark:bg-slate-950/70"
       >
         <div class="flex items-center justify-between">
-          <span class="font-semibold text-slate-700 dark:text-slate-200">{{ event.eventType | titlecase }}</span>
+          <span class="font-semibold text-slate-700 dark:text-slate-200">{{ formatEventType(event.eventType) }}</span>
           <span class="text-xs text-slate-500 dark:text-slate-400">{{ formatDate(event.createdAt) }}</span>
         </div>
         <p class="mt-1 text-slate-600 dark:text-slate-300">{{ event.message }}</p>
+        <dl
+          *ngIf="eventDetails(event).length > 0"
+          class="mt-2 space-y-1 text-xs text-slate-500 dark:text-slate-300"
+        >
+          <div *ngFor="let detail of eventDetails(event)" class="flex items-center justify-between gap-3">
+            <dt class="font-semibold uppercase tracking-wide">{{ detail.label }}</dt>
+            <dd class="text-right text-sm font-medium text-slate-700 dark:text-slate-100">{{ detail.value }}</dd>
+          </div>
+        </dl>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">{{ formatEventActor(event) }}</p>
       </li>
     </ul>
     <form class="space-y-2" (ngSubmit)="submitNote()">

@@ -71,9 +71,10 @@
     <form *ngIf="showCreateForm()" class="px-4 py-4 space-y-4" (ngSubmit)="submitGiftCard()">
       <div class="grid gap-4 md:grid-cols-2">
         <div class="space-y-2">
-          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Code</label>
+          <label for="gift-card-code" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Code</label>
           <div class="flex gap-2">
             <input
+              id="gift-card-code"
               name="code"
               [(ngModel)]="giftCardForm.code"
               class="flex-1 rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -89,8 +90,9 @@
           </div>
         </div>
         <div class="space-y-2">
-          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Amount ({{ giftCardForm.currency }})</label>
+          <label for="gift-card-amount" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Amount ({{ giftCardForm.currency }})</label>
           <input
+            id="gift-card-amount"
             name="amount"
             type="number"
             min="0.01"
@@ -102,8 +104,9 @@
           />
         </div>
         <div class="space-y-2">
-          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Currency</label>
+          <label for="gift-card-currency" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Currency</label>
           <input
+            id="gift-card-currency"
             name="currency"
             [(ngModel)]="giftCardForm.currency"
             class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 uppercase"
@@ -111,8 +114,9 @@
           />
         </div>
         <div class="space-y-2">
-          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Issued to (email)</label>
+          <label for="gift-card-issued-email" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Issued to (email)</label>
           <input
+            id="gift-card-issued-email"
             name="issuedToEmail"
             type="email"
             [(ngModel)]="giftCardForm.issuedToEmail"
@@ -121,8 +125,9 @@
           />
         </div>
         <div class="space-y-2">
-          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</label>
+          <label for="gift-card-status" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</label>
           <select
+            id="gift-card-status"
             name="status"
             [(ngModel)]="giftCardForm.status"
             class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -131,8 +136,9 @@
           </select>
         </div>
         <div class="space-y-2">
-          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Expires on</label>
+          <label for="gift-card-expires" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Expires on</label>
           <input
+            id="gift-card-expires"
             name="expiresOn"
             type="date"
             [(ngModel)]="giftCardForm.expiresOn"
@@ -141,8 +147,9 @@
         </div>
       </div>
       <div class="space-y-2">
-        <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Note</label>
+        <label for="gift-card-note" class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Note</label>
         <textarea
+          id="gift-card-note"
           name="note"
           rows="3"
           [(ngModel)]="giftCardForm.note"

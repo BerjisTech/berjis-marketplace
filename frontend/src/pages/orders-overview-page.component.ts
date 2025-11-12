@@ -16,7 +16,16 @@ import { ApiResponse, ProductService, ProductSummary } from '../app/core/service
 import { CustomerService, CustomerSummary } from '../app/core/services/customer.service';
 import { environment } from '../environments/environment';
 
-const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
+const ORDER_STATUSES = [
+  'draft',
+  'pending',
+  'processing',
+  'shipped',
+  'delivered',
+  'cancelled',
+  'partially_refunded',
+  'refunded',
+] as const;
 
 @Component({
   standalone: true,
@@ -619,13 +628,155 @@ export class OrdersOverviewPageComponent implements OnInit {
 
   formatDate(value: string): string {
     if (!value) {
-      return '—';
+      return '-';
     }
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) {
       return value;
     }
     return date.toLocaleString();
+  }
+
+  formatStatus(status: string | null | undefined): string {
+    if (!status) {
+      return '-';
+    }
+    return status
+      .split('_')
+      .filter((segment) => segment.length > 0)
+      .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+      .join(' ');
+  }
+
+  formatEventType(eventType: string | null | undefined): string {
+    if (!eventType) {
+      return '-';
+    }
+    return this.formatStatus(eventType.replace(/\./g, '_'));
+  }
+
+  isRefundedStatus(status: string | null | undefined): boolean {
+    const value = status?.toLowerCase();
+    return value === 'refunded' || value === 'partially_refunded';
+  }
+
+  eventDetails(event: OrderTimelineEvent): TimelineDetail[] {
+    const meta = event.metadata;
+    if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
+      return [];
+    }
+    const record = meta as Record<string, unknown>;
+    const details: TimelineDetail[] = [];
+    const orderCurrency = this.timelineOrder()?.currency || 'USD';
+
+    const formatCents = (label: string, value: unknown, currency = orderCurrency) => {
+      const cents = this.parseCents(value);
+      if (cents === null) {
+        return;
+      }
+      details.push({ label, value: this.formatCurrency(cents, currency) });
+    };
+    const pushText = (label: string, value: unknown) => {
+      if (typeof value !== 'string') {
+        return;
+      }
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return;
+      }
+      details.push({ label, value: trimmed });
+    };
+
+    switch (event.eventType) {
+      case 'order.refunded': {
+        formatCents('Refund amount', record['amountCents']);
+        formatCents('Refund total', record['refundTotalCents']);
+        const remaining = this.parseCents(record['remainingRefundableCents']);
+        if (remaining !== null && remaining > 0) {
+          details.push({ label: 'Remaining refundable', value: this.formatCurrency(remaining, orderCurrency) });
+        }
+        const giftCardAmount = this.parseCents(record['giftCardAmountCents']);
+        if (giftCardAmount !== null && giftCardAmount > 0) {
+          details.push({ label: 'Gift card returned', value: this.formatCurrency(giftCardAmount, orderCurrency) });
+        }
+        pushText('Reason', record['reason']);
+        break;
+      }
+      case 'order.cancelled': {
+        const previousStatus = typeof record['previousStatus'] === 'string' ? record['previousStatus'] : '';
+        if (previousStatus) {
+          details.push({ label: 'Previous status', value: this.formatStatus(previousStatus) });
+        }
+        const discountAmount = this.parseCents(record['discountAmountCents']);
+        if (discountAmount !== null && discountAmount > 0) {
+          details.push({ label: 'Discount reversed', value: this.formatCurrency(discountAmount, orderCurrency) });
+        }
+        const giftCardAmount = this.parseCents(record['giftCardAmountCents']);
+        if (giftCardAmount !== null && giftCardAmount > 0) {
+          details.push({ label: 'Gift card returned', value: this.formatCurrency(giftCardAmount, orderCurrency) });
+        }
+        pushText('Gift card', record['giftCardCode']);
+        break;
+      }
+      case 'order.created': {
+        let metaCurrency = orderCurrency;
+        if (typeof record['currency'] === 'string') {
+          const trimmed = record['currency'].trim();
+          if (trimmed) {
+            metaCurrency = trimmed;
+          }
+        }
+        formatCents('Subtotal', record['subtotalCents'], metaCurrency);
+        formatCents('Total', record['totalCents'], metaCurrency);
+        const discountAmount = this.parseCents(record['discountAmountCents']);
+        if (discountAmount !== null && discountAmount > 0) {
+          details.push({ label: 'Discount applied', value: this.formatCurrency(discountAmount, metaCurrency) });
+        }
+        const giftCardAmount = this.parseCents(record['giftCardAmountCents']);
+        if (giftCardAmount !== null && giftCardAmount > 0) {
+          details.push({ label: 'Gift card used', value: this.formatCurrency(giftCardAmount, metaCurrency) });
+        }
+        if (metaCurrency) {
+          details.push({ label: 'Currency', value: metaCurrency.toUpperCase() });
+        }
+        break;
+      }
+      default: {
+        for (const [key, value] of Object.entries(record)) {
+          if (value === null || value === undefined) {
+            continue;
+          }
+          if (typeof value === 'string' && value.trim() !== '') {
+            details.push({ label: this.formatStatus(key), value: value.trim() });
+          } else if (typeof value === 'number') {
+            details.push({ label: this.formatStatus(key), value: value.toString() });
+          }
+        }
+      }
+    }
+
+    return details;
+  }
+
+  formatEventActor(event: OrderTimelineEvent): string {
+    const actor = event.createdBy;
+    if (!actor) {
+      return 'System event';
+    }
+    return `By ${actor.slice(0, 8)}…`;
+  }
+
+  private parseCents(value: unknown): number | null {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return Math.round(value);
+    }
+    if (typeof value === 'string') {
+      const parsed = Number.parseFloat(value);
+      if (Number.isFinite(parsed)) {
+        return Math.round(parsed);
+      }
+    }
+    return null;
   }
 
   statusOptions(): readonly string[] {
@@ -664,4 +815,9 @@ interface ManualOrderForm {
 interface ManualSubtotal {
   subtotalCents: number;
   currency: string | null;
+}
+
+interface TimelineDetail {
+  label: string;
+  value: string;
 }

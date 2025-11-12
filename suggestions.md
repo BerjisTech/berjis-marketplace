@@ -20,3 +20,24 @@
   - [ ] Update the cancellation handler to increment inventory/adjustment records for each order item.
   - [ ] Ensure inventory alerts and low-stock signals respect the restock.
   - [ ] Surface the restock action in dashboards/audit logs so staff can trace the change.
+
+## Show staff names in order timeline
+- **Description:** Timeline events display truncated UUIDs for staff actions. Surfacing the staff member's display name would give better context to merchants reviewing activity.
+- **Tasks:**
+  - [ ] Fetch staff profile metadata (name/avatar) for the UUIDs referenced in timeline events.
+  - [ ] Extend the marketplace service to include actor display info in `/v1/orders/:id/events` responses or provide a batch lookup endpoint.
+  - [ ] Update the Angular dashboard timeline to render the resolved display names and avatars where available.
+
+## Replace refund prompt with guided modal
+- **Description:** Partial refunds rely on a `window.prompt`, which is brittle and blocks additional validation. A dedicated modal should collect the amount, reason, and optional communication to improve UX.
+- **Tasks:**
+  - [ ] Create a refund modal component with amount input, validation, and reason dropdown/textarea.
+  - [ ] Reuse the modal for full and partial refunds, replacing the current prompt-based flow.
+  - [ ] Ensure the modal invokes the existing refund API and updates the timeline/orders list upon success.
+
+## Support clearing draft expiration dates
+- **Description:** Draft order updates can set a new expiration date but cannot clear an existing one because the API treats missing values as no-op. Allowing drafts to revert to no expiry would simplify long-lived drafts.
+- **Tasks:**
+  - [ ] Adjust the draft update handler to distinguish between omitted fields and explicit nulls (e.g., use pointer wrappers).
+  - [ ] Update the Angular draft editor to send a null payload when merchants remove the expiration date.
+  - [ ] Add integration tests to confirm clearing and setting expirations behave as expected.

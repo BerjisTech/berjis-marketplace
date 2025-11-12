@@ -90,12 +90,12 @@
 - [x] Order editing capabilities
 - [x] Order cancellation
 - [x] Refund processing
-- [ ] Partial refunds
-- [ ] Order notes/comments
-- [ ] Order timeline/history
+- [x] Partial refunds
+- [x] Order notes/comments
+- [x] Order timeline/history
 
 ### Order Features
-- [ ] Draft orders
+- [x] Draft orders
 - [ ] Abandoned checkout tracking
 - [ ] Abandoned cart recovery
 - [ ] Returns management system
