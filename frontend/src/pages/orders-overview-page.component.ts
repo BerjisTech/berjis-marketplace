@@ -15,7 +15,7 @@ import { ApiResponse, ProductService, ProductSummary } from '../app/core/service
 import { CustomerService, CustomerSummary } from '../app/core/services/customer.service';
 import { environment } from '../environments/environment';
 
-const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
+const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'] as const;
 
 @Component({
   standalone: true,
@@ -62,6 +62,7 @@ export class OrdersOverviewPageComponent implements OnInit {
   readonly manualSubtotalCents = computed(() => this.manualSummary().subtotalCents);
   readonly manualCurrency = computed(() => this.manualSummary().currency);
   readonly cancellingOrder = signal<string>('');
+  readonly refundingOrder = signal<string>('');
 
   readonly filteredOrders = computed(() => {
     const orders = this.orders();
@@ -205,7 +206,8 @@ export class OrdersOverviewPageComponent implements OnInit {
   }
 
   canEdit(order: ShopOrder): boolean {
-    return order.status?.toLowerCase() !== 'cancelled';
+    const status = order.status?.toLowerCase();
+    return status !== 'cancelled' && status !== 'refunded';
   }
 
   canCancel(order: ShopOrder): boolean {
@@ -235,6 +237,37 @@ export class OrdersOverviewPageComponent implements OnInit {
       error: () => {
         this.cancellingOrder.set('');
         this.error.set('Could not cancel order.');
+      },
+    });
+  }
+
+  canRefund(order: ShopOrder): boolean {
+    const status = order.status?.toLowerCase();
+    return status !== 'cancelled' && status !== 'refunded';
+  }
+
+  refundOrder(order: ShopOrder): void {
+    if (!this.canRefund(order) || this.refundingOrder()) {
+      return;
+    }
+    const confirmed = window.confirm(
+      'Refund this order? Only full refunds are supported and the sale will be marked as refunded.',
+    );
+    if (!confirmed) {
+      return;
+    }
+    this.message.set('');
+    this.error.set('');
+    this.refundingOrder.set(order.uuid);
+    this.ordersService.refundOrder(order.uuid).subscribe({
+      next: () => {
+        this.refundingOrder.set('');
+        this.message.set('Order refunded.');
+        this.loadOrders();
+      },
+      error: () => {
+        this.refundingOrder.set('');
+        this.error.set('Could not refund order.');
       },
     });
   }

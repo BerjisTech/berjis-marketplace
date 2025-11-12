@@ -60,7 +60,9 @@ export interface ShopOrder {
   shippingCarrier?: string;
   shippedAt?: string;
   deliveredAt?: string;
-   cancelledAt?: string;
+  cancelledAt?: string;
+  refundedAt?: string;
+  refundTotalCents: number;
   customerUuid?: string;
   customerEmail: string;
   customerName: string;
@@ -127,6 +129,17 @@ export class OrderService {
     return this.http.post<ApiResponse<unknown>>(
       `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/cancel`,
       {},
+      { withCredentials: true },
+    );
+  }
+
+  refundOrder(
+    orderUuid: string,
+    payload?: { amountCents?: number; reason?: string },
+  ): Observable<ApiResponse<unknown>> {
+    return this.http.post<ApiResponse<unknown>>(
+      `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/refunds`,
+      payload ?? {},
       { withCredentials: true },
     );
   }

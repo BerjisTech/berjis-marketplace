@@ -89,7 +89,7 @@
 - [x] Order status workflow (pending, processing, shipped, delivered, cancelled)
 - [x] Order editing capabilities
 - [x] Order cancellation
-- [ ] Refund processing
+- [x] Refund processing
 - [ ] Partial refunds
 - [ ] Order notes/comments
 - [ ] Order timeline/history

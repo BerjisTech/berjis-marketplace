@@ -417,21 +417,23 @@ type CustomerOrder struct {
 }
 
 type ShopOrder struct {
-	UUID            uuid.UUID  `db:"uuid" json:"uuid"`
-	TotalCents      int64      `db:"total_cents" json:"totalCents"`
-	Currency        string     `db:"currency" json:"currency"`
-	Status          string     `db:"status" json:"status"`
-	CreatedAt       time.Time  `db:"created_at" json:"createdAt"`
-	UpdatedAt       time.Time  `db:"updated_at" json:"updatedAt"`
-	TrackingNumber  *string    `db:"tracking_number" json:"trackingNumber,omitempty"`
-	TrackingURL     *string    `db:"tracking_url" json:"trackingUrl,omitempty"`
-	ShippingCarrier *string    `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
-	ShippedAt       *time.Time `db:"shipped_at" json:"shippedAt,omitempty"`
-	DeliveredAt     *time.Time `db:"delivered_at" json:"deliveredAt,omitempty"`
-	CancelledAt     *time.Time `db:"cancelled_at" json:"cancelledAt,omitempty"`
-	CustomerUUID    *uuid.UUID `db:"customer_uuid" json:"customerUuid,omitempty"`
-	CustomerEmail   string     `db:"customer_email" json:"customerEmail"`
-	CustomerName    string     `db:"customer_name" json:"customerName"`
+	UUID             uuid.UUID  `db:"uuid" json:"uuid"`
+	TotalCents       int64      `db:"total_cents" json:"totalCents"`
+	Currency         string     `db:"currency" json:"currency"`
+	Status           string     `db:"status" json:"status"`
+	CreatedAt        time.Time  `db:"created_at" json:"createdAt"`
+	UpdatedAt        time.Time  `db:"updated_at" json:"updatedAt"`
+	TrackingNumber   *string    `db:"tracking_number" json:"trackingNumber,omitempty"`
+	TrackingURL      *string    `db:"tracking_url" json:"trackingUrl,omitempty"`
+	ShippingCarrier  *string    `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
+	ShippedAt        *time.Time `db:"shipped_at" json:"shippedAt,omitempty"`
+	DeliveredAt      *time.Time `db:"delivered_at" json:"deliveredAt,omitempty"`
+	RefundedAt       *time.Time `db:"refunded_at" json:"refundedAt,omitempty"`
+	RefundTotalCents int64      `db:"refund_total_cents" json:"refundTotalCents"`
+	CancelledAt      *time.Time `db:"cancelled_at" json:"cancelledAt,omitempty"`
+	CustomerUUID     *uuid.UUID `db:"customer_uuid" json:"customerUuid,omitempty"`
+	CustomerEmail    string     `db:"customer_email" json:"customerEmail"`
+	CustomerName     string     `db:"customer_name" json:"customerName"`
 }
 
 type SalesPoint struct {
@@ -4406,6 +4408,8 @@ func New(opts Options) *fiber.App {
                                                   o.shipped_at,
                                                   o.delivered_at,
                                                   o.cancelled_at,
+                                                  o.refunded_at,
+                                                  o.refund_total_cents,
                                                   c.uuid AS customer_uuid,
                                                   COALESCE(c.email,'') AS customer_email,
                                                   TRIM(BOTH ' ' FROM COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) AS customer_name
@@ -4414,7 +4418,7 @@ func New(opts Options) *fiber.App {
                                            JOIN products p ON p.uuid=oi.product_uuid
                                            LEFT JOIN customers c ON c.shop_uuid=p.shop_uuid AND c.user_uuid=o.user_uuid
                                            WHERE p.shop_uuid=$1
-                                           GROUP BY o.uuid, o.currency, o.status, o.created_at, o.updated_at, o.tracking_number, o.tracking_url, o.shipping_carrier, o.shipped_at, o.delivered_at, o.cancelled_at, c.uuid, c.email, c.first_name, c.last_name
+                                           GROUP BY o.uuid, o.currency, o.status, o.created_at, o.updated_at, o.tracking_number, o.tracking_url, o.shipping_carrier, o.shipped_at, o.delivered_at, o.cancelled_at, o.refunded_at, o.refund_total_cents, c.uuid, c.email, c.first_name, c.last_name
                                            ORDER BY o.created_at DESC
                                            LIMIT 200`, shop.UUID); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
@@ -4660,6 +4664,127 @@ func New(opts Options) *fiber.App {
 		}
 
 		return c.JSON(fiber.Map{"success": true})
+	})
+
+	app.Post("/v1/orders/:id/refunds", requireAuth, func(c *fiber.Ctx) error {
+		orderParam := strings.TrimSpace(c.Params("id"))
+		if orderParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		orderID, err := uuid.Parse(orderParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+
+		var body struct {
+			AmountCents int64  `json:"amountCents"`
+			Reason      string `json:"reason"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		reason := strings.TrimSpace(body.Reason)
+		if reason == "" {
+			reason = "manual refund"
+		}
+
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+
+		var row struct {
+			Status           string     `db:"status"`
+			TotalCents       int64      `db:"total_cents"`
+			RefundTotalCents int64      `db:"refund_total_cents"`
+			DiscountUUID     *uuid.UUID `db:"discount_uuid"`
+			DiscountAmount   int64      `db:"discount_amount_cents"`
+			GiftCardUUID     *uuid.UUID `db:"gift_card_uuid"`
+			GiftCardAmount   int64      `db:"gift_card_amount_cents"`
+		}
+		if err := tx.Get(&row, `SELECT status, total_cents, refund_total_cents, discount_uuid, discount_amount_cents, gift_card_uuid, gift_card_amount_cents
+                                FROM orders
+                                WHERE uuid=$1
+                                FOR UPDATE`, orderID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "order not found"})
+			}
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		status := strings.ToLower(strings.TrimSpace(row.Status))
+		if status == "cancelled" || status == "refunded" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "order already closed"})
+		}
+
+		refundable := row.TotalCents - row.RefundTotalCents
+		if refundable <= 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "order already refunded"})
+		}
+
+		amount := body.AmountCents
+		if amount == 0 {
+			amount = refundable
+		}
+		if amount <= 0 || amount != refundable {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "only full refunds are supported"})
+		}
+
+		if row.DiscountUUID != nil && row.DiscountAmount > 0 {
+			if _, err := tx.Exec(`DELETE FROM discount_redemptions WHERE order_uuid=$1`, orderID); err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+		}
+
+		if row.GiftCardUUID != nil && row.GiftCardAmount > 0 {
+			giftCardRefund := row.GiftCardAmount
+			if giftCardRefund > amount {
+				giftCardRefund = amount
+			}
+			if giftCardRefund > 0 {
+				if err := refundGiftCard(tx, *row.GiftCardUUID, giftCardRefund); err != nil {
+					return respondWithError(c, err)
+				}
+			}
+		}
+
+		processedBy := srvAuth.UserID(c)
+		var processedUUID *uuid.UUID
+		if parsed, err := uuid.Parse(processedBy); err == nil {
+			processedUUID = &parsed
+		}
+		if _, err := tx.Exec(`INSERT INTO order_refunds(uuid, order_uuid, amount_cents, reason, processed_by)
+                               VALUES($1,$2,$3,$4,$5)`,
+			uuid.New(), orderID, amount, reason, processedUUID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		if _, err := tx.Exec(`UPDATE orders
+                              SET status='refunded',
+                                  refund_total_cents=refund_total_cents + $2,
+                                  refunded_at=now(),
+                                  updated_at=now()
+                              WHERE uuid=$1`, orderID, amount); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		if err := tx.Commit(); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"amountCents": amount}})
 	})
 
 	app.Get("/v1/invitations/:token", func(c *fiber.Ctx) error {
@@ -5207,6 +5332,8 @@ type Order struct {
 	ShippingCarrier     *string    `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
 	ShippedAt           *time.Time `db:"shipped_at" json:"shippedAt,omitempty"`
 	DeliveredAt         *time.Time `db:"delivered_at" json:"deliveredAt,omitempty"`
+	RefundTotalCents    int64      `db:"refund_total_cents" json:"refundTotalCents"`
+	RefundedAt          *time.Time `db:"refunded_at" json:"refundedAt,omitempty"`
 	CancelledAt         *time.Time `db:"cancelled_at" json:"cancelledAt,omitempty"`
 }
 
@@ -6127,7 +6254,7 @@ func listOrders(c *fiber.Ctx, db *sqlx.DB) error {
 	user := srvAuth.UserID(c)
 	var out []Order
 	if err := db.Select(&out, `SELECT uuid,shop_uuid,subtotal_cents,total_cents,currency,status,discount_code,discount_amount_cents,gift_card_code,gift_card_amount_cents,
-                                      created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at,cancelled_at
+                                      created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at,cancelled_at,refunded_at,refund_total_cents
                                FROM orders
                                WHERE user_uuid=$1
                                ORDER BY created_at DESC`, user); err != nil {
@@ -6141,7 +6268,7 @@ func getOrder(c *fiber.Ctx, db *sqlx.DB) error {
 	id := c.Params("id")
 	var o Order
 	if err := db.Get(&o, `SELECT uuid,shop_uuid,subtotal_cents,total_cents,currency,status,discount_code,discount_amount_cents,gift_card_code,gift_card_amount_cents,
-                                  created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at,cancelled_at
+                                  created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at,cancelled_at,refunded_at,refund_total_cents
                           FROM orders
                           WHERE uuid=$1 AND user_uuid=$2`, id, user); err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
@@ -6834,6 +6961,7 @@ var allowedOrderStatuses = map[string]string{
 	"shipped":    "shipped",
 	"delivered":  "delivered",
 	"cancelled":  "cancelled",
+	"refunded":   "refunded",
 }
 
 func normalizeOrderStatus(status string) string {
@@ -7374,7 +7502,7 @@ func loadOrderMeta(db *sqlx.DB, id uuid.UUID) (orderMeta, error) {
 
 func isValidOrderStatus(status string) bool {
 	switch strings.ToLower(status) {
-	case "pending", "processing", "shipped", "delivered", "cancelled":
+	case "pending", "processing", "shipped", "delivered", "cancelled", "refunded":
 		return true
 	default:
 		return false
