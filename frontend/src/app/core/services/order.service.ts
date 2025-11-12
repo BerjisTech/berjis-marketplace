@@ -14,6 +14,30 @@ export interface CreateOrderPayload {
   [key: string]: unknown;
 }
 
+export interface ManualOrderItemPayload {
+  productUuid: string;
+  quantity: number;
+}
+
+export interface CreateManualOrderPayload {
+  customerUuid: string;
+  items: ManualOrderItemPayload[];
+  status?: string;
+  discountCode?: string;
+  giftCardCode?: string;
+  shippingAddress?: string;
+  paymentMethod?: string;
+}
+
+export interface CreateManualOrderResponse {
+  uuid: string;
+  subtotalCents: number;
+  totalCents: number;
+  discountAmountCents: number;
+  giftCardAmountCents: number;
+  currency: string;
+}
+
 interface OrderResponseData {
   uuid?: string;
   id?: string;
@@ -36,6 +60,7 @@ export interface ShopOrder {
   shippingCarrier?: string;
   shippedAt?: string;
   deliveredAt?: string;
+   cancelledAt?: string;
   customerUuid?: string;
   customerEmail: string;
   customerName: string;
@@ -79,10 +104,29 @@ export class OrderService {
     );
   }
 
+  createManualOrder(
+    shopSlug: string,
+    payload: CreateManualOrderPayload,
+  ): Observable<ApiResponse<CreateManualOrderResponse>> {
+    return this.http.post<ApiResponse<CreateManualOrderResponse>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/orders`,
+      payload,
+      { withCredentials: true },
+    );
+  }
+
   updateTracking(orderUuid: string, payload: UpdateTrackingPayload): Observable<ApiResponse<unknown>> {
     return this.http.patch<ApiResponse<unknown>>(
       `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/tracking`,
       payload,
+      { withCredentials: true },
+    );
+  }
+
+  cancelOrder(orderUuid: string): Observable<ApiResponse<unknown>> {
+    return this.http.post<ApiResponse<unknown>>(
+      `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/cancel`,
+      {},
       { withCredentials: true },
     );
   }

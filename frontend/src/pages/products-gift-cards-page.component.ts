@@ -9,6 +9,7 @@ import {
   GiftCardReportSummary,
   GiftCardService,
   GiftCardTransaction,
+  CreateGiftCardPayload,
 } from '../app/core/services/gift-card.service';
 
 interface ShopSummary {
@@ -17,6 +18,22 @@ interface ShopSummary {
   slug: string;
   description?: string;
 }
+
+type GiftCardStatusOption = 'draft' | 'active' | 'disabled';
+
+interface GiftCardFormModel {
+  code: string;
+  amount: string;
+  currency: string;
+  issuedToEmail: string;
+  note: string;
+  status: GiftCardStatusOption;
+  expiresOn: string;
+}
+
+const GIFT_CARD_CODE_SEGMENTS = 4;
+const GIFT_CARD_CODE_SEGMENT_LENGTH = 4;
+const GIFT_CARD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 @Component({
   standalone: true,
@@ -46,6 +63,14 @@ export class ProductsGiftCardsPageComponent implements OnInit {
   readonly cardsError = signal<string>('');
   readonly summaryError = signal<string>('');
   readonly transactionsError = signal<string>('');
+
+  readonly showCreateForm = signal<boolean>(false);
+  readonly creatingGiftCard = signal<boolean>(false);
+  readonly createError = signal<string>('');
+  readonly createSuccess = signal<string>('');
+
+  giftCardForm: GiftCardFormModel = this.createDefaultGiftCardForm();
+  readonly cardStatusOptions: GiftCardStatusOption[] = ['active', 'draft', 'disabled'];
 
   readonly hasCards = computed(() => !this.loadingCards() && this.cards().length > 0);
   readonly totalIssuedCents = computed(() => this.summary()?.issuedCents ?? 0);
@@ -107,6 +132,105 @@ export class ProductsGiftCardsPageComponent implements OnInit {
     }
     this.loadSummary(true);
     this.loadCards(true);
+  }
+
+  toggleCreateForm(): void {
+    const next = !this.showCreateForm();
+    this.showCreateForm.set(next);
+    if (next) {
+      this.createError.set('');
+      this.createSuccess.set('');
+    }
+  }
+
+  generateNewCode(): void {
+    this.createError.set('');
+    this.createSuccess.set('');
+    this.giftCardForm.code = this.generateRandomGiftCardCode();
+  }
+
+  resetGiftCardForm(): void {
+    this.giftCardForm = this.createDefaultGiftCardForm();
+    this.createError.set('');
+    this.createSuccess.set('');
+  }
+
+  submitGiftCard(): void {
+    const slug = this.shopSlug();
+    if (!slug) {
+      this.createError.set('Select a shop first.');
+      return;
+    }
+    if (this.creatingGiftCard()) {
+      return;
+    }
+    this.createError.set('');
+    this.createSuccess.set('');
+
+    const amountValue = Number.parseFloat(this.giftCardForm.amount);
+    if (!Number.isFinite(amountValue) || amountValue <= 0) {
+      this.createError.set('Enter a gift card amount greater than zero.');
+      return;
+    }
+    const balanceCents = Math.round(amountValue * 100);
+    const currency = this.giftCardForm.currency.trim().toUpperCase() || 'USD';
+    this.giftCardForm.currency = currency;
+
+    const payload: CreateGiftCardPayload = {
+      balanceCents,
+      currency,
+      status: this.giftCardForm.status,
+    };
+
+    const normalizedCode = this.normalizeGiftCardCode(this.giftCardForm.code);
+    if (normalizedCode) {
+      payload.code = normalizedCode;
+      this.giftCardForm.code = normalizedCode;
+    }
+
+    const issuedTo = this.giftCardForm.issuedToEmail.trim();
+    if (issuedTo) {
+      payload.issuedToEmail = issuedTo;
+    }
+
+    const note = this.giftCardForm.note.trim();
+    if (note) {
+      payload.note = note;
+    }
+
+    const expiresOn = this.giftCardForm.expiresOn.trim();
+    if (expiresOn) {
+      const iso = this.toIsoDate(expiresOn);
+      if (!iso) {
+        this.createError.set('Enter a valid expiration date (YYYY-MM-DD).');
+        return;
+      }
+      payload.expiresAt = iso;
+    }
+
+    this.creatingGiftCard.set(true);
+    this.giftCardsApi.create(slug, payload).subscribe({
+      next: (response) => {
+        this.creatingGiftCard.set(false);
+        const responseCode = response?.data?.code ?? normalizedCode;
+        if (responseCode) {
+          this.createSuccess.set(`Gift card created. Code ${responseCode}`);
+        } else {
+          this.createSuccess.set('Gift card created.');
+        }
+        this.giftCardForm = this.createDefaultGiftCardForm();
+        this.loadSummary(true);
+        this.loadCards(true);
+      },
+      error: (err) => {
+        this.creatingGiftCard.set(false);
+        const message =
+          err?.error?.message ||
+          err?.message ||
+          'Could not create gift card.';
+        this.createError.set(message);
+      },
+    });
   }
 
   loadSummary(force = false): void {
@@ -178,6 +302,72 @@ export class ProductsGiftCardsPageComponent implements OnInit {
     this.selectedCard.set(null);
     this.transactions.set([]);
     this.transactionsError.set('');
+  }
+
+  private createDefaultGiftCardForm(): GiftCardFormModel {
+    return {
+      code: '',
+      amount: '',
+      currency: 'USD',
+      issuedToEmail: '',
+      note: '',
+      status: 'active',
+      expiresOn: '',
+    };
+  }
+
+  private normalizeGiftCardCode(code: string): string {
+    if (!code) {
+      return '';
+    }
+    const cleaned = code
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, '')
+      .replace(/^-+/, '')
+      .replace(/-+$/, '')
+      .replace(/-{2,}/g, '-');
+    return cleaned;
+  }
+
+  private generateRandomGiftCardCode(): string {
+    const segments: string[] = [];
+    for (let i = 0; i < GIFT_CARD_CODE_SEGMENTS; i += 1) {
+      segments.push(this.randomCodeSegment(GIFT_CARD_CODE_SEGMENT_LENGTH));
+    }
+    return segments.join('-');
+  }
+
+  private randomCodeSegment(length: number): string {
+    const alphabetLength = GIFT_CARD_ALPHABET.length;
+    if (length <= 0 || alphabetLength === 0) {
+      return '';
+    }
+    let result = '';
+    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const buffer = new Uint32Array(length);
+      crypto.getRandomValues(buffer);
+      for (let i = 0; i < buffer.length; i += 1) {
+        const index = buffer[i] % alphabetLength;
+        result += GIFT_CARD_ALPHABET[index];
+      }
+      return result;
+    }
+    for (let i = 0; i < length; i += 1) {
+      const index = Math.floor(Math.random() * alphabetLength);
+      result += GIFT_CARD_ALPHABET[index];
+    }
+    return result;
+  }
+
+  private toIsoDate(dateValue: string): string | null {
+    if (!dateValue) {
+      return null;
+    }
+    const isoCandidate = new Date(`${dateValue}T00:00:00Z`);
+    if (Number.isNaN(isoCandidate.getTime())) {
+      return null;
+    }
+    return isoCandidate.toISOString();
   }
 
   trackShopBy(_index: number, shop: ShopSummary): string {

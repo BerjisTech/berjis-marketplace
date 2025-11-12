@@ -48,6 +48,11 @@ export interface CreateGiftCardPayload {
   expiresAt?: string | null;
 }
 
+export interface CreateGiftCardResponse {
+  uuid: string;
+  code: string;
+}
+
 export type UpdateGiftCardPayload = Partial<CreateGiftCardPayload>;
 
 @Injectable({ providedIn: 'root' })
@@ -62,8 +67,8 @@ export class GiftCardService {
     );
   }
 
-  create(shopSlug: string, payload: CreateGiftCardPayload): Observable<ApiResponse<{ uuid: string }>> {
-    return this.http.post<ApiResponse<{ uuid: string }>>(
+  create(shopSlug: string, payload: CreateGiftCardPayload): Observable<ApiResponse<CreateGiftCardResponse>> {
+    return this.http.post<ApiResponse<CreateGiftCardResponse>>(
       `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/gift-cards`,
       payload,
       { withCredentials: true },

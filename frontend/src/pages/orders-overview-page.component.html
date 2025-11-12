@@ -28,6 +28,14 @@
         [ngModel]="search()"
         (ngModelChange)="changeSearch($event)"
       />
+      <button
+        type="button"
+        class="rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        (click)="openManual()"
+        [disabled]="!selectedShopSlug()"
+      >
+        Create order
+      </button>
       <a routerLink="/dashboard/orders/draft" class="chip-link">Drafts</a>
       <a routerLink="/dashboard/orders/abandoned-checkouts" class="chip-link">Abandoned checkouts</a>
       <a routerLink="/dashboard/orders/returns" class="chip-link">Returns</a>
@@ -111,13 +119,25 @@
             </td>
             <td class="px-4 py-3 align-middle text-slate-700 dark:text-slate-200">{{ formatDate(order.updatedAt) }}</td>
             <td class="px-4 py-3 align-middle">
-              <button
-                type="button"
-                class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
-                (click)="openEdit(order)"
-              >
-                Update
-              </button>
+              <div class="flex items-center justify-end gap-2">
+                <button
+                  *ngIf="canEdit(order)"
+                  type="button"
+                  class="rounded-full border border-blue-900/20 px-3 py-1 text-sm text-blue-900 transition hover:border-blue-400 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:text-slate-200 dark:hover:border-blue-400 dark:hover:text-blue-200"
+                  (click)="openEdit(order)"
+                >
+                  Update
+                </button>
+                <button
+                  *ngIf="canCancel(order)"
+                  type="button"
+                  class="rounded-full border border-rose-200 px-3 py-1 text-sm text-rose-600 transition hover:border-rose-400 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-500/40 dark:text-rose-300 dark:hover:border-rose-300 dark:hover:text-rose-200"
+                  (click)="cancelOrder(order)"
+                  [disabled]="cancellingOrder() === order.uuid"
+                >
+                  {{ cancellingOrder() === order.uuid ? 'Cancelling…' : 'Cancel' }}
+                </button>
+              </div>
             </td>
           </tr>
           <tr *ngIf="!loading() && filteredOrders().length === 0">
@@ -135,6 +155,177 @@
     </div>
   </section>
 </div>
+
+<app-modal
+  [open]="manualModalOpen()"
+  title="Create manual order"
+  maxWidth="720px"
+  (closed)="closeManual()"
+>
+  <form class="space-y-4" (ngSubmit)="submitManual()">
+    <div class="rounded-lg bg-blue-50/80 p-3 text-xs text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+      Manual orders require a customer that already has a Berjis account linked to your shop.
+    </div>
+    <div *ngIf="manualError()" class="notice error">{{ manualError() }}</div>
+    <div *ngIf="manualOptionsLoading()" class="text-sm text-blue-500">Loading customers and products.</div>
+
+    <div class="grid gap-2">
+      <label class="form-label" for="manual-customer">Customer</label>
+      <select
+        id="manual-customer"
+        class="form-input"
+        [ngModel]="manualForm().customerUuid"
+        (ngModelChange)="updateManualCustomer($event)"
+        name="manualCustomer"
+        required
+      >
+        <option value="">Select a customer</option>
+        <option *ngFor="let customer of manualCustomers()" [value]="customer.uuid">
+          {{ customer.customerName || ((customer.firstName + ' ' + customer.lastName).trim()) || customer.email }}
+          &ndash; {{ customer.email }}
+        </option>
+      </select>
+    </div>
+
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="manual-status">Order status</label>
+        <select
+          id="manual-status"
+          class="form-input"
+          [ngModel]="manualForm().status"
+          (ngModelChange)="updateManualStatus($event)"
+          name="manualStatus"
+        >
+          <option *ngFor="let status of statusOptions()" [value]="status">{{ status | titlecase }}</option>
+        </select>
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="manual-payment-method">Payment method</label>
+        <input
+          id="manual-payment-method"
+          class="form-input"
+          [ngModel]="manualForm().paymentMethod"
+          (ngModelChange)="updateManualPaymentMethod($event)"
+          name="manualPaymentMethod"
+          placeholder="Cash, Card on file, etc."
+        />
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <div class="flex items-center justify-between">
+        <label class="form-label">Items</label>
+        <button type="button" class="text-sm text-blue-600 hover:text-blue-700" (click)="addManualItem()">
+          + Add product
+        </button>
+      </div>
+      <div class="space-y-3">
+        <div
+          *ngFor="let item of manualForm().items; let i = index"
+          class="rounded-lg border border-blue-900/15 bg-white/90 p-3 dark:border-slate-800 dark:bg-slate-950/70"
+        >
+          <div class="grid gap-3 md:grid-cols-[minmax(0,3fr)_minmax(0,1fr)_auto] md:items-end">
+            <div class="grid gap-2">
+              <label class="form-label" [for]="'manual-product-' + i">Product</label>
+              <select
+                class="form-input"
+                [id]="'manual-product-' + i"
+                [ngModel]="item.productUuid"
+                (ngModelChange)="updateManualItemProduct(i, $event)"
+                [name]="'manualProduct' + i"
+              >
+                <option value="">Select a product</option>
+                <option *ngFor="let product of manualProducts()" [value]="product.uuid">
+                  {{ product.title }} &middot; {{ formatCurrency(product.priceCents ?? 0, product.currency ?? 'USD') }}
+                </option>
+              </select>
+            </div>
+            <div class="grid gap-2">
+              <label class="form-label" [for]="'manual-quantity-' + i">Quantity</label>
+              <input
+                type="number"
+                min="1"
+                class="form-input"
+                [id]="'manual-quantity-' + i"
+                [ngModel]="item.quantity"
+                (ngModelChange)="updateManualItemQuantity(i, $event)"
+                [name]="'manualQuantity' + i"
+              />
+            </div>
+            <div class="flex items-center justify-end pt-5 md:pt-0">
+              <button
+                type="button"
+                class="text-xs text-rose-500 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
+                (click)="removeManualItem(i)"
+                [disabled]="manualForm().items.length === 1"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-2">
+      <label class="form-label" for="manual-shipping-address">Shipping address</label>
+      <textarea
+        id="manual-shipping-address"
+        class="form-input"
+        rows="2"
+        [ngModel]="manualForm().shippingAddress"
+        (ngModelChange)="updateManualShippingAddress($event)"
+        name="manualShippingAddress"
+        placeholder="Optional shipping details"
+      ></textarea>
+    </div>
+
+    <div class="grid gap-2 md:grid-cols-2">
+      <div class="grid gap-2">
+        <label class="form-label" for="manual-discount">Discount code</label>
+        <input
+          id="manual-discount"
+          class="form-input uppercase"
+          [ngModel]="manualForm().discountCode"
+          (ngModelChange)="updateManualDiscountCode($event)"
+          name="manualDiscount"
+          placeholder="Optional"
+        />
+      </div>
+      <div class="grid gap-2">
+        <label class="form-label" for="manual-gift-card">Gift card code</label>
+        <input
+          id="manual-gift-card"
+          class="form-input uppercase"
+          [ngModel]="manualForm().giftCardCode"
+          (ngModelChange)="updateManualGiftCardCode($event)"
+          name="manualGiftCard"
+          placeholder="Optional"
+        />
+      </div>
+    </div>
+
+    <div class="rounded-lg bg-blue-50/70 px-3 py-2 text-sm text-blue-900 dark:bg-slate-900/60 dark:text-slate-200">
+      Estimated subtotal:
+      <strong>
+        {{ formatCurrency(manualSubtotalCents() ?? 0, manualCurrency() || 'USD') }}
+      </strong>
+    </div>
+
+    <div class="flex items-center justify-end gap-2 pt-2">
+      <button type="button" class="rounded-full border px-4 py-2 text-sm" (click)="closeManual()">Cancel</button>
+      <button
+        type="submit"
+        class="btn btn-primary rounded-full px-5"
+        [disabled]="manualBusy() || manualOptionsLoading()"
+      >
+        {{ manualBusy() ? 'Creating…' : 'Create order' }}
+      </button>
+    </div>
+  </form>
+  <p *ngIf="manualBusy()" class="pt-2 text-sm text-slate-500 dark:text-slate-300">Creating order.</p>
+</app-modal>
 
 <app-modal
   [open]="editModalOpen()"

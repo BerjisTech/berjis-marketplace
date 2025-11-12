@@ -56,6 +56,125 @@
 
   <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70">
     <div class="border-b border-blue-900/10 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
+      <div>
+        <div class="text-sm font-medium text-blue-900 dark:text-white">Issue new gift card</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Leave the code blank to auto generate a secure code.</div>
+      </div>
+      <button
+        class="rounded-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2"
+        type="button"
+        (click)="toggleCreateForm()"
+      >
+        {{ showCreateForm() ? 'Hide form' : 'New gift card' }}
+      </button>
+    </div>
+    <form *ngIf="showCreateForm()" class="px-4 py-4 space-y-4" (ngSubmit)="submitGiftCard()">
+      <div class="grid gap-4 md:grid-cols-2">
+        <div class="space-y-2">
+          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Code</label>
+          <div class="flex gap-2">
+            <input
+              name="code"
+              [(ngModel)]="giftCardForm.code"
+              class="flex-1 rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Leave blank to auto generate"
+            />
+            <button
+              class="rounded-md border border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white text-xs font-semibold px-3 py-2"
+              type="button"
+              (click)="generateNewCode()"
+            >
+              Generate
+            </button>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Amount ({{ giftCardForm.currency }})</label>
+          <input
+            name="amount"
+            type="number"
+            min="0.01"
+            step="0.01"
+            required
+            [(ngModel)]="giftCardForm.amount"
+            class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="e.g. 50.00"
+          />
+        </div>
+        <div class="space-y-2">
+          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Currency</label>
+          <input
+            name="currency"
+            [(ngModel)]="giftCardForm.currency"
+            class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 uppercase"
+            placeholder="USD"
+          />
+        </div>
+        <div class="space-y-2">
+          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Issued to (email)</label>
+          <input
+            name="issuedToEmail"
+            type="email"
+            [(ngModel)]="giftCardForm.issuedToEmail"
+            class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="customer@example.com"
+          />
+        </div>
+        <div class="space-y-2">
+          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Status</label>
+          <select
+            name="status"
+            [(ngModel)]="giftCardForm.status"
+            class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            <option *ngFor="let status of cardStatusOptions" [value]="status">{{ status }}</option>
+          </select>
+        </div>
+        <div class="space-y-2">
+          <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Expires on</label>
+          <input
+            name="expiresOn"
+            type="date"
+            [(ngModel)]="giftCardForm.expiresOn"
+            class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+      </div>
+      <div class="space-y-2">
+        <label class="block text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">Note</label>
+        <textarea
+          name="note"
+          rows="3"
+          [(ngModel)]="giftCardForm.note"
+          class="w-full rounded-lg border border-blue-900/20 dark:border-slate-700 bg-white/90 dark:bg-slate-900/70 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="Internal note for this gift card (optional)"
+        ></textarea>
+      </div>
+      <div *ngIf="createError()" class="text-sm text-rose-500">{{ createError() }}</div>
+      <div *ngIf="createSuccess()" class="text-sm text-emerald-600 dark:text-emerald-400">
+        {{ createSuccess() }}
+      </div>
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3 pt-2">
+        <button
+          class="rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          type="submit"
+          [disabled]="creatingGiftCard()"
+        >
+          {{ creatingGiftCard() ? 'Issuing…' : 'Issue gift card' }}
+        </button>
+        <button
+          class="text-sm text-slate-500 hover:text-slate-700 dark:text-slate-300"
+          type="button"
+          (click)="resetGiftCardForm()"
+        >
+          Reset form
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70">
+    <div class="border-b border-blue-900/10 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
       <div class="text-sm font-medium text-blue-900 dark:text-white">Issued gift cards</div>
       <div *ngIf="loadingCards()" class="text-xs text-blue-500">Loading…</div>
     </div>

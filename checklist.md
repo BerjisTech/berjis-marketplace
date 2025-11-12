@@ -75,8 +75,8 @@
 - [x] Collection sorting options
 
 ### Gift Cards
-- [ ] Gift card creation
-- [ ] Gift card code generation
+- [x] Gift card creation
+- [x] Gift card code generation
 - [x] Gift card balance tracking
 - [x] Gift card redemption
 
@@ -85,10 +85,10 @@
 ## 3. Order Management
 
 ### Order Processing
-- [ ] Order creation (manual and automatic)
-- [ ] Order status workflow (pending, processing, shipped, delivered, cancelled)
-- [ ] Order editing capabilities
-- [ ] Order cancellation
+- [x] Order creation (manual and automatic)
+- [x] Order status workflow (pending, processing, shipped, delivered, cancelled)
+- [x] Order editing capabilities
+- [x] Order cancellation
 - [ ] Refund processing
 - [ ] Partial refunds
 - [ ] Order notes/comments

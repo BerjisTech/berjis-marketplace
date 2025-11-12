@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"crypto/rand"
 	"database/sql"
 	"encoding/csv"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"io"
 	"log"
 	"math"
+	"math/big"
 	"net/http"
 	"net/mail"
 	"os"
@@ -426,6 +428,7 @@ type ShopOrder struct {
 	ShippingCarrier *string    `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
 	ShippedAt       *time.Time `db:"shipped_at" json:"shippedAt,omitempty"`
 	DeliveredAt     *time.Time `db:"delivered_at" json:"deliveredAt,omitempty"`
+	CancelledAt     *time.Time `db:"cancelled_at" json:"cancelledAt,omitempty"`
 	CustomerUUID    *uuid.UUID `db:"customer_uuid" json:"customerUuid,omitempty"`
 	CustomerEmail   string     `db:"customer_email" json:"customerEmail"`
 	CustomerName    string     `db:"customer_name" json:"customerName"`
@@ -3473,9 +3476,22 @@ func New(opts Options) *fiber.App {
 		if err := c.BodyParser(&body); err != nil {
 			return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
 		}
-		code := strings.ToUpper(strings.TrimSpace(body.Code))
+		code := normalizeGiftCardCode(body.Code)
 		if code == "" {
-			return c.Status(400).JSON(fiber.Map{"success": false, "message": "code is required"})
+			generated, err := generateUniqueGiftCardCode(opts.DB, shop.UUID)
+			if err != nil {
+				log.Printf("gift card code generation failed: %v", err)
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "could not generate gift card code"})
+			}
+			code = generated
+		} else {
+			exists, err := giftCardCodeExists(opts.DB, shop.UUID, code)
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+			if exists {
+				return c.Status(fiber.StatusConflict).JSON(fiber.Map{"success": false, "message": "a gift card with that code already exists"})
+			}
 		}
 		if body.BalanceCents <= 0 {
 			return c.Status(400).JSON(fiber.Map{"success": false, "message": "balance must be greater than zero"})
@@ -3494,7 +3510,7 @@ func New(opts Options) *fiber.App {
 		if err := addGiftCardTransaction(opts.DB, id, body.BalanceCents, "issued"); err != nil {
 			log.Printf("gift card transaction error: %v", err)
 		}
-		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"uuid": id}})
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"uuid": id, "code": code}})
 	})
 
 	app.Get("/v1/my/shops/:slug/gift-cards/report", requireAuth, func(c *fiber.Ctx) error {
@@ -4131,6 +4147,243 @@ func New(opts Options) *fiber.App {
 		return c.JSON(fiber.Map{"success": true, "data": orders})
 	})
 
+	app.Post("/v1/my/shops/:slug/orders", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			CustomerUUID string `json:"customerUuid"`
+			Items        []struct {
+				ProductUUID string `json:"productUuid"`
+				Quantity    int    `json:"quantity"`
+			} `json:"items"`
+			DiscountCode    string `json:"discountCode"`
+			GiftCardCode    string `json:"giftCardCode"`
+			Status          string `json:"status"`
+			ShippingAddress string `json:"shippingAddress"`
+			PaymentMethod   string `json:"paymentMethod"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		customerID, err := uuid.Parse(strings.TrimSpace(body.CustomerUUID))
+		if err != nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid customer id"})
+		}
+		if len(body.Items) == 0 {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "at least one order item is required"})
+		}
+		type requestedItem struct {
+			ProductUUID uuid.UUID
+			Quantity    int
+		}
+		requestItems := make([]requestedItem, 0, len(body.Items))
+		for idx, item := range body.Items {
+			productID, err := uuid.Parse(strings.TrimSpace(item.ProductUUID))
+			if err != nil {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("invalid product id at position %d", idx)})
+			}
+			if item.Quantity <= 0 {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "item quantities must be greater than zero"})
+			}
+			requestItems = append(requestItems, requestedItem{
+				ProductUUID: productID,
+				Quantity:    item.Quantity,
+			})
+		}
+		var customerRow struct {
+			UserUUID *uuid.UUID `db:"user_uuid"`
+			Email    string     `db:"email"`
+		}
+		if err := opts.DB.Get(&customerRow, `SELECT user_uuid, email FROM customers WHERE uuid=$1 AND shop_uuid=$2`, customerID, shop.UUID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(404).JSON(fiber.Map{"success": false, "message": "customer not found"})
+			}
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		if customerRow.UserUUID == nil || *customerRow.UserUUID == uuid.Nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "customer must be linked to an active user account"})
+		}
+		userUUID := customerRow.UserUUID.String()
+
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+
+		type manualItem struct {
+			ProductUUID uuid.UUID
+			Quantity    int
+			PriceCents  int64
+		}
+		preparedItems := make([]manualItem, 0, len(requestItems))
+		subtotal := int64(0)
+		currency := ""
+		for _, item := range requestItems {
+			var productRow struct {
+				ShopUUID   uuid.UUID `db:"shop_uuid"`
+				PriceCents int64     `db:"price_cents"`
+				Currency   string    `db:"currency"`
+			}
+			if err := tx.Get(&productRow, `SELECT shop_uuid, price_cents, currency FROM products WHERE uuid=$1 AND deleted_at IS NULL`, item.ProductUUID); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return c.Status(404).JSON(fiber.Map{"success": false, "message": "product not found"})
+				}
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+			if productRow.ShopUUID != shop.UUID {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "product does not belong to this shop"})
+			}
+			if currency == "" {
+				currency = productRow.Currency
+			} else if !strings.EqualFold(currency, productRow.Currency) {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "all items must use the same currency"})
+			}
+			if item.Quantity <= 0 {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "item quantities must be greater than zero"})
+			}
+			lineSubtotal := int64(item.Quantity) * productRow.PriceCents
+			subtotal += lineSubtotal
+			preparedItems = append(preparedItems, manualItem{
+				ProductUUID: item.ProductUUID,
+				Quantity:    item.Quantity,
+				PriceCents:  productRow.PriceCents,
+			})
+		}
+		if subtotal <= 0 {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "order subtotal must be greater than zero"})
+		}
+
+		var discount *Discount
+		var discountAmount int64
+		var discountCodeStored *string
+		discountCode := strings.TrimSpace(body.DiscountCode)
+		if discountCode != "" {
+			disc, amount, err := applyDiscountInTx(tx, discountCode, shop.UUID, userUUID, subtotal)
+			if err != nil {
+				return respondWithError(c, err)
+			}
+			if disc != nil && amount > 0 {
+				discount = disc
+				discountAmount = amount
+				code := strings.ToUpper(strings.TrimSpace(disc.Code))
+				discountCodeStored = &code
+			}
+		}
+
+		remaining := subtotal - discountAmount
+		if remaining < 0 {
+			remaining = 0
+		}
+
+		var giftCard *GiftCard
+		var giftCardAmount int64
+		var giftCardCodeStored *string
+		giftCardCode := strings.TrimSpace(body.GiftCardCode)
+		if giftCardCode != "" {
+			card, amount, err := applyGiftCardInTx(tx, giftCardCode, shop.UUID, remaining)
+			if err != nil {
+				return respondWithError(c, err)
+			}
+			if card != nil && amount > 0 {
+				giftCard = card
+				giftCardAmount = amount
+				if giftCardAmount > remaining {
+					giftCardAmount = remaining
+				}
+				remaining -= giftCardAmount
+				if remaining < 0 {
+					remaining = 0
+				}
+				code := strings.ToUpper(strings.TrimSpace(card.Code))
+				giftCardCodeStored = &code
+			}
+		}
+
+		total := remaining
+		status := normalizeOrderStatus(body.Status)
+
+		orderID := uuid.New()
+		var discountUUIDValue any
+		if discount != nil {
+			discountUUIDValue = discount.UUID
+		}
+		var giftCardUUIDValue any
+		if giftCard != nil {
+			giftCardUUIDValue = giftCard.UUID
+		}
+		shippingAddress := strings.TrimSpace(body.ShippingAddress)
+		var shippingAddressValue any
+		if shippingAddress != "" {
+			shippingAddressValue = shippingAddress
+		}
+		paymentMethod := strings.TrimSpace(body.PaymentMethod)
+		var paymentMethodValue any
+		if paymentMethod != "" {
+			paymentMethodValue = paymentMethod
+		}
+
+		if _, err := tx.Exec(`INSERT INTO orders(uuid, user_uuid, shop_uuid, subtotal_cents, total_cents, currency, status, discount_uuid, discount_code, discount_amount_cents, gift_card_uuid, gift_card_code, gift_card_amount_cents, shipping_address, payment_method)
+                              VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+			orderID,
+			*customerRow.UserUUID,
+			shop.UUID,
+			subtotal,
+			total,
+			currency,
+			status,
+			discountUUIDValue,
+			discountCodeStored,
+			discountAmount,
+			giftCardUUIDValue,
+			giftCardCodeStored,
+			giftCardAmount,
+			shippingAddressValue,
+			paymentMethodValue); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		for _, item := range preparedItems {
+			if _, err := tx.Exec(`INSERT INTO order_items(order_uuid, product_uuid, quantity, price_cents) VALUES($1,$2,$3,$4)`,
+				orderID, item.ProductUUID, item.Quantity, item.PriceCents); err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+		}
+
+		if discount != nil && discountAmount > 0 {
+			if _, err := tx.Exec(`INSERT INTO discount_redemptions(uuid, discount_uuid, order_uuid, user_uuid, shop_uuid, amount_cents)
+                                   VALUES($1,$2,$3,$4,$5,$6)`,
+				uuid.New(), discount.UUID, orderID, *customerRow.UserUUID, shop.UUID, discountAmount); err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+		}
+
+		if giftCard != nil && giftCardAmount > 0 {
+			if err := redeemGiftCard(tx, giftCard, giftCardAmount); err != nil {
+				return respondWithError(c, err)
+			}
+		}
+
+		if err := tx.Commit(); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
+			"uuid":                orderID,
+			"subtotalCents":       subtotal,
+			"discountAmountCents": discountAmount,
+			"giftCardAmountCents": giftCardAmount,
+			"totalCents":          total,
+			"currency":            currency,
+		}})
+	})
+
 	app.Get("/v1/my/shops/:slug/orders", requireAuth, func(c *fiber.Ctx) error {
 		slug := c.Params("slug")
 		shop, role, err := ensureShopAccess(c, opts.DB, slug)
@@ -4152,6 +4405,7 @@ func New(opts Options) *fiber.App {
                                                   o.shipping_carrier,
                                                   o.shipped_at,
                                                   o.delivered_at,
+                                                  o.cancelled_at,
                                                   c.uuid AS customer_uuid,
                                                   COALESCE(c.email,'') AS customer_email,
                                                   TRIM(BOTH ' ' FROM COALESCE(c.first_name,'') || ' ' || COALESCE(c.last_name,'')) AS customer_name
@@ -4160,7 +4414,7 @@ func New(opts Options) *fiber.App {
                                            JOIN products p ON p.uuid=oi.product_uuid
                                            LEFT JOIN customers c ON c.shop_uuid=p.shop_uuid AND c.user_uuid=o.user_uuid
                                            WHERE p.shop_uuid=$1
-                                           GROUP BY o.uuid, o.currency, o.status, o.created_at, o.updated_at, o.tracking_number, o.tracking_url, o.shipping_carrier, o.shipped_at, o.delivered_at, c.uuid, c.email, c.first_name, c.last_name
+                                           GROUP BY o.uuid, o.currency, o.status, o.created_at, o.updated_at, o.tracking_number, o.tracking_url, o.shipping_carrier, o.shipped_at, o.delivered_at, o.cancelled_at, c.uuid, c.email, c.first_name, c.last_name
                                            ORDER BY o.created_at DESC
                                            LIMIT 200`, shop.UUID); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
@@ -4330,6 +4584,81 @@ func New(opts Options) *fiber.App {
 		if affected, _ := res.RowsAffected(); affected == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "not found"})
 		}
+		return c.JSON(fiber.Map{"success": true})
+	})
+
+	app.Post("/v1/orders/:id/cancel", requireAuth, func(c *fiber.Ctx) error {
+		orderParam := strings.TrimSpace(c.Params("id"))
+		if orderParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		orderID, err := uuid.Parse(orderParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+
+		var row struct {
+			Status         string     `db:"status"`
+			DiscountUUID   *uuid.UUID `db:"discount_uuid"`
+			DiscountAmount int64      `db:"discount_amount_cents"`
+			GiftCardUUID   *uuid.UUID `db:"gift_card_uuid"`
+			GiftCardAmount int64      `db:"gift_card_amount_cents"`
+			GiftCardCode   *string    `db:"gift_card_code"`
+		}
+		if err := tx.Get(&row, `SELECT status, discount_uuid, discount_amount_cents, gift_card_uuid, gift_card_amount_cents, gift_card_code
+                                FROM orders
+                                WHERE uuid=$1
+                                FOR UPDATE`, orderID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "order not found"})
+			}
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		status := strings.ToLower(strings.TrimSpace(row.Status))
+		switch status {
+		case "cancelled":
+			return c.JSON(fiber.Map{"success": true})
+		case "delivered", "shipped":
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "order can no longer be cancelled"})
+		}
+
+		if row.DiscountUUID != nil && row.DiscountAmount > 0 {
+			if _, err := tx.Exec(`DELETE FROM discount_redemptions WHERE order_uuid=$1`, orderID); err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+		}
+
+		if row.GiftCardUUID != nil && row.GiftCardAmount > 0 {
+			if err := refundGiftCard(tx, *row.GiftCardUUID, row.GiftCardAmount); err != nil {
+				return respondWithError(c, err)
+			}
+		}
+
+		if _, err := tx.Exec(`UPDATE orders SET status='cancelled', cancelled_at=now(), updated_at=now() WHERE uuid=$1`, orderID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		if err := tx.Commit(); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
 		return c.JSON(fiber.Map{"success": true})
 	})
 
@@ -4878,6 +5207,7 @@ type Order struct {
 	ShippingCarrier     *string    `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
 	ShippedAt           *time.Time `db:"shipped_at" json:"shippedAt,omitempty"`
 	DeliveredAt         *time.Time `db:"delivered_at" json:"deliveredAt,omitempty"`
+	CancelledAt         *time.Time `db:"cancelled_at" json:"cancelledAt,omitempty"`
 }
 
 var allowedTeamRoles = map[string]bool{
@@ -5609,6 +5939,59 @@ func redeemGiftCard(tx *sqlx.Tx, card *GiftCard, amount int64) error {
 	return nil
 }
 
+func refundGiftCard(tx *sqlx.Tx, cardUUID uuid.UUID, amount int64) error {
+	if amount <= 0 {
+		return nil
+	}
+	var card GiftCard
+	if err := tx.Get(&card, `SELECT uuid, balance_cents, original_balance_cents, status, redeemed_at
+                              FROM gift_cards
+                              WHERE uuid=$1
+                              FOR UPDATE`, cardUUID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fiber.NewError(fiber.StatusNotFound, "gift card not found")
+		}
+		return err
+	}
+	maxCredit := card.OriginalBalanceCents - card.BalanceCents
+	if maxCredit <= 0 {
+		return nil
+	}
+	credit := amount
+	if credit > maxCredit {
+		credit = maxCredit
+	}
+	if credit <= 0 {
+		return nil
+	}
+	newBalance := card.BalanceCents + credit
+	status := card.Status
+	if newBalance > 0 && !strings.EqualFold(status, "active") {
+		status = "active"
+	}
+	var redeemedAt any
+	if newBalance == 0 {
+		redeemedAt = card.RedeemedAt
+	} else {
+		redeemedAt = nil
+	}
+	if _, err := tx.Exec(`UPDATE gift_cards
+                           SET balance_cents=$1,
+                               status=$2,
+                               redeemed_at=$3,
+                               updated_at=now()
+                           WHERE uuid=$4`,
+		newBalance, status, redeemedAt, cardUUID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`INSERT INTO gift_card_transactions(uuid, gift_card_uuid, change_cents, reason)
+                           VALUES($1,$2,$3,$4)`,
+		uuid.New(), cardUUID, credit, "order cancellation refund"); err != nil {
+		return err
+	}
+	return nil
+}
+
 func previewCartPricing(c *fiber.Ctx, db *sqlx.DB) error {
 	user := srvAuth.UserID(c)
 	cartID, err := ensureCart(db, user)
@@ -5744,7 +6127,7 @@ func listOrders(c *fiber.Ctx, db *sqlx.DB) error {
 	user := srvAuth.UserID(c)
 	var out []Order
 	if err := db.Select(&out, `SELECT uuid,shop_uuid,subtotal_cents,total_cents,currency,status,discount_code,discount_amount_cents,gift_card_code,gift_card_amount_cents,
-                                      created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at
+                                      created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at,cancelled_at
                                FROM orders
                                WHERE user_uuid=$1
                                ORDER BY created_at DESC`, user); err != nil {
@@ -5758,9 +6141,9 @@ func getOrder(c *fiber.Ctx, db *sqlx.DB) error {
 	id := c.Params("id")
 	var o Order
 	if err := db.Get(&o, `SELECT uuid,shop_uuid,subtotal_cents,total_cents,currency,status,discount_code,discount_amount_cents,gift_card_code,gift_card_amount_cents,
-                                  created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at
-                           FROM orders
-                           WHERE uuid=$1 AND user_uuid=$2`, id, user); err != nil {
+                                  created_at,updated_at,tracking_number,tracking_url,shipping_carrier,shipped_at,delivered_at,cancelled_at
+                          FROM orders
+                          WHERE uuid=$1 AND user_uuid=$2`, id, user); err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
 	}
 	return c.JSON(fiber.Map{"success": true, "data": o})
@@ -6356,6 +6739,109 @@ func normalizeDiscountStatus(status string) string {
 	default:
 		return "draft"
 	}
+}
+
+const (
+	giftCardCodeSegments      = 4
+	giftCardCodeSegmentLength = 4
+)
+
+var giftCardCodeAlphabet = []byte("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+
+func normalizeGiftCardCode(code string) string {
+	if code == "" {
+		return ""
+	}
+	normalized := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r - ('a' - 'A')
+		case r >= 'A' && r <= 'Z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == '-':
+			return '-'
+		default:
+			return -1
+		}
+	}, code)
+	normalized = strings.Trim(normalized, "-")
+	for strings.Contains(normalized, "--") {
+		normalized = strings.ReplaceAll(normalized, "--", "-")
+	}
+	return normalized
+}
+
+func generateUniqueGiftCardCode(db *sqlx.DB, shopUUID uuid.UUID) (string, error) {
+	for attempts := 0; attempts < 10; attempts++ {
+		code, err := generateRandomGiftCardCode()
+		if err != nil {
+			return "", err
+		}
+		exists, err := giftCardCodeExists(db, shopUUID, code)
+		if err != nil {
+			return "", err
+		}
+		if !exists {
+			return code, nil
+		}
+	}
+	return "", errors.New("unable to generate a unique gift card code")
+}
+
+func giftCardCodeExists(db *sqlx.DB, shopUUID uuid.UUID, code string) (bool, error) {
+	var exists bool
+	if err := db.Get(&exists, `SELECT EXISTS(SELECT 1 FROM gift_cards WHERE shop_uuid=$1 AND code=$2)`,
+		shopUUID, code); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+func generateRandomGiftCardCode() (string, error) {
+	segments := make([]string, giftCardCodeSegments)
+	for i := 0; i < giftCardCodeSegments; i++ {
+		segment, err := generateGiftCardCodeSegment(giftCardCodeSegmentLength)
+		if err != nil {
+			return "", err
+		}
+		segments[i] = segment
+	}
+	return strings.Join(segments, "-"), nil
+}
+
+func generateGiftCardCodeSegment(length int) (string, error) {
+	if length <= 0 {
+		return "", errors.New("gift card code segment length must be positive")
+	}
+	var builder strings.Builder
+	builder.Grow(length)
+	alphabetLength := big.NewInt(int64(len(giftCardCodeAlphabet)))
+	for i := 0; i < length; i++ {
+		index, err := rand.Int(rand.Reader, alphabetLength)
+		if err != nil {
+			return "", err
+		}
+		builder.WriteByte(giftCardCodeAlphabet[index.Int64()])
+	}
+	return builder.String(), nil
+}
+
+var allowedOrderStatuses = map[string]string{
+	"pending":    "pending",
+	"processing": "processing",
+	"shipped":    "shipped",
+	"delivered":  "delivered",
+	"cancelled":  "cancelled",
+}
+
+func normalizeOrderStatus(status string) string {
+	normalized := strings.ToLower(strings.TrimSpace(status))
+	if value, ok := allowedOrderStatuses[normalized]; ok {
+		return value
+	}
+	return "pending"
 }
 
 func normalizeGiftCardStatus(status string) string {
