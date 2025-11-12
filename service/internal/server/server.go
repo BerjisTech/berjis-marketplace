@@ -776,6 +776,8 @@ func New(opts Options) *fiber.App {
 	})
 	app.Post("/v1/shops", requireAuth, func(c *fiber.Ctx) error {
 		owner := srvAuth.UserID(c)
+		userUUID := uuidPtrFromString(srvAuth.UserID(c))
+
 		var body struct {
 			Name, Slug, Description string
 			Meta                    map[string]any `json:"meta"`
@@ -4372,6 +4374,21 @@ func New(opts Options) *fiber.App {
 			}
 		}
 
+		creationMeta := map[string]any{
+			"subtotalCents": subtotal,
+			"totalCents":    total,
+			"currency":      currency,
+		}
+		if discountAmount > 0 {
+			creationMeta["discountAmountCents"] = discountAmount
+		}
+		if giftCardAmount > 0 {
+			creationMeta["giftCardAmountCents"] = giftCardAmount
+		}
+		if _, err := recordOrderEvent(tx, orderID, "order.created", "Order created manually", userUUID, creationMeta); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "failed to record order event"})
+		}
+
 		if err := tx.Commit(); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
@@ -4618,14 +4635,15 @@ func New(opts Options) *fiber.App {
 		defer tx.Rollback()
 
 		var row struct {
-			Status         string     `db:"status"`
-			DiscountUUID   *uuid.UUID `db:"discount_uuid"`
-			DiscountAmount int64      `db:"discount_amount_cents"`
-			GiftCardUUID   *uuid.UUID `db:"gift_card_uuid"`
-			GiftCardAmount int64      `db:"gift_card_amount_cents"`
-			GiftCardCode   *string    `db:"gift_card_code"`
+			Status           string     `db:"status"`
+			DiscountUUID     *uuid.UUID `db:"discount_uuid"`
+			DiscountAmount   int64      `db:"discount_amount_cents"`
+			GiftCardUUID     *uuid.UUID `db:"gift_card_uuid"`
+			GiftCardAmount   int64      `db:"gift_card_amount_cents"`
+			GiftCardCode     *string    `db:"gift_card_code"`
+			RefundTotalCents int64      `db:"refund_total_cents"`
 		}
-		if err := tx.Get(&row, `SELECT status, discount_uuid, discount_amount_cents, gift_card_uuid, gift_card_amount_cents, gift_card_code
+		if err := tx.Get(&row, `SELECT status, discount_uuid, discount_amount_cents, gift_card_uuid, gift_card_amount_cents, gift_card_code, refund_total_cents
                                 FROM orders
                                 WHERE uuid=$1
                                 FOR UPDATE`, orderID); err != nil {
@@ -4642,6 +4660,9 @@ func New(opts Options) *fiber.App {
 		case "delivered", "shipped":
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "order can no longer be cancelled"})
 		}
+		if row.RefundTotalCents > 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "order has refunds applied"})
+		}
 
 		if row.DiscountUUID != nil && row.DiscountAmount > 0 {
 			if _, err := tx.Exec(`DELETE FROM discount_redemptions WHERE order_uuid=$1`, orderID); err != nil {
@@ -4657,6 +4678,11 @@ func New(opts Options) *fiber.App {
 
 		if _, err := tx.Exec(`UPDATE orders SET status='cancelled', cancelled_at=now(), updated_at=now() WHERE uuid=$1`, orderID); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		userUUID := uuidPtrFromString(srvAuth.UserID(c))
+		if _, err := recordOrderEvent(tx, orderID, "order.cancelled", "Order cancelled", userUUID, nil); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "failed to record order event"})
 		}
 
 		if err := tx.Commit(); err != nil {
@@ -4725,8 +4751,8 @@ func New(opts Options) *fiber.App {
 		}
 
 		status := strings.ToLower(strings.TrimSpace(row.Status))
-		if status == "cancelled" || status == "refunded" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "order already closed"})
+		if status == "cancelled" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "cancelled orders cannot be refunded"})
 		}
 
 		refundable := row.TotalCents - row.RefundTotalCents
@@ -4735,11 +4761,11 @@ func New(opts Options) *fiber.App {
 		}
 
 		amount := body.AmountCents
-		if amount == 0 {
+		if amount <= 0 {
 			amount = refundable
 		}
-		if amount <= 0 || amount != refundable {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "only full refunds are supported"})
+		if amount <= 0 || amount > refundable {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid refund amount"})
 		}
 
 		if row.DiscountUUID != nil && row.DiscountAmount > 0 {
@@ -4748,10 +4774,25 @@ func New(opts Options) *fiber.App {
 			}
 		}
 
-		if row.GiftCardUUID != nil && row.GiftCardAmount > 0 {
-			giftCardRefund := row.GiftCardAmount
-			if giftCardRefund > amount {
-				giftCardRefund = amount
+		giftCardRefund := int64(0)
+		if row.GiftCardUUID != nil {
+			var giftCardSums struct {
+				Amount int64 `db:"gift_card_refunded"`
+			}
+			if err := tx.Get(&giftCardSums, `SELECT COALESCE(SUM(gift_card_amount_cents),0) AS gift_card_refunded
+			                                 FROM order_refunds WHERE order_uuid=$1`, orderID); err != nil {
+				return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+			}
+			remainingGiftCard := row.GiftCardAmount - giftCardSums.Amount
+			if remainingGiftCard < 0 {
+				remainingGiftCard = 0
+			}
+			if remainingGiftCard > 0 {
+				if amount < remainingGiftCard {
+					giftCardRefund = amount
+				} else {
+					giftCardRefund = remainingGiftCard
+				}
 			}
 			if giftCardRefund > 0 {
 				if err := refundGiftCard(tx, *row.GiftCardUUID, giftCardRefund); err != nil {
@@ -4760,31 +4801,134 @@ func New(opts Options) *fiber.App {
 			}
 		}
 
-		processedBy := srvAuth.UserID(c)
-		var processedUUID *uuid.UUID
-		if parsed, err := uuid.Parse(processedBy); err == nil {
-			processedUUID = &parsed
-		}
-		if _, err := tx.Exec(`INSERT INTO order_refunds(uuid, order_uuid, amount_cents, reason, processed_by)
-                               VALUES($1,$2,$3,$4,$5)`,
-			uuid.New(), orderID, amount, reason, processedUUID); err != nil {
+		processedUUID := uuidPtrFromString(srvAuth.UserID(c))
+
+		if _, err := tx.Exec(`INSERT INTO order_refunds(uuid, order_uuid, amount_cents, gift_card_amount_cents, discount_amount_cents, reason, processed_by)
+                               VALUES($1,$2,$3,$4,$5,$6,$7)`,
+			uuid.New(), orderID, amount, giftCardRefund, int64(0), reason, processedUUID); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 
+		newRefundTotal := row.RefundTotalCents + amount
+		newStatus := status
+		if newRefundTotal >= row.TotalCents {
+			newStatus = "refunded"
+		} else if newRefundTotal > 0 {
+			newStatus = "partially_refunded"
+		}
 		if _, err := tx.Exec(`UPDATE orders
-                              SET status='refunded',
-                                  refund_total_cents=refund_total_cents + $2,
-                                  refunded_at=now(),
+                              SET status=$2,
+                                  refund_total_cents=$3,
+                                  refunded_at=CASE WHEN $2='refunded' THEN now() ELSE refunded_at END,
                                   updated_at=now()
-                              WHERE uuid=$1`, orderID, amount); err != nil {
+                              WHERE uuid=$1`, orderID, newStatus, newRefundTotal); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		eventMeta := map[string]any{
+			"amountCents":      amount,
+			"refundTotalCents": newRefundTotal,
+			"reason":           reason,
+			"status":           newStatus,
+		}
+		if giftCardRefund > 0 {
+			eventMeta["giftCardAmountCents"] = giftCardRefund
+		}
+		if _, err := recordOrderEvent(tx, orderID, "order.refunded", fmt.Sprintf("Refunded %s", formatCents(amount)), processedUUID, eventMeta); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "failed to record order event"})
 		}
 
 		if err := tx.Commit(); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 
-		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"amountCents": amount}})
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
+			"amountCents":      amount,
+			"refundTotalCents": newRefundTotal,
+			"status":           newStatus,
+		}})
+	})
+
+	app.Get("/v1/orders/:id/events", requireAuth, func(c *fiber.Ctx) error {
+		orderParam := strings.TrimSpace(c.Params("id"))
+		if orderParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		orderID, err := uuid.Parse(orderParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		events, err := fetchOrderEvents(opts.DB, orderID)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": events})
+	})
+
+	app.Post("/v1/orders/:id/notes", requireAuth, func(c *fiber.Ctx) error {
+		orderParam := strings.TrimSpace(c.Params("id"))
+		if orderParam == "" {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		orderID, err := uuid.Parse(orderParam)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		_, role, err := ensureShopAccess(c, opts.DB, meta.ShopSlug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			Message string `json:"message"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		message := strings.TrimSpace(body.Message)
+		if message == "" {
+			return c.Status(400).JSON(fiber.Map{"success": false, "message": "message is required"})
+		}
+
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+
+		eventID, err := recordOrderEvent(tx, orderID, "order.note", message, uuidPtrFromString(srvAuth.UserID(c)), nil)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "failed to record order event"})
+		}
+
+		if err := tx.Commit(); err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		event, err := fetchOrderEventByID(opts.DB, eventID)
+		if err != nil {
+			// Event recorded but fetch failed; return success without payload.
+			return c.JSON(fiber.Map{"success": true})
+		}
+
+		return c.JSON(fiber.Map{"success": true, "data": event})
 	})
 
 	app.Get("/v1/invitations/:token", func(c *fiber.Ctx) error {
@@ -5337,6 +5481,16 @@ type Order struct {
 	CancelledAt         *time.Time `db:"cancelled_at" json:"cancelledAt,omitempty"`
 }
 
+type OrderEvent struct {
+	UUID      uuid.UUID       `db:"uuid" json:"uuid"`
+	OrderUUID uuid.UUID       `db:"order_uuid" json:"orderUuid"`
+	EventType string          `db:"event_type" json:"eventType"`
+	Message   string          `db:"message" json:"message"`
+	Metadata  json.RawMessage `db:"metadata" json:"metadata,omitempty"`
+	CreatedBy *uuid.UUID      `db:"created_by" json:"createdBy,omitempty"`
+	CreatedAt time.Time       `db:"created_at" json:"createdAt"`
+}
+
 var allowedTeamRoles = map[string]bool{
 	"manager": true,
 	"staff":   true,
@@ -5695,6 +5849,7 @@ func clearCart(c *fiber.Ctx, db *sqlx.DB) error {
 
 func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 	user := srvAuth.UserID(c)
+	userUUID := uuidPtrFromString(user)
 	cartID, err := ensureCart(db, user)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
@@ -5834,6 +5989,21 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 		if err := redeemGiftCard(tx, giftCard, giftCardAmount); err != nil {
 			return respondWithError(c, err)
 		}
+	}
+
+	creationMeta := map[string]any{
+		"subtotalCents": subtotal,
+		"totalCents":    total,
+		"currency":      currency,
+	}
+	if discountAmount > 0 {
+		creationMeta["discountAmountCents"] = discountAmount
+	}
+	if giftCardAmount > 0 {
+		creationMeta["giftCardAmountCents"] = giftCardAmount
+	}
+	if _, err := recordOrderEvent(tx, orderID, "order.created", "Order created from checkout", userUUID, creationMeta); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "failed to record order event"})
 	}
 
 	if _, err := tx.Exec(`DELETE FROM cart_items WHERE cart_uuid=$1`, cartID); err != nil {
@@ -6962,6 +7132,7 @@ var allowedOrderStatuses = map[string]string{
 	"delivered":  "delivered",
 	"cancelled":  "cancelled",
 	"refunded":   "refunded",
+	"partially_refunded": "partially_refunded",
 }
 
 func normalizeOrderStatus(status string) string {
@@ -7481,11 +7652,14 @@ type orderMeta struct {
 	OrderUUID uuid.UUID `db:"uuid"`
 	ShopUUID  uuid.UUID `db:"shop_uuid"`
 	ShopSlug  string    `db:"slug"`
+	Status    string    `db:"status"`
+	TotalCents int64    `db:"total_cents"`
+	RefundTotalCents int64 `db:"refund_total_cents"`
 }
 
 func loadOrderMeta(db *sqlx.DB, id uuid.UUID) (orderMeta, error) {
 	var meta orderMeta
-	if err := db.Get(&meta, `SELECT o.uuid, s.uuid AS shop_uuid, s.slug
+	if err := db.Get(&meta, `SELECT o.uuid, s.uuid AS shop_uuid, s.slug, o.status, o.total_cents, o.refund_total_cents
                                FROM orders o
                                JOIN order_items oi ON oi.order_uuid=o.uuid
                                JOIN products p ON p.uuid=oi.product_uuid
@@ -7500,9 +7674,72 @@ func loadOrderMeta(db *sqlx.DB, id uuid.UUID) (orderMeta, error) {
 	return meta, nil
 }
 
+func uuidPtrFromString(value string) *uuid.UUID {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	id, err := uuid.Parse(value)
+	if err != nil {
+		return nil
+	}
+	return &id
+}
+
+func recordOrderEvent(ext sqlx.Ext, order uuid.UUID, eventType, message string, createdBy *uuid.UUID, metadata map[string]any) (uuid.UUID, error) {
+	eventType = strings.TrimSpace(eventType)
+	if eventType == "" {
+		return uuid.Nil, errors.New("event type required")
+	}
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return uuid.Nil, errors.New("event message required")
+	}
+	var metaJSON any
+	if metadata != nil {
+		buf, err := json.Marshal(metadata)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		metaJSON = buf
+	}
+	eventID := uuid.New()
+	if _, err := ext.Exec(`INSERT INTO order_events(uuid, order_uuid, event_type, message, metadata, created_by)
+                           VALUES($1,$2,$3,$4,$5,$6)`,
+		eventID, order, eventType, message, metaJSON, createdBy); err != nil {
+		return uuid.Nil, err
+	}
+	return eventID, nil
+}
+
+func fetchOrderEvents(db *sqlx.DB, order uuid.UUID) ([]OrderEvent, error) {
+	var events []OrderEvent
+	if err := db.Select(&events, `SELECT uuid, order_uuid, event_type, message, metadata, created_by, created_at
+                                   FROM order_events
+                                   WHERE order_uuid=$1
+                                   ORDER BY created_at ASC`, order); err != nil {
+		return nil, err
+	}
+	return events, nil
+}
+
+func fetchOrderEventByID(db *sqlx.DB, id uuid.UUID) (OrderEvent, error) {
+	var event OrderEvent
+	if err := db.Get(&event, `SELECT uuid, order_uuid, event_type, message, metadata, created_by, created_at
+                               FROM order_events
+                               WHERE uuid=$1`, id); err != nil {
+		return OrderEvent{}, err
+	}
+	return event, nil
+}
+
+func formatCents(amount int64) string {
+	return fmt.Sprintf("$%.2f", float64(amount)/100)
+}
+
 func isValidOrderStatus(status string) bool {
 	switch strings.ToLower(status) {
-	case "pending", "processing", "shipped", "delivered", "cancelled", "refunded":
+	case "pending", "processing", "shipped", "delivered", "cancelled", "refunded", "partially_refunded":
 		return true
 	default:
 		return false

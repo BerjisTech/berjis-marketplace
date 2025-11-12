@@ -68,6 +68,16 @@ export interface ShopOrder {
   customerName: string;
 }
 
+export interface OrderTimelineEvent {
+  uuid: string;
+  orderUuid: string;
+  eventType: string;
+  message: string;
+  metadata?: unknown;
+  createdBy?: string;
+  createdAt: string;
+}
+
 export interface UpdateTrackingPayload {
   status?: string;
   trackingNumber?: string;
@@ -147,6 +157,21 @@ export class OrderService {
   getShopMetrics(shopSlug: string): Observable<ApiResponse<ShopMetrics>> {
     return this.http.get<ApiResponse<ShopMetrics>>(
       `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/metrics`,
+      { withCredentials: true },
+    );
+  }
+
+  timeline(orderUuid: string): Observable<ApiResponse<OrderTimelineEvent[]>> {
+    return this.http.get<ApiResponse<OrderTimelineEvent[]>>(
+      `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/events`,
+      { withCredentials: true },
+    );
+  }
+
+  addNote(orderUuid: string, message: string): Observable<ApiResponse<OrderTimelineEvent>> {
+    return this.http.post<ApiResponse<OrderTimelineEvent>>(
+      `${this.api}/v1/orders/${encodeURIComponent(orderUuid)}/notes`,
+      { message },
       { withCredentials: true },
     );
   }

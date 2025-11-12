@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import {
   CreateManualOrderPayload,
   OrderService,
+  OrderTimelineEvent,
   ShopMetrics,
   ShopOrder,
   UpdateTrackingPayload,
@@ -63,6 +64,12 @@ export class OrdersOverviewPageComponent implements OnInit {
   readonly manualCurrency = computed(() => this.manualSummary().currency);
   readonly cancellingOrder = signal<string>('');
   readonly refundingOrder = signal<string>('');
+  readonly timelineModalOpen = signal<boolean>(false);
+  readonly timelineOrder = signal<ShopOrder | null>(null);
+  readonly timelineEvents = signal<OrderTimelineEvent[]>([]);
+  readonly timelineLoading = signal<boolean>(false);
+  readonly timelineError = signal<string>('');
+  noteMessage = '';
 
   readonly filteredOrders = computed(() => {
     const orders = this.orders();
@@ -117,8 +124,16 @@ export class OrdersOverviewPageComponent implements OnInit {
     this.error.set('');
     this.ordersService.listShopOrders(slug).subscribe({
       next: (response) => {
-        this.orders.set(response?.data ?? []);
+        const data = response?.data ?? [];
+        this.orders.set(data);
         this.loading.set(false);
+        const current = this.timelineOrder();
+        if (current) {
+          const updated = data.find((order) => order.uuid === current.uuid);
+          if (updated) {
+            this.timelineOrder.set(updated);
+          }
+        }
       },
       error: () => {
         this.loading.set(false);
@@ -205,6 +220,12 @@ export class OrdersOverviewPageComponent implements OnInit {
     });
   }
 
+  remainingRefundCents(order: ShopOrder): number {
+    const total = order?.totalCents ?? 0;
+    const refunded = order?.refundTotalCents ?? 0;
+    return Math.max(0, total - refunded);
+  }
+
   canEdit(order: ShopOrder): boolean {
     const status = order.status?.toLowerCase();
     return status !== 'cancelled' && status !== 'refunded';
@@ -233,6 +254,9 @@ export class OrdersOverviewPageComponent implements OnInit {
         this.cancellingOrder.set('');
         this.message.set('Order cancelled.');
         this.loadOrders();
+        if (this.timelineOrder()?.uuid === order.uuid) {
+          this.loadTimeline(order.uuid);
+        }
       },
       error: () => {
         this.cancellingOrder.set('');
@@ -243,33 +267,112 @@ export class OrdersOverviewPageComponent implements OnInit {
 
   canRefund(order: ShopOrder): boolean {
     const status = order.status?.toLowerCase();
-    return status !== 'cancelled' && status !== 'refunded';
+    return status !== 'cancelled' && this.remainingRefundCents(order) > 0;
   }
 
   refundOrder(order: ShopOrder): void {
     if (!this.canRefund(order) || this.refundingOrder()) {
       return;
     }
-    const confirmed = window.confirm(
-      'Refund this order? Only full refunds are supported and the sale will be marked as refunded.',
+    const remainingCents = this.remainingRefundCents(order);
+    const currency = order.currency ?? 'USD';
+    let amountCents = remainingCents;
+    const promptDefault = (remainingCents / 100).toFixed(2);
+    const input = window.prompt(
+      `Enter refund amount (${this.formatCurrency(remainingCents, currency)} available). Leave blank for a full refund.`,
+      promptDefault,
     );
-    if (!confirmed) {
+    if (input !== null) {
+      const trimmed = input.trim();
+      if (trimmed !== '') {
+        const parsed = Number.parseFloat(trimmed);
+        if (!Number.isFinite(parsed) || parsed <= 0) {
+          this.error.set('Invalid refund amount.');
+          return;
+        }
+        amountCents = Math.round(parsed * 100);
+      }
+    }
+    if (amountCents <= 0 || amountCents > remainingCents) {
+      this.error.set('Invalid refund amount.');
       return;
     }
     this.message.set('');
     this.error.set('');
     this.refundingOrder.set(order.uuid);
-    this.ordersService.refundOrder(order.uuid).subscribe({
+    this.ordersService.refundOrder(order.uuid, { amountCents, reason: 'Manual refund' }).subscribe({
       next: () => {
         this.refundingOrder.set('');
         this.message.set('Order refunded.');
         this.loadOrders();
+        if (this.timelineOrder()?.uuid === order.uuid) {
+          this.loadTimeline(order.uuid);
+        }
       },
       error: () => {
         this.refundingOrder.set('');
         this.error.set('Could not refund order.');
       },
     });
+  }
+
+  openTimeline(order: ShopOrder): void {
+    this.timelineOrder.set(order);
+    this.timelineModalOpen.set(true);
+    this.timelineError.set('');
+    this.noteMessage = '';
+    this.timelineEvents.set([]);
+    this.loadTimeline(order.uuid);
+  }
+
+  closeTimeline(): void {
+    this.timelineModalOpen.set(false);
+    this.timelineOrder.set(null);
+    this.timelineEvents.set([]);
+    this.timelineLoading.set(false);
+    this.timelineError.set('');
+    this.noteMessage = '';
+  }
+
+  loadTimeline(orderUuid: string): void {
+    this.timelineLoading.set(true);
+    this.timelineError.set('');
+    this.ordersService.timeline(orderUuid).subscribe({
+      next: (response) => {
+        this.timelineEvents.set(response?.data ?? []);
+        this.timelineLoading.set(false);
+      },
+      error: () => {
+        this.timelineLoading.set(false);
+        this.timelineError.set('Unable to load order timeline.');
+      },
+    });
+  }
+
+  submitNote(): void {
+    const order = this.timelineOrder();
+    if (!order) {
+      return;
+    }
+    const message = this.noteMessage.trim();
+    if (!message) {
+      this.timelineError.set('Please enter a note.');
+      return;
+    }
+    this.timelineError.set('');
+    this.ordersService.addNote(order.uuid, message).subscribe({
+      next: () => {
+        this.noteMessage = '';
+        this.loadTimeline(order.uuid);
+      },
+      error: () => {
+        this.timelineError.set('Could not add note.');
+      },
+    });
+  }
+
+  trackTimelineEventBy(_index: number, event: OrderTimelineEvent): string {
+    return event.uuid;
   }
 
   openManual(): void {
