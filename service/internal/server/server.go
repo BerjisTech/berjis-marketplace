@@ -434,6 +434,22 @@ type ShopOrder struct {
 	CustomerUUID     *uuid.UUID `db:"customer_uuid" json:"customerUuid,omitempty"`
 	CustomerEmail    string     `db:"customer_email" json:"customerEmail"`
 	CustomerName     string     `db:"customer_name" json:"customerName"`
+	DraftSourceUUID  *uuid.UUID `db:"draft_source_uuid" json:"draftSourceUuid,omitempty"`
+}
+
+type AbandonedCheckout struct {
+	CartUUID       uuid.UUID  `db:"cart_uuid" json:"cartUuid"`
+	UserUUID       uuid.UUID  `db:"user_uuid" json:"userUuid"`
+	ShopUUID       uuid.UUID  `db:"shop_uuid" json:"shopUuid"`
+	CustomerUUID   *uuid.UUID `db:"customer_uuid" json:"customerUuid,omitempty"`
+	CustomerEmail  string     `db:"customer_email" json:"customerEmail"`
+	CustomerName   string     `db:"customer_name" json:"customerName"`
+	ItemCount      int        `db:"item_count" json:"itemCount"`
+	SubtotalCents  int64      `db:"subtotal_cents" json:"subtotalCents"`
+	Currency       string     `db:"currency" json:"currency"`
+	FirstAddedAt   *time.Time `db:"first_added_at" json:"firstAddedAt,omitempty"`
+	LastAddedAt    *time.Time `db:"last_added_at" json:"lastAddedAt,omitempty"`
+	LastActivityAt time.Time  `db:"last_activity_at" json:"lastActivityAt"`
 }
 
 type SalesPoint struct {
@@ -4980,6 +4996,72 @@ func New(opts Options) *fiber.App {
 		}})
 	})
 
+	app.Get("/v1/my/shops/:slug/checkouts/abandoned", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		const query = `WITH cart_summary AS (
+                         SELECT
+                           c.uuid AS cart_uuid,
+                           c.user_uuid,
+                           p.shop_uuid,
+                           SUM(ci.quantity) AS item_count,
+                           SUM(ci.quantity * p.price_cents) AS subtotal_cents,
+                           MIN(ci.added_at) AS first_added_at,
+                           MAX(ci.added_at) AS last_added_at,
+                           GREATEST(c.updated_at, COALESCE(MAX(ci.added_at), c.updated_at)) AS last_activity_at,
+                           MIN(p.currency) AS currency
+                         FROM carts c
+                         JOIN cart_items ci ON ci.cart_uuid = c.uuid
+                         JOIN products p ON p.uuid = ci.product_uuid AND p.deleted_at IS NULL
+                         GROUP BY c.uuid, c.user_uuid, p.shop_uuid, c.updated_at
+                         HAVING SUM(ci.quantity) > 0
+                            AND COUNT(DISTINCT p.currency) = 1
+                       )
+                       SELECT
+                         cs.cart_uuid,
+                         cs.user_uuid,
+                         cs.shop_uuid,
+                         cs.item_count,
+                         cs.subtotal_cents,
+                         cs.currency,
+                         cs.first_added_at,
+                         cs.last_added_at,
+                         cs.last_activity_at,
+                         cust.uuid AS customer_uuid,
+                         COALESCE(cust.email, up.email, '') AS customer_email,
+                         COALESCE(NULLIF(TRIM(COALESCE(cust.first_name,'') || ' ' || COALESCE(cust.last_name,'')), ''), up.display_name, '') AS customer_name
+                       FROM cart_summary cs
+                       LEFT JOIN customers cust ON cust.shop_uuid = cs.shop_uuid AND cust.user_uuid = cs.user_uuid
+                       LEFT JOIN user_profiles up ON up.user_uuid = cs.user_uuid
+                       WHERE cs.shop_uuid=$1
+                         AND cs.subtotal_cents > 0
+                         AND cs.last_activity_at <= now() - interval '24 hours'
+                         AND NOT EXISTS (
+                           SELECT 1 FROM orders o
+                           WHERE o.shop_uuid = cs.shop_uuid
+                             AND o.user_uuid = cs.user_uuid
+                             AND o.created_at >= cs.last_activity_at
+                         )
+                       ORDER BY cs.last_activity_at ASC
+                       LIMIT 200`
+		var rows []AbandonedCheckout
+		if err := opts.DB.Select(&rows, query, shop.UUID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		for i := range rows {
+			if rows[i].CustomerName == "" && rows[i].CustomerEmail != "" {
+				rows[i].CustomerName = rows[i].CustomerEmail
+			}
+		}
+		return c.JSON(fiber.Map{"success": true, "data": rows})
+	})
+
 	app.Get("/v1/my/shops/:slug/orders", requireAuth, func(c *fiber.Ctx) error {
 		slug := c.Params("slug")
 		shop, role, err := ensureShopAccess(c, opts.DB, slug)
@@ -6478,10 +6560,12 @@ func addCartItem(c *fiber.Ctx, db *sqlx.DB) error {
 	}
 	// upsert
 	_, err = db.Exec(`INSERT INTO cart_items(cart_uuid,product_uuid,quantity) VALUES($1,$2,$3)
-                      ON CONFLICT (cart_uuid, product_uuid) DO UPDATE SET quantity=cart_items.quantity+EXCLUDED.quantity`, cartID, pid, body.Quantity)
+                      ON CONFLICT (cart_uuid, product_uuid) DO UPDATE SET quantity=cart_items.quantity+EXCLUDED.quantity,
+                                                                        added_at=now()`, cartID, pid, body.Quantity)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
+	_, _ = db.Exec(`UPDATE carts SET updated_at=now() WHERE uuid=$1`, cartID)
 	return getCart(c, db)
 }
 
@@ -6499,11 +6583,13 @@ func updateCartItem(c *fiber.Ctx, db *sqlx.DB) error {
 		if _, err := db.Exec(`DELETE FROM cart_items WHERE uuid=$1`, id); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
+		_, _ = db.Exec(`UPDATE carts SET updated_at=now() WHERE user_uuid=$1`, user)
 		return c.JSON(fiber.Map{"success": true})
 	}
-	if _, err := db.Exec(`UPDATE cart_items SET quantity=$1 WHERE uuid=$2`, body.Quantity, id); err != nil {
+	if _, err := db.Exec(`UPDATE cart_items SET quantity=$1, added_at=now() WHERE uuid=$2`, body.Quantity, id); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
+	_, _ = db.Exec(`UPDATE carts SET updated_at=now() WHERE user_uuid=$1`, user)
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -6512,6 +6598,7 @@ func deleteCartItem(c *fiber.Ctx, db *sqlx.DB) error {
 	if _, err := db.Exec(`DELETE FROM cart_items WHERE uuid=$1`, id); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
+	_, _ = db.Exec(`UPDATE carts SET updated_at=now() WHERE user_uuid=$1`, srvAuth.UserID(c))
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -6524,6 +6611,7 @@ func clearCart(c *fiber.Ctx, db *sqlx.DB) error {
 	if _, err := db.Exec(`DELETE FROM cart_items WHERE cart_uuid=$1`, cartID); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
+	_, _ = db.Exec(`UPDATE carts SET updated_at=now() WHERE uuid=$1`, cartID)
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -6687,6 +6775,9 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 	}
 
 	if _, err := tx.Exec(`DELETE FROM cart_items WHERE cart_uuid=$1`, cartID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	if _, err := tx.Exec(`UPDATE carts SET updated_at=now() WHERE uuid=$1`, cartID); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 	if err := tx.Commit(); err != nil {

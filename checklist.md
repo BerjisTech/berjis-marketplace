@@ -96,7 +96,7 @@
 
 ### Order Features
 - [x] Draft orders
-- [ ] Abandoned checkout tracking
+- [x] Abandoned checkout tracking
 - [ ] Abandoned cart recovery
 - [ ] Returns management system
 - [ ] Return requests

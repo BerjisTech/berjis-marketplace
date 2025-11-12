@@ -41,3 +41,10 @@
   - [ ] Adjust the draft update handler to distinguish between omitted fields and explicit nulls (e.g., use pointer wrappers).
   - [ ] Update the Angular draft editor to send a null payload when merchants remove the expiration date.
   - [ ] Add integration tests to confirm clearing and setting expirations behave as expected.
+
+## Automate abandoned checkout outreach
+- **Description:** We surface abandoned checkouts but merchants still need to contact customers manually. Automating reminder emails would improve recovery rates.
+- **Tasks:**
+  - [ ] Add an async job that sends branded reminder emails when a checkout has been inactive for a configured window.
+  - [ ] Provide admin toggles per shop to enable reminders and customize cadence/content.
+  - [ ] Track follow-up status so the dashboard shows whether outreach has been attempted automatically.

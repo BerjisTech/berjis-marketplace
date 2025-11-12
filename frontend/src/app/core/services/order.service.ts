@@ -94,6 +94,21 @@ export interface ShopMetrics {
   salesSeries: { date: string; totalCents: number }[];
 }
 
+export interface AbandonedCheckout {
+  cartUuid: string;
+  userUuid: string;
+  shopUuid: string;
+  customerUuid?: string;
+  customerEmail: string;
+  customerName: string;
+  itemCount: number;
+  subtotalCents: number;
+  currency: string;
+  firstAddedAt?: string;
+  lastAddedAt?: string;
+  lastActivityAt: string;
+}
+
 export interface DraftOrderItem {
   uuid: string;
   draftUuid: string;
@@ -197,6 +212,13 @@ export class OrderService {
   listShopOrders(shopSlug: string): Observable<ApiResponse<ShopOrder[]>> {
     return this.http.get<ApiResponse<ShopOrder[]>>(
       `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/orders`,
+      { withCredentials: true },
+    );
+  }
+
+  listAbandonedCheckouts(shopSlug: string): Observable<ApiResponse<AbandonedCheckout[]>> {
+    return this.http.get<ApiResponse<AbandonedCheckout[]>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/checkouts/abandoned`,
       { withCredentials: true },
     );
   }
