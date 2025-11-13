@@ -62,3 +62,10 @@
   - [ ] Add a service worker that polls `campaign_messages` for due items and sends email through the configured provider.
   - [ ] Update message records with send results, retries, and error info.
   - [ ] Surface delivery stats in the marketing dashboard and expose an admin endpoint for monitoring.
+
+## Build attribution insights dashboard
+- **Description:** We now log UTM and attribution data, but there’s no reporting UI summarising performance by source/medium or conversions. A dashboard would help marketing teams act on the captured data.
+- **Tasks:**
+  - [ ] Aggregate marketing_attributions + orders into daily source/medium stats.
+  - [ ] Expose an API endpoint that returns attribution metrics for analytics widgets.
+  - [ ] Update the marketing admin page to visualise conversions and top channels.

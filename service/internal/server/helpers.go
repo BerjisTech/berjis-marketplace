@@ -73,6 +73,17 @@ type discountEffect struct {
 	ShippingDiscountCents int64
 }
 
+type attributionVisitInput struct {
+	Source      string
+	Medium      string
+	Campaign    string
+	Term        string
+	Content     string
+	Referrer    string
+	LandingPage string
+	Metadata    json.RawMessage
+}
+
 type Order struct {
 	UUID                uuid.UUID          `db:"uuid" json:"uuid"`
 	ShopUUID            *uuid.UUID         `db:"shop_uuid" json:"shopUuid,omitempty"`
@@ -777,6 +788,9 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 		if err := redeemGiftCard(tx, giftCard, giftCardAmount); err != nil {
 			return respondWithError(c, err)
 		}
+	}
+	if err := linkAttributionToOrder(tx, user, shopUUID, orderID); err != nil {
+		return respondWithError(c, err)
 	}
 
 	creationMeta := map[string]any{
@@ -3313,6 +3327,73 @@ func uniqueStrings(values []string) []string {
 	return out
 }
 
+func saveAttributionVisit(db *sqlx.DB, shop uuid.UUID, user string, input attributionVisitInput) (MarketingAttribution, error) {
+	user = strings.TrimSpace(user)
+	if user == "" {
+		return MarketingAttribution{}, fiber.NewError(fiber.StatusBadRequest, "user required")
+	}
+	userUUID, err := uuid.Parse(user)
+	if err != nil {
+		return MarketingAttribution{}, fiber.NewError(fiber.StatusBadRequest, "invalid user id")
+	}
+	if shop == uuid.Nil {
+		return MarketingAttribution{}, fiber.NewError(fiber.StatusBadRequest, "shop required")
+	}
+	normalize := func(value string) string {
+		return strings.TrimSpace(value)
+	}
+	source := normalize(input.Source)
+	medium := normalize(input.Medium)
+	campaign := normalize(input.Campaign)
+	term := normalize(input.Term)
+	content := normalize(input.Content)
+	referrer := normalize(input.Referrer)
+	landing := normalize(input.LandingPage)
+	var attribution MarketingAttribution
+	err = db.Get(&attribution, `INSERT INTO marketing_attributions(uuid, shop_uuid, user_uuid, order_uuid, source, medium, campaign, term, content, referrer, landing_page, metadata)
+                                 VALUES(uuid_generate_v4(),$1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10)
+                                 RETURNING uuid, shop_uuid, user_uuid, order_uuid, source, medium, campaign, term, content, referrer, landing_page, metadata, created_at`,
+		shop, userUUID, nullableString(source), nullableString(medium), nullableString(campaign), nullableString(term), nullableString(content), nullableString(referrer), nullableString(landing), nullIfEmptyJSON(input.Metadata))
+	if err != nil {
+		return MarketingAttribution{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	return attribution, nil
+}
+
+func nullableString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func linkAttributionToOrder(tx *sqlx.Tx, user string, shop uuid.UUID, order uuid.UUID) error {
+	user = strings.TrimSpace(user)
+	if user == "" || shop == uuid.Nil {
+		return nil
+	}
+	userUUID, err := uuid.Parse(user)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid user id")
+	}
+	var attributionUUID uuid.UUID
+	err = tx.Get(&attributionUUID, `SELECT uuid
+                                   FROM marketing_attributions
+                                   WHERE user_uuid=$1 AND shop_uuid=$2 AND order_uuid IS NULL
+                                   ORDER BY created_at DESC
+                                   LIMIT 1`, userUUID, shop)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		return fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	if _, err := tx.Exec(`UPDATE marketing_attributions SET order_uuid=$1 WHERE uuid=$2`, order, attributionUUID); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	return nil
+}
+
 func uuidPtrFromString(value string) *uuid.UUID {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -3593,6 +3674,9 @@ func createManualOrderTx(tx *sqlx.Tx, shop Shop, customerUserUUID uuid.UUID, pre
 		if err := redeemGiftCard(tx, giftCard, giftCardAmount); err != nil {
 			return manualOrderResult{}, err
 		}
+	}
+	if err := linkAttributionToOrder(tx, userString, shop.UUID, orderID); err != nil {
+		return manualOrderResult{}, err
 	}
 
 	eventType := opts.EventType

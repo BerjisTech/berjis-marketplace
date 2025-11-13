@@ -187,10 +187,10 @@
 - [x] Campaign tracking
 
 ### Attributions
-- [ ] UTM parameter tracking
-- [ ] Source attribution
-- [ ] Conversion tracking
-- [ ] Customer acquisition tracking
+- [x] UTM parameter tracking
+- [x] Source attribution
+- [x] Conversion tracking
+- [x] Customer acquisition tracking
 
 ### Automations
 - [ ] Automated email triggers

@@ -3,11 +3,14 @@ package server
 import (
 	"database/sql"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+
+	srvAuth "github.com/berjistech/berjis-ecosystem/marketplace/service/internal/auth"
 )
 
 func registerMarketingRoutes(app *fiber.App, opts Options, requireAuth fiber.Handler) {
@@ -205,5 +208,77 @@ func registerMarketingRoutes(app *fiber.App, opts Options, requireAuth fiber.Han
 			response["nextScheduledAt"] = nextScheduled.Time
 		}
 		return c.JSON(fiber.Map{"success": true, "data": response})
+	})
+
+	app.Post("/v1/my/shops/:slug/attributions/visit", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var body struct {
+			Source      string          `json:"source"`
+			Medium      string          `json:"medium"`
+			Campaign    string          `json:"campaign"`
+			Term        string          `json:"term"`
+			Content     string          `json:"content"`
+			Referrer    string          `json:"referrer"`
+			LandingPage string          `json:"landingPage"`
+			Metadata    json.RawMessage `json:"metadata"`
+		}
+		if err := c.BodyParser(&body); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid body"})
+		}
+		attribution, err := saveAttributionVisit(opts.DB, shop.UUID, srvAuth.UserID(c), attributionVisitInput{
+			Source:      body.Source,
+			Medium:      body.Medium,
+			Campaign:    body.Campaign,
+			Term:        body.Term,
+			Content:     body.Content,
+			Referrer:    body.Referrer,
+			LandingPage: body.LandingPage,
+			Metadata:    body.Metadata,
+		})
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		return c.JSON(fiber.Map{"success": true, "data": attribution})
+	})
+
+	app.Get("/v1/my/shops/:slug/attributions", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		limit := 100
+		if l := strings.TrimSpace(c.Query("limit")); l != "" {
+			if v, parseErr := strconv.Atoi(l); parseErr == nil && v > 0 && v <= 500 {
+				limit = v
+			}
+		}
+		after := c.Query("after")
+		args := []any{shop.UUID}
+		query := `SELECT uuid, shop_uuid, user_uuid, order_uuid, source, medium, campaign, term, content, referrer, landing_page, metadata, created_at
+                  FROM marketing_attributions
+                  WHERE shop_uuid=$1`
+		if after != "" {
+			if t, err := time.Parse(time.RFC3339, after); err == nil {
+				query += " AND created_at > $2"
+				args = append(args, t)
+			}
+		}
+		query += " ORDER BY created_at DESC LIMIT " + strconv.Itoa(limit)
+		var rows []MarketingAttribution
+		if err := opts.DB.Select(&rows, query, args...); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": rows})
 	})
 }
