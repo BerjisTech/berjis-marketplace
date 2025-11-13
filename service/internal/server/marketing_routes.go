@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"encoding/json"
 	"strings"
 	"time"
@@ -129,5 +130,80 @@ func registerMarketingRoutes(app *fiber.App, opts Options, requireAuth fiber.Han
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
 		return c.JSON(fiber.Map{"success": true, "data": message})
+	})
+
+	app.Get("/v1/my/shops/:slug/campaigns/:id/tracking", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		campaignID, err := uuid.Parse(strings.TrimSpace(c.Params("id")))
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid campaign id"})
+		}
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		var campaign MarketingCampaign
+		if err := opts.DB.Get(&campaign, `SELECT uuid, shop_uuid, name, channel, status, budget_cents, spend_cents, starts_at, ends_at, metadata, created_at, updated_at
+                                         FROM marketing_campaigns
+                                         WHERE uuid=$1 AND shop_uuid=$2`, campaignID, shop.UUID); err != nil {
+			return respondWithError(c, err)
+		}
+		type statRow struct {
+			Status string `db:"status"`
+			Count  int64  `db:"count"`
+		}
+		var rows []statRow
+		if err := opts.DB.Select(&rows, `SELECT status, COUNT(1) AS count
+                                         FROM campaign_messages
+                                         WHERE campaign_uuid=$1
+                                         GROUP BY status`, campaignID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		stats := map[string]int64{}
+		var total int64
+		for _, row := range rows {
+			stats[row.Status] = row.Count
+			total += row.Count
+		}
+		var lastSent sql.NullTime
+		if err := opts.DB.Get(&lastSent, `SELECT MAX(sent_at) FROM campaign_messages WHERE campaign_uuid=$1 AND sent_at IS NOT NULL`, campaignID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		var nextScheduled sql.NullTime
+		if err := opts.DB.Get(&nextScheduled, `SELECT MIN(scheduled_at)
+                                               FROM campaign_messages
+                                               WHERE campaign_uuid=$1 AND status='scheduled' AND scheduled_at > now()`, campaignID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		response := fiber.Map{
+			"campaign": fiber.Map{
+				"uuid":        campaign.UUID,
+				"name":        campaign.Name,
+				"channel":     campaign.Channel,
+				"status":      campaign.Status,
+				"budgetCents": campaign.BudgetCents,
+				"spendCents":  campaign.SpendCents,
+				"startsAt":    campaign.StartsAt,
+				"endsAt":      campaign.EndsAt,
+			},
+			"messages": fiber.Map{
+				"total":     total,
+				"scheduled": stats["scheduled"],
+				"queued":    stats["queued"],
+				"sent":      stats["sent"],
+				"failed":    stats["failed"],
+				"draft":     stats["draft"],
+			},
+		}
+		if lastSent.Valid {
+			response["lastSentAt"] = lastSent.Time
+		}
+		if nextScheduled.Valid {
+			response["nextScheduledAt"] = nextScheduled.Time
+		}
+		return c.JSON(fiber.Map{"success": true, "data": response})
 	})
 }

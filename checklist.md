@@ -184,7 +184,7 @@
 - [x] Campaign creation
 - [x] Email campaign system (minimal in-house)
 - [x] Campaign scheduling
-- [ ] Campaign tracking
+- [x] Campaign tracking
 
 ### Attributions
 - [ ] UTM parameter tracking

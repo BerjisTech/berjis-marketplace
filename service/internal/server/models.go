@@ -280,6 +280,22 @@ type CampaignMessage struct {
 	UpdatedAt    time.Time       `db:"updated_at" json:"updatedAt"`
 }
 
+type MarketingAttribution struct {
+	UUID        uuid.UUID       `db:"uuid" json:"uuid"`
+	ShopUUID    uuid.UUID       `db:"shop_uuid" json:"shopUuid"`
+	UserUUID    uuid.UUID       `db:"user_uuid" json:"userUuid"`
+	OrderUUID   *uuid.UUID      `db:"order_uuid" json:"orderUuid,omitempty"`
+	Source      string          `db:"source" json:"source"`
+	Medium      string          `db:"medium" json:"medium"`
+	Campaign    string          `db:"campaign" json:"campaign"`
+	Term        string          `db:"term" json:"term"`
+	Content     string          `db:"content" json:"content"`
+	Referrer    string          `db:"referrer" json:"referrer"`
+	LandingPage string          `db:"landing_page" json:"landingPage"`
+	Metadata    json.RawMessage `db:"metadata" json:"metadata,omitempty"`
+	CreatedAt   time.Time       `db:"created_at" json:"createdAt"`
+}
+
 type Supplier struct {
 	UUID         uuid.UUID `db:"uuid" json:"uuid"`
 	ShopUUID     uuid.UUID `db:"shop_uuid" json:"shopUuid"`
