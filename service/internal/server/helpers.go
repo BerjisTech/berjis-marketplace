@@ -13,6 +13,8 @@ import (
 	"math/big"
 	"net/http"
 	"net/mail"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -60,28 +62,40 @@ type cartPricingRow struct {
 	ShopUUID    uuid.UUID `db:"shop_uuid"`
 }
 
+type discountCalculationLine struct {
+	ProductUUID uuid.UUID
+	Quantity    int
+	UnitPrice   int64
+}
+
+type discountEffect struct {
+	AmountCents           int64
+	ShippingDiscountCents int64
+}
+
 type Order struct {
-	UUID                uuid.UUID  `db:"uuid" json:"uuid"`
-	ShopUUID            *uuid.UUID `db:"shop_uuid" json:"shopUuid,omitempty"`
-	SubtotalCents       int64      `db:"subtotal_cents" json:"subtotalCents"`
-	TotalCents          int64      `db:"total_cents" json:"totalCents"`
-	Currency            string     `db:"currency" json:"currency"`
-	Status              string     `db:"status" json:"status"`
-	DiscountCode        *string    `db:"discount_code" json:"discountCode,omitempty"`
-	DiscountAmountCents int64      `db:"discount_amount_cents" json:"discountAmountCents"`
-	GiftCardCode        *string    `db:"gift_card_code" json:"giftCardCode,omitempty"`
-	GiftCardAmountCents int64      `db:"gift_card_amount_cents" json:"giftCardAmountCents"`
-	CreatedAt           time.Time  `db:"created_at" json:"createdAt"`
-	UpdatedAt           time.Time  `db:"updated_at" json:"updatedAt"`
-	TrackingNumber      *string    `db:"tracking_number" json:"trackingNumber,omitempty"`
-	TrackingURL         *string    `db:"tracking_url" json:"trackingUrl,omitempty"`
-	ShippingCarrier     *string    `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
-	ShippedAt           *time.Time `db:"shipped_at" json:"shippedAt,omitempty"`
-	DeliveredAt         *time.Time `db:"delivered_at" json:"deliveredAt,omitempty"`
-	RefundTotalCents    int64      `db:"refund_total_cents" json:"refundTotalCents"`
-	RefundedAt          *time.Time `db:"refunded_at" json:"refundedAt,omitempty"`
-	CancelledAt         *time.Time `db:"cancelled_at" json:"cancelledAt,omitempty"`
-	DraftSourceUUID     *uuid.UUID `db:"draft_source_uuid" json:"draftSourceUuid,omitempty"`
+	UUID                uuid.UUID          `db:"uuid" json:"uuid"`
+	ShopUUID            *uuid.UUID         `db:"shop_uuid" json:"shopUuid,omitempty"`
+	SubtotalCents       int64              `db:"subtotal_cents" json:"subtotalCents"`
+	TotalCents          int64              `db:"total_cents" json:"totalCents"`
+	Currency            string             `db:"currency" json:"currency"`
+	Status              string             `db:"status" json:"status"`
+	DiscountCode        *string            `db:"discount_code" json:"discountCode,omitempty"`
+	DiscountAmountCents int64              `db:"discount_amount_cents" json:"discountAmountCents"`
+	GiftCardCode        *string            `db:"gift_card_code" json:"giftCardCode,omitempty"`
+	GiftCardAmountCents int64              `db:"gift_card_amount_cents" json:"giftCardAmountCents"`
+	CreatedAt           time.Time          `db:"created_at" json:"createdAt"`
+	UpdatedAt           time.Time          `db:"updated_at" json:"updatedAt"`
+	TrackingNumber      *string            `db:"tracking_number" json:"trackingNumber,omitempty"`
+	TrackingURL         *string            `db:"tracking_url" json:"trackingUrl,omitempty"`
+	ShippingCarrier     *string            `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
+	ShippedAt           *time.Time         `db:"shipped_at" json:"shippedAt,omitempty"`
+	DeliveredAt         *time.Time         `db:"delivered_at" json:"deliveredAt,omitempty"`
+	RefundTotalCents    int64              `db:"refund_total_cents" json:"refundTotalCents"`
+	RefundedAt          *time.Time         `db:"refunded_at" json:"refundedAt,omitempty"`
+	CancelledAt         *time.Time         `db:"cancelled_at" json:"cancelledAt,omitempty"`
+	DraftSourceUUID     *uuid.UUID         `db:"draft_source_uuid" json:"draftSourceUuid,omitempty"`
+	Fulfillments        []OrderFulfillment `db:"-" json:"fulfillments,omitempty"`
 }
 
 type OrderEvent struct {
@@ -116,6 +130,48 @@ type OrderDraft struct {
 	CreatedAt           time.Time   `db:"created_at" json:"createdAt"`
 	UpdatedAt           time.Time   `db:"updated_at" json:"updatedAt"`
 	Items               []DraftItem `db:"-" json:"items"`
+}
+
+type fulfillmentItemInput struct {
+	OrderItemUUID uuid.UUID
+	Quantity      int
+}
+
+type fulfillmentLabelRequest struct {
+	Carrier            string `json:"carrier"`
+	Service            string `json:"service"`
+	PackageWeightGrams int    `json:"packageWeightGrams"`
+	FromAddress        string `json:"fromAddress"`
+	ToAddress          string `json:"toAddress"`
+}
+
+type fulfillmentCreateParams struct {
+	Items           []fulfillmentItemInput
+	LocationUUID    *uuid.UUID
+	Status          string
+	TrackingNumber  *string
+	TrackingURL     *string
+	ShippingCarrier *string
+	LabelURL        *string
+	LabelData       map[string]any
+	LabelRequest    *fulfillmentLabelRequest
+	Notes           *string
+	CreatedBy       *uuid.UUID
+}
+
+type fulfillmentUpdateParams struct {
+	Status          *string
+	TrackingNumber  *string
+	TrackingURL     *string
+	ShippingCarrier *string
+	LocationUUID    *uuid.UUID
+	LabelURL        *string
+	LabelData       map[string]any
+	LabelRequest    *fulfillmentLabelRequest
+	Notes           *string
+	ClearTracking   bool
+	ClearLabel      bool
+	UpdatedBy       *uuid.UUID
 }
 
 type DraftItem struct {
@@ -536,7 +592,7 @@ func clearCart(c *fiber.Ctx, db *sqlx.DB) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
+func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) error {
 	user := srvAuth.UserID(c)
 	userUUID := uuidPtrFromString(user)
 	cartID, err := ensureCart(db, user)
@@ -573,29 +629,68 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 		return respondWithError(c, err)
 	}
 
+	lines := make([]discountCalculationLine, 0, len(items))
+	for _, item := range items {
+		lines = append(lines, discountCalculationLine{
+			ProductUUID: item.ProductUUID,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.PriceCents,
+		})
+	}
+
 	var discount *Discount
-	var discountAmount int64
 	var discountCodeStored *string
+	productDiscount := int64(0)
+	shippingDiscount := int64(0)
+
+	shippingCents := int64(0)
+	if !multiShop && shopUUID != uuid.Nil && shippingFlatCents > 0 {
+		shippingCents = shippingFlatCents
+	}
+	originalShipping := shippingCents
+
 	if discountCode != "" {
 		if shopUUID == uuid.Nil || multiShop {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "discounts require items from a single shop"})
 		}
-		disc, amount, err := applyDiscountInTx(tx, discountCode, shopUUID, user, subtotal)
+		disc, effect, err := applyDiscountInTx(tx, discountCode, shopUUID, user, lines, subtotal, shippingCents)
 		if err != nil {
 			return respondWithError(c, err)
 		}
-		if disc != nil && amount > 0 {
+		if disc != nil {
 			discount = disc
-			discountAmount = amount
+			productDiscount = effect.AmountCents
+			if productDiscount < 0 {
+				productDiscount = 0
+			}
+			if productDiscount > subtotal {
+				productDiscount = subtotal
+			}
+			shippingDiscount = effect.ShippingDiscountCents
+			if shippingDiscount < 0 {
+				shippingDiscount = 0
+			}
+			if shippingDiscount > shippingCents {
+				shippingDiscount = shippingCents
+			}
 			code := strings.ToUpper(strings.TrimSpace(disc.Code))
 			discountCodeStored = &code
 		}
 	}
 
-	remaining := subtotal - discountAmount
+	remaining := subtotal - productDiscount
 	if remaining < 0 {
 		remaining = 0
 	}
+
+	if shippingDiscount > 0 {
+		shippingCents -= shippingDiscount
+		if shippingCents < 0 {
+			shippingCents = 0
+		}
+	}
+
+	totalBeforeGift := remaining + shippingCents
 
 	var giftCard *GiftCard
 	var giftCardAmount int64
@@ -604,26 +699,26 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 		if shopUUID == uuid.Nil || multiShop {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "gift cards require items from a single shop"})
 		}
-		card, amount, err := applyGiftCardInTx(tx, giftCardCode, shopUUID, remaining)
+		card, amount, err := applyGiftCardInTx(tx, giftCardCode, shopUUID, totalBeforeGift)
 		if err != nil {
 			return respondWithError(c, err)
 		}
 		if card != nil && amount > 0 {
 			giftCard = card
 			giftCardAmount = amount
-			if giftCardAmount > remaining {
-				giftCardAmount = remaining
-			}
-			remaining -= giftCardAmount
-			if remaining < 0 {
-				remaining = 0
+			if giftCardAmount > totalBeforeGift {
+				giftCardAmount = totalBeforeGift
 			}
 			code := strings.ToUpper(strings.TrimSpace(card.Code))
 			giftCardCodeStored = &code
+			totalBeforeGift -= giftCardAmount
+			if totalBeforeGift < 0 {
+				totalBeforeGift = 0
+			}
 		}
 	}
 
-	total := remaining
+	total := totalBeforeGift
 
 	var shopValue any
 	if shopUUID != uuid.Nil && !multiShop {
@@ -636,6 +731,10 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 	var discountUUIDValue any
 	if discount != nil {
 		discountUUIDValue = discount.UUID
+	}
+	discountAmount := productDiscount + shippingDiscount
+	if discountAmount > subtotal+originalShipping {
+		discountAmount = subtotal + originalShipping
 	}
 	var giftCardUUIDValue any
 	if giftCard != nil {
@@ -681,12 +780,17 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 	}
 
 	creationMeta := map[string]any{
-		"subtotalCents": subtotal,
-		"totalCents":    total,
-		"currency":      currency,
+		"subtotalCents":         subtotal,
+		"totalCents":            total,
+		"currency":              currency,
+		"shippingCents":         shippingCents,
+		"originalShippingCents": originalShipping,
 	}
 	if discountAmount > 0 {
 		creationMeta["discountAmountCents"] = discountAmount
+	}
+	if shippingDiscount > 0 {
+		creationMeta["shippingDiscountCents"] = shippingDiscount
 	}
 	if giftCardAmount > 0 {
 		creationMeta["giftCardAmountCents"] = giftCardAmount
@@ -711,12 +815,14 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB) error {
 	}
 
 	return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
-		"uuid":                orderID,
-		"subtotalCents":       subtotal,
-		"discountAmountCents": discountAmount,
-		"giftCardAmountCents": giftCardAmount,
-		"totalCents":          total,
-		"currency":            currency,
+		"uuid":                  orderID,
+		"subtotalCents":         subtotal,
+		"discountAmountCents":   discountAmount,
+		"giftCardAmountCents":   giftCardAmount,
+		"shippingCents":         shippingCents,
+		"shippingDiscountCents": shippingDiscount,
+		"totalCents":            total,
+		"currency":              currency,
 	}})
 }
 
@@ -810,63 +916,155 @@ func computeCartPricingTotals(rows []cartPricingRow) (int64, string, uuid.UUID, 
 	return subtotal, currency, shopUUID, multiShop, nil
 }
 
-func applyDiscountInTx(tx *sqlx.Tx, code string, shop uuid.UUID, user string, subtotal int64) (*Discount, int64, error) {
+func applyDiscountInTx(tx *sqlx.Tx, code string, shop uuid.UUID, user string, lines []discountCalculationLine, subtotal int64, shippingCents int64) (*Discount, discountEffect, error) {
+	result := discountEffect{}
 	normalized := strings.TrimSpace(code)
 	if normalized == "" {
-		return nil, 0, fiber.NewError(fiber.StatusBadRequest, "invalid discount code")
+		return nil, result, fiber.NewError(fiber.StatusBadRequest, "invalid discount code")
 	}
 	var discount Discount
-	if err := tx.Get(&discount, `SELECT uuid, shop_uuid, name, code, description, discount_type, amount_cents, percentage, starts_at, ends_at,
-                                       usage_limit_total, usage_limit_per_customer, auto_apply, status
+	if err := tx.Get(&discount, `SELECT uuid, shop_uuid, name, code, description, discount_type, amount_cents, percentage,
+                                       minimum_subtotal_cents, free_shipping, buy_quantity, get_quantity, get_percentage,
+                                       starts_at, ends_at,
+                                       usage_limit_total, usage_limit_per_customer, auto_apply, status, applies_to
                                  FROM discounts
                                  WHERE LOWER(code)=LOWER($1) AND shop_uuid=$2 AND status='active'
                                  FOR UPDATE`, normalized, shop); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, 0, fiber.NewError(fiber.StatusNotFound, "discount not found")
+			return nil, result, fiber.NewError(fiber.StatusNotFound, "discount not found")
 		}
-		return nil, 0, err
+		return nil, result, err
 	}
 	now := time.Now()
 	if discount.StartsAt != nil && now.Before(*discount.StartsAt) {
-		return nil, 0, fiber.NewError(fiber.StatusBadRequest, "discount not yet active")
+		return nil, result, fiber.NewError(fiber.StatusBadRequest, "discount not yet active")
 	}
 	if discount.EndsAt != nil && now.After(*discount.EndsAt) {
-		return nil, 0, fiber.NewError(fiber.StatusBadRequest, "discount expired")
+		return nil, result, fiber.NewError(fiber.StatusBadRequest, "discount expired")
 	}
 	if discount.UsageLimitTotal != nil {
 		var totalCount int
 		if err := tx.Get(&totalCount, `SELECT COUNT(1) FROM discount_redemptions WHERE discount_uuid=$1`, discount.UUID); err != nil {
-			return nil, 0, err
+			return nil, result, err
 		}
 		if totalCount >= *discount.UsageLimitTotal {
-			return nil, 0, fiber.NewError(fiber.StatusBadRequest, "discount usage limit reached")
+			return nil, result, fiber.NewError(fiber.StatusBadRequest, "discount usage limit reached")
 		}
 	}
 	if discount.UsageLimitPerCustomer != nil {
 		var userCount int
 		if err := tx.Get(&userCount, `SELECT COUNT(1) FROM discount_redemptions WHERE discount_uuid=$1 AND user_uuid=$2`, discount.UUID, user); err != nil {
-			return nil, 0, err
+			return nil, result, err
 		}
 		if userCount >= *discount.UsageLimitPerCustomer {
-			return nil, 0, fiber.NewError(fiber.StatusBadRequest, "discount already used by customer")
+			return nil, result, fiber.NewError(fiber.StatusBadRequest, "discount already used by customer")
 		}
 	}
-	var amount int64
-	switch strings.ToLower(strings.TrimSpace(discount.DiscountType)) {
+	if discount.MinimumSubtotalCents > 0 && subtotal < discount.MinimumSubtotalCents {
+		return nil, result, fiber.NewError(fiber.StatusBadRequest, "discount requires a higher order subtotal")
+	}
+
+	scope := parseDiscountScope(discount.AppliesTo)
+	dType := strings.ToLower(strings.TrimSpace(discount.DiscountType))
+	switch dType {
 	case "amount":
-		amount = discount.AmountCents
+		result.AmountCents = discount.AmountCents
 	case "percentage":
-		amount = int64(math.Round(float64(subtotal) * discount.Percentage / 100.0))
+		result.AmountCents = int64(math.Round(float64(subtotal) * discount.Percentage / 100.0))
+	case "free_shipping":
+		if shippingCents <= 0 && !discount.FreeShipping {
+			result.AmountCents = 0
+		} else {
+			result.ShippingDiscountCents = shippingCents
+		}
+	case "bogo":
+		if discount.BuyQuantity == nil || discount.GetQuantity == nil {
+			return nil, result, fiber.NewError(fiber.StatusBadRequest, "buy/get quantities not configured for discount")
+		}
+		if len(lines) == 0 {
+			return nil, result, fiber.NewError(fiber.StatusBadRequest, "cart items required for discount evaluation")
+		}
+		result.AmountCents = calculateBogoDiscount(lines, scope, *discount.BuyQuantity, *discount.GetQuantity, discount.GetPercentage)
 	default:
-		amount = 0
+		result.AmountCents = 0
 	}
-	if amount < 0 {
-		amount = 0
+
+	if result.AmountCents < 0 {
+		result.AmountCents = 0
 	}
-	if amount > subtotal {
-		amount = subtotal
+	if result.AmountCents > subtotal {
+		result.AmountCents = subtotal
 	}
-	return &discount, amount, nil
+	if result.ShippingDiscountCents < 0 {
+		result.ShippingDiscountCents = 0
+	}
+	if result.ShippingDiscountCents > shippingCents {
+		result.ShippingDiscountCents = shippingCents
+	}
+
+	return &discount, result, nil
+}
+
+type discountScope struct {
+	ProductUUIDs []uuid.UUID
+}
+
+func parseDiscountScope(raw json.RawMessage) discountScope {
+	scope := discountScope{}
+	if len(raw) == 0 {
+		return scope
+	}
+	var payload struct {
+		ProductUUIDs []string `json:"productUuids"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return scope
+	}
+	for _, s := range payload.ProductUUIDs {
+		if id, err := uuid.Parse(strings.TrimSpace(s)); err == nil {
+			scope.ProductUUIDs = append(scope.ProductUUIDs, id)
+		}
+	}
+	return scope
+}
+
+func (s discountScope) matches(product uuid.UUID) bool {
+	if len(s.ProductUUIDs) == 0 {
+		return true
+	}
+	for _, id := range s.ProductUUIDs {
+		if id == product {
+			return true
+		}
+	}
+	return false
+}
+
+func calculateBogoDiscount(lines []discountCalculationLine, scope discountScope, buyQty, getQty int, getPercentage float64) int64 {
+	if buyQty <= 0 || getQty <= 0 || getPercentage <= 0 {
+		return 0
+	}
+	groupSize := buyQty + getQty
+	if groupSize <= 0 {
+		return 0
+	}
+	total := int64(0)
+	for _, line := range lines {
+		if !scope.matches(line.ProductUUID) {
+			continue
+		}
+		if line.Quantity < buyQty+getQty {
+			continue
+		}
+		groups := line.Quantity / groupSize
+		if groups <= 0 {
+			continue
+		}
+		discountedUnits := groups * getQty
+		discountPerUnit := float64(line.UnitPrice) * (getPercentage / 100.0)
+		total += int64(math.Round(float64(discountedUnits) * discountPerUnit))
+	}
+	return total
 }
 
 func applyGiftCardInTx(tx *sqlx.Tx, code string, shop uuid.UUID, remaining int64) (*GiftCard, int64, error) {
@@ -986,7 +1184,7 @@ func refundGiftCard(tx *sqlx.Tx, cardUUID uuid.UUID, amount int64) error {
 	return nil
 }
 
-func previewCartPricing(c *fiber.Ctx, db *sqlx.DB) error {
+func validateDiscountCodeForCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) error {
 	user := srvAuth.UserID(c)
 	cartID, err := ensureCart(db, user)
 	if err != nil {
@@ -994,20 +1192,19 @@ func previewCartPricing(c *fiber.Ctx, db *sqlx.DB) error {
 	}
 	var body struct {
 		DiscountCode string `json:"discountCode"`
-		GiftCardCode string `json:"giftCardCode"`
 	}
-	if err := c.BodyParser(&body); err != nil && err != io.EOF {
-		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid checkout payload"})
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid body"})
 	}
 	discountCode := strings.TrimSpace(body.DiscountCode)
-	giftCardCode := strings.TrimSpace(body.GiftCardCode)
-
+	if discountCode == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "discount code required"})
+	}
 	tx, err := db.Beginx()
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 	defer tx.Rollback()
-
 	items, err := fetchCartPricingRowsForUpdate(tx, cartID)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
@@ -1015,54 +1212,50 @@ func previewCartPricing(c *fiber.Ctx, db *sqlx.DB) error {
 	if len(items) == 0 {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "cart empty"})
 	}
-
-	subtotal, currency, shopUUID, multiShop, err := computeCartPricingTotals(items)
+	subtotal, _, shopUUID, multiShop, err := computeCartPricingTotals(items)
 	if err != nil {
 		return respondWithError(c, err)
 	}
-
-	var discountAmount int64
-	if discountCode != "" {
-		if shopUUID == uuid.Nil || multiShop {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "discounts require items from a single shop"})
-		}
-		_, amount, err := applyDiscountInTx(tx, discountCode, shopUUID, user, subtotal)
-		if err != nil {
-			return respondWithError(c, err)
-		}
-		discountAmount = amount
+	if shopUUID == uuid.Nil || multiShop {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "discounts require items from a single shop"})
 	}
-
-	remaining := subtotal - discountAmount
-	if remaining < 0 {
-		remaining = 0
+	lines := make([]discountCalculationLine, 0, len(items))
+	for _, item := range items {
+		lines = append(lines, discountCalculationLine{
+			ProductUUID: item.ProductUUID,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.PriceCents,
+		})
 	}
-
-	var giftCardAmount int64
-	if giftCardCode != "" {
-		if shopUUID == uuid.Nil || multiShop {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "gift cards require items from a single shop"})
-		}
-		_, amount, err := applyGiftCardInTx(tx, giftCardCode, shopUUID, remaining)
-		if err != nil {
-			return respondWithError(c, err)
-		}
-		if amount > remaining {
-			amount = remaining
-		}
-		giftCardAmount = amount
-		remaining -= giftCardAmount
-		if remaining < 0 {
-			remaining = 0
-		}
+	shippingCents := int64(0)
+	if shippingFlatCents > 0 {
+		shippingCents = shippingFlatCents
 	}
-
+	discount, effect, err := applyDiscountInTx(tx, discountCode, shopUUID, user, lines, subtotal, shippingCents)
+	if err != nil {
+		return respondWithError(c, err)
+	}
+	if discount == nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "discount not applicable"})
+	}
+	discountTotal := effect.AmountCents + effect.ShippingDiscountCents
 	return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
-		"subtotalCents":       subtotal,
-		"discountAmountCents": discountAmount,
-		"giftCardAmountCents": giftCardAmount,
-		"totalCents":          remaining,
-		"currency":            currency,
+		"valid": true,
+		"discount": fiber.Map{
+			"uuid":                 discount.UUID,
+			"code":                 discount.Code,
+			"name":                 discount.Name,
+			"discountType":         discount.DiscountType,
+			"amountCents":          discount.AmountCents,
+			"percentage":           discount.Percentage,
+			"minimumSubtotalCents": discount.MinimumSubtotalCents,
+			"freeShipping":         discount.FreeShipping,
+			"buyQuantity":          discount.BuyQuantity,
+			"getQuantity":          discount.GetQuantity,
+			"getPercentage":        discount.GetPercentage,
+		},
+		"discountAmountCents":   discountTotal,
+		"shippingDiscountCents": effect.ShippingDiscountCents,
 	}})
 }
 
@@ -1077,6 +1270,7 @@ func getDiscountReport(c *fiber.Ctx, db *sqlx.DB) error {
 	}
 	var rows []DiscountReportRow
 	query := `SELECT d.uuid, d.shop_uuid, d.name, d.code, d.description, d.discount_type, d.amount_cents, d.percentage,
+                     d.minimum_subtotal_cents, d.free_shipping, d.buy_quantity, d.get_quantity, d.get_percentage,
                      d.starts_at, d.ends_at, d.usage_limit_total, d.usage_limit_per_customer, d.auto_apply, d.status,
                      d.created_at, d.updated_at,
                      COALESCE(SUM(r.amount_cents),0) AS total_amount_cents,
@@ -1127,6 +1321,19 @@ func listOrders(c *fiber.Ctx, db *sqlx.DB) error {
                                ORDER BY created_at DESC`, user); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
+	if len(out) > 0 {
+		orderIDs := make([]uuid.UUID, 0, len(out))
+		for _, order := range out {
+			orderIDs = append(orderIDs, order.UUID)
+		}
+		fulfillmentMap, err := loadOrderFulfillments(db, orderIDs)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		for idx := range out {
+			out[idx].Fulfillments = fulfillmentMap[out[idx].UUID]
+		}
+	}
 	return c.JSON(fiber.Map{"success": true, "data": out})
 }
 
@@ -1139,6 +1346,14 @@ func getOrder(c *fiber.Ctx, db *sqlx.DB) error {
                           FROM orders
                           WHERE uuid=$1 AND user_uuid=$2`, id, user); err != nil {
 		return c.Status(404).JSON(fiber.Map{"success": false, "message": "not found"})
+	}
+	orderID, err := uuid.Parse(id)
+	if err == nil {
+		if fulfillmentMap, ferr := loadOrderFulfillments(db, []uuid.UUID{orderID}); ferr == nil {
+			if list, ok := fulfillmentMap[orderID]; ok {
+				o.Fulfillments = list
+			}
+		}
 	}
 	return c.JSON(fiber.Map{"success": true, "data": o})
 }
@@ -2389,6 +2604,715 @@ func loadOrderMeta(db *sqlx.DB, id uuid.UUID) (orderMeta, error) {
 	return meta, nil
 }
 
+func normalizeFulfillmentStatus(status string) string {
+	return strings.ToLower(strings.TrimSpace(status))
+}
+
+func isValidFulfillmentStatus(status string) bool {
+	switch normalizeFulfillmentStatus(status) {
+	case "pending", "ready", "shipped", "delivered", "cancelled":
+		return true
+	default:
+		return false
+	}
+}
+
+func loadOrderFulfillments(db sqlx.Queryer, orderIDs []uuid.UUID) (map[uuid.UUID][]OrderFulfillment, error) {
+	result := make(map[uuid.UUID][]OrderFulfillment, len(orderIDs))
+	if len(orderIDs) == 0 {
+		return result, nil
+	}
+	unique := make([]uuid.UUID, 0, len(orderIDs))
+	seen := make(map[uuid.UUID]struct{}, len(orderIDs))
+	for _, id := range orderIDs {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+	var rows []struct {
+		OrderFulfillment
+		LabelDataRaw []byte `db:"label_data"`
+	}
+	query := `SELECT f.uuid,
+                     f.order_uuid,
+                     f.shop_uuid,
+                     f.location_uuid,
+                     f.status,
+                     f.tracking_number,
+                     f.tracking_url,
+                     f.shipping_carrier,
+                     f.label_url,
+                     f.label_data,
+                     f.label_generated_at,
+                     f.notes,
+                     f.shipped_at,
+                     f.delivered_at,
+                     f.cancelled_at,
+                     f.created_by,
+                     f.updated_by,
+                     f.created_at,
+                     f.updated_at,
+                     loc.name AS location_name,
+                     loc.code AS location_code
+              FROM order_fulfillments f
+              LEFT JOIN inventory_locations loc ON loc.uuid=f.location_uuid
+              WHERE f.order_uuid = ANY($1)
+              ORDER BY f.created_at ASC`
+	if err := sqlx.Select(db, &rows, query, pq.Array(unique)); err != nil {
+		return nil, err
+	}
+	fulfillmentIDs := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		f := row.OrderFulfillment
+		if len(row.LabelDataRaw) > 0 {
+			f.LabelData = json.RawMessage(append([]byte(nil), row.LabelDataRaw...))
+		}
+		result[f.OrderUUID] = append(result[f.OrderUUID], f)
+		fulfillmentIDs = append(fulfillmentIDs, f.UUID)
+	}
+	itemMap, err := loadOrderFulfillmentItems(db, fulfillmentIDs)
+	if err != nil {
+		return nil, err
+	}
+	for orderID, fulfillments := range result {
+		for idx := range fulfillments {
+			fulfillments[idx].Items = itemMap[fulfillments[idx].UUID]
+		}
+		result[orderID] = fulfillments
+	}
+	return result, nil
+}
+
+func loadOrderFulfillmentItems(db sqlx.Queryer, fulfillmentIDs []uuid.UUID) (map[uuid.UUID][]OrderFulfillmentItem, error) {
+	result := make(map[uuid.UUID][]OrderFulfillmentItem, len(fulfillmentIDs))
+	if len(fulfillmentIDs) == 0 {
+		return result, nil
+	}
+	var rows []OrderFulfillmentItem
+	query := `SELECT fi.uuid,
+                     fi.fulfillment_uuid,
+                     fi.order_item_uuid,
+                     fi.product_uuid,
+                     fi.quantity,
+                     oi.quantity AS order_quantity,
+                     COALESCE(p.title,'') AS product_title,
+                     oi.price_cents
+              FROM order_fulfillment_items fi
+              JOIN order_items oi ON oi.uuid = fi.order_item_uuid
+              JOIN products p ON p.uuid = oi.product_uuid
+              WHERE fi.fulfillment_uuid = ANY($1)
+              ORDER BY fi.created_at ASC`
+	if err := sqlx.Select(db, &rows, query, pq.Array(fulfillmentIDs)); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		result[row.FulfillmentUUID] = append(result[row.FulfillmentUUID], row)
+	}
+	return result, nil
+}
+
+func generateTrackingNumber() (string, error) {
+	const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const length = 14
+	buff := make([]byte, length)
+	for i := 0; i < length; i++ {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(alphabet))))
+		if err != nil {
+			return "", err
+		}
+		buff[i] = alphabet[n.Int64()]
+	}
+	return "FUL-" + string(buff), nil
+}
+
+func generateShippingLabelArtifacts(fulfillmentID, orderID uuid.UUID, req *fulfillmentLabelRequest) (string, map[string]any, string, error) {
+	if req == nil {
+		return "", nil, "", nil
+	}
+	baseDir := filepath.Join("/data/uploads", "labels")
+	if err := os.MkdirAll(baseDir, 0o755); err != nil {
+		return "", nil, "", err
+	}
+	tracking, err := generateTrackingNumber()
+	if err != nil {
+		return "", nil, "", err
+	}
+	now := time.Now().UTC()
+	content := fmt.Sprintf(
+		"FULFILLMENT %s\nORDER %s\nCARRIER: %s\nSERVICE: %s\nWEIGHT(g): %d\nFROM: %s\nTO: %s\nTRACKING: %s\nGENERATED: %s\n",
+		fulfillmentID, orderID, strings.TrimSpace(req.Carrier), strings.TrimSpace(req.Service), req.PackageWeightGrams, strings.TrimSpace(req.FromAddress), strings.TrimSpace(req.ToAddress), tracking, now.Format(time.RFC3339),
+	)
+	fileName := fmt.Sprintf("%s.txt", fulfillmentID.String())
+	filePath := filepath.Join(baseDir, fileName)
+	if err := os.WriteFile(filePath, []byte(content), 0o644); err != nil {
+		return "", nil, "", err
+	}
+	url := "/uploads/labels/" + fileName
+	meta := map[string]any{
+		"carrier":            strings.TrimSpace(req.Carrier),
+		"service":            strings.TrimSpace(req.Service),
+		"packageWeightGrams": req.PackageWeightGrams,
+		"fromAddress":        strings.TrimSpace(req.FromAddress),
+		"toAddress":          strings.TrimSpace(req.ToAddress),
+		"generatedAt":        now,
+		"trackingNumber":     tracking,
+	}
+	return url, meta, tracking, nil
+}
+
+func createOrderFulfillmentTx(tx *sqlx.Tx, meta orderMeta, params fulfillmentCreateParams) (OrderFulfillment, error) {
+	if len(params.Items) == 0 {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "fulfillment must include at least one item")
+	}
+	status := normalizeFulfillmentStatus(params.Status)
+	if status == "" {
+		status = "pending"
+	}
+	if !isValidFulfillmentStatus(status) {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "invalid fulfillment status")
+	}
+	var locationValue any
+	if params.LocationUUID != nil {
+		var exists int
+		if err := tx.Get(&exists, `SELECT COUNT(1) FROM inventory_locations WHERE uuid=$1 AND shop_uuid=$2`, *params.LocationUUID, meta.ShopUUID); err != nil {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+		}
+		if exists == 0 {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "invalid fulfillment location for shop")
+		}
+		locationValue = *params.LocationUUID
+	}
+	itemQuantities := make(map[uuid.UUID]int, len(params.Items))
+	orderItemIDs := make([]uuid.UUID, 0, len(params.Items))
+	for _, item := range params.Items {
+		if item.OrderItemUUID == uuid.Nil {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "order item id required")
+		}
+		if item.Quantity <= 0 {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "fulfillment item quantities must be positive")
+		}
+		if _, ok := itemQuantities[item.OrderItemUUID]; ok {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "duplicate order item in fulfillment request")
+		}
+		itemQuantities[item.OrderItemUUID] = item.Quantity
+		orderItemIDs = append(orderItemIDs, item.OrderItemUUID)
+	}
+	var orderItems []struct {
+		UUID        uuid.UUID `db:"uuid"`
+		ProductUUID uuid.UUID `db:"product_uuid"`
+		Quantity    int       `db:"quantity"`
+	}
+	if err := sqlx.Select(tx, &orderItems, `SELECT uuid, product_uuid, quantity FROM order_items WHERE order_uuid=$1 AND uuid = ANY($2)`, meta.OrderUUID, pq.Array(orderItemIDs)); err != nil {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	if len(orderItems) != len(orderItemIDs) {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "one or more order items not found on order")
+	}
+	var fulfilledRows []struct {
+		OrderItemUUID uuid.UUID `db:"order_item_uuid"`
+		Quantity      int       `db:"quantity"`
+	}
+	if err := sqlx.Select(tx, &fulfilledRows, `SELECT fi.order_item_uuid, COALESCE(SUM(fi.quantity),0) AS quantity
+                                               FROM order_fulfillment_items fi
+                                               JOIN order_fulfillments f ON f.uuid=fi.fulfillment_uuid
+                                               WHERE fi.order_item_uuid = ANY($1) AND f.status <> 'cancelled'
+                                               GROUP BY fi.order_item_uuid`, pq.Array(orderItemIDs)); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	alreadyFulfilled := make(map[uuid.UUID]int, len(fulfilledRows))
+	for _, row := range fulfilledRows {
+		alreadyFulfilled[row.OrderItemUUID] = row.Quantity
+	}
+	for _, item := range orderItems {
+		requested := itemQuantities[item.UUID]
+		fulfilled := alreadyFulfilled[item.UUID]
+		remaining := item.Quantity - fulfilled
+		if remaining <= 0 {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "order item already fully fulfilled")
+		}
+		if requested > remaining {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "requested quantity exceeds remaining for order item")
+		}
+	}
+	fulfillmentID := uuid.New()
+	labelURL := params.LabelURL
+	labelData := params.LabelData
+	var labelGeneratedAtValue any
+	if params.LabelRequest != nil {
+		url, meta, tracking, err := generateShippingLabelArtifacts(fulfillmentID, meta.OrderUUID, params.LabelRequest)
+		if err != nil {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "failed to generate shipping label")
+		}
+		labelURL = &url
+		if labelData == nil {
+			labelData = map[string]any{}
+		}
+		for k, v := range meta {
+			labelData[k] = v
+		}
+		if params.TrackingNumber == nil && tracking != "" {
+			params.TrackingNumber = &tracking
+		}
+		now := time.Now().UTC()
+		labelGeneratedAtValue = now
+	}
+	var labelDataValue any
+	if len(labelData) > 0 {
+		buf, err := json.Marshal(labelData)
+		if err != nil {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "invalid label metadata")
+		}
+		labelDataValue = buf
+	}
+	var trackingNumberValue any
+	if params.TrackingNumber != nil {
+		trimmed := strings.TrimSpace(*params.TrackingNumber)
+		if trimmed != "" {
+			trackingNumberValue = trimmed
+		}
+	}
+	var trackingURLValue any
+	if params.TrackingURL != nil {
+		trimmed := strings.TrimSpace(*params.TrackingURL)
+		if trimmed != "" {
+			trackingURLValue = trimmed
+		}
+	}
+	var carrierValue any
+	if params.ShippingCarrier != nil {
+		trimmed := strings.TrimSpace(*params.ShippingCarrier)
+		if trimmed != "" {
+			carrierValue = trimmed
+		}
+	}
+	var labelURLValue any
+	if labelURL != nil && strings.TrimSpace(*labelURL) != "" {
+		labelURLValue = strings.TrimSpace(*labelURL)
+	}
+	var notesValue any
+	if params.Notes != nil {
+		trimmed := strings.TrimSpace(*params.Notes)
+		if trimmed != "" {
+			notesValue = trimmed
+		}
+	}
+	var createdByValue any
+	if params.CreatedBy != nil {
+		createdByValue = *params.CreatedBy
+	}
+	now := time.Now().UTC()
+	var shippedAtValue any
+	var deliveredAtValue any
+	switch status {
+	case "shipped":
+		shippedAtValue = now
+	case "delivered":
+		shippedAtValue = now
+		deliveredAtValue = now
+	}
+	if _, err := tx.Exec(`INSERT INTO order_fulfillments(uuid, order_uuid, shop_uuid, location_uuid, status, tracking_number, tracking_url, shipping_carrier, label_url, label_data, label_generated_at, notes, shipped_at, delivered_at, created_by, updated_by)
+                          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+		fulfillmentID,
+		meta.OrderUUID,
+		meta.ShopUUID,
+		locationValue,
+		status,
+		trackingNumberValue,
+		trackingURLValue,
+		carrierValue,
+		labelURLValue,
+		labelDataValue,
+		labelGeneratedAtValue,
+		notesValue,
+		shippedAtValue,
+		deliveredAtValue,
+		createdByValue,
+		createdByValue); err != nil {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	for _, item := range orderItems {
+		qty := itemQuantities[item.UUID]
+		if _, err := tx.Exec(`INSERT INTO order_fulfillment_items(uuid, fulfillment_uuid, order_item_uuid, product_uuid, quantity)
+                              VALUES($1,$2,$3,$4,$5)`,
+			uuid.New(), fulfillmentID, item.UUID, item.ProductUUID, qty); err != nil {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+		}
+	}
+	if _, err := recordOrderEvent(tx, meta.OrderUUID, "fulfillment.created", "Order fulfillment created", params.CreatedBy, map[string]any{
+		"fulfillmentUuid": fulfillmentID,
+		"status":          status,
+		"itemCount":       len(params.Items),
+	}); err != nil {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "failed to record order event")
+	}
+	if err := recalcOrderFulfillmentState(tx, meta.OrderUUID); err != nil {
+		return OrderFulfillment{}, err
+	}
+	var updatedStatus struct {
+		Status string `db:"status"`
+	}
+	if err := tx.Get(&updatedStatus, `SELECT status FROM orders WHERE uuid=$1`, meta.OrderUUID); err == nil && !strings.EqualFold(updatedStatus.Status, meta.Status) {
+		_, _ = recordOrderEvent(tx, meta.OrderUUID, "order.status", fmt.Sprintf("Order status changed from %s to %s after fulfillment update", meta.Status, updatedStatus.Status), params.CreatedBy, map[string]any{
+			"previousStatus": meta.Status,
+			"status":         updatedStatus.Status,
+		})
+		meta.Status = updatedStatus.Status
+	}
+	fullMap, err := loadOrderFulfillments(tx, []uuid.UUID{meta.OrderUUID})
+	if err != nil {
+		return OrderFulfillment{}, err
+	}
+	for _, f := range fullMap[meta.OrderUUID] {
+		if f.UUID == fulfillmentID {
+			return f, nil
+		}
+	}
+	return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "could not load fulfillment")
+}
+
+func updateOrderFulfillmentTx(tx *sqlx.Tx, meta orderMeta, fulfillmentID uuid.UUID, params fulfillmentUpdateParams) (OrderFulfillment, error) {
+	var existing struct {
+		Status       string     `db:"status"`
+		LocationUUID *uuid.UUID `db:"location_uuid"`
+	}
+	if err := tx.Get(&existing, `SELECT status, location_uuid FROM order_fulfillments WHERE uuid=$1 AND order_uuid=$2`, fulfillmentID, meta.OrderUUID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusNotFound, "fulfillment not found")
+		}
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	sets := make([]string, 0, 8)
+	args := make([]any, 0, 8)
+	statusChanged := false
+	if params.Status != nil {
+		status := normalizeFulfillmentStatus(*params.Status)
+		if !isValidFulfillmentStatus(status) {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "invalid fulfillment status")
+		}
+		sets = append(sets, fmt.Sprintf("status=$%d", len(args)+1))
+		args = append(args, status)
+		statusChanged = !strings.EqualFold(status, existing.Status)
+		now := time.Now().UTC()
+		switch status {
+		case "shipped":
+			sets = append(sets, fmt.Sprintf("shipped_at=COALESCE(shipped_at,$%d)", len(args)+1))
+			args = append(args, now)
+		case "delivered":
+			sets = append(sets, fmt.Sprintf("shipped_at=COALESCE(shipped_at,$%d)", len(args)+1))
+			args = append(args, now)
+			sets = append(sets, fmt.Sprintf("delivered_at=COALESCE(delivered_at,$%d)", len(args)+1))
+			args = append(args, now)
+		case "pending", "ready":
+			sets = append(sets, "shipped_at=NULL")
+			sets = append(sets, "delivered_at=NULL")
+		case "cancelled":
+			sets = append(sets, fmt.Sprintf("cancelled_at=COALESCE(cancelled_at,$%d)", len(args)+1))
+			args = append(args, now)
+		}
+	}
+	if params.LocationUUID != nil {
+		if *params.LocationUUID == uuid.Nil {
+			sets = append(sets, "location_uuid=NULL")
+		} else {
+			var exists int
+			if err := tx.Get(&exists, `SELECT COUNT(1) FROM inventory_locations WHERE uuid=$1 AND shop_uuid=$2`, *params.LocationUUID, meta.ShopUUID); err != nil {
+				return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+			}
+			if exists == 0 {
+				return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "invalid fulfillment location for shop")
+			}
+			sets = append(sets, fmt.Sprintf("location_uuid=$%d", len(args)+1))
+			args = append(args, *params.LocationUUID)
+		}
+	}
+	if params.ClearTracking {
+		sets = append(sets, "tracking_number=NULL", "tracking_url=NULL", "shipping_carrier=NULL")
+	}
+	if params.TrackingNumber != nil {
+		value := strings.TrimSpace(*params.TrackingNumber)
+		if value == "" {
+			sets = append(sets, "tracking_number=NULL")
+		} else {
+			sets = append(sets, fmt.Sprintf("tracking_number=$%d", len(args)+1))
+			args = append(args, value)
+		}
+	}
+	if params.TrackingURL != nil {
+		value := strings.TrimSpace(*params.TrackingURL)
+		if value == "" {
+			sets = append(sets, "tracking_url=NULL")
+		} else {
+			sets = append(sets, fmt.Sprintf("tracking_url=$%d", len(args)+1))
+			args = append(args, value)
+		}
+	}
+	if params.ShippingCarrier != nil {
+		value := strings.TrimSpace(*params.ShippingCarrier)
+		if value == "" {
+			sets = append(sets, "shipping_carrier=NULL")
+		} else {
+			sets = append(sets, fmt.Sprintf("shipping_carrier=$%d", len(args)+1))
+			args = append(args, value)
+		}
+	}
+	if params.ClearLabel {
+		sets = append(sets, "label_url=NULL", "label_data=NULL", "label_generated_at=NULL")
+	}
+	if params.LabelURL != nil {
+		value := strings.TrimSpace(*params.LabelURL)
+		if value == "" {
+			sets = append(sets, "label_url=NULL")
+		} else {
+			sets = append(sets, fmt.Sprintf("label_url=$%d", len(args)+1))
+			args = append(args, value)
+		}
+	}
+	if len(params.LabelData) > 0 {
+		buf, err := json.Marshal(params.LabelData)
+		if err != nil {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "invalid label metadata")
+		}
+		sets = append(sets, fmt.Sprintf("label_data=$%d", len(args)+1))
+		args = append(args, buf)
+	}
+	if params.Notes != nil {
+		value := strings.TrimSpace(*params.Notes)
+		if value == "" {
+			sets = append(sets, "notes=NULL")
+		} else {
+			sets = append(sets, fmt.Sprintf("notes=$%d", len(args)+1))
+			args = append(args, value)
+		}
+	}
+	if params.LabelRequest != nil {
+		url, metaData, tracking, err := generateShippingLabelArtifacts(fulfillmentID, meta.OrderUUID, params.LabelRequest)
+		if err != nil {
+			return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "failed to generate shipping label")
+		}
+		if url != "" {
+			sets = append(sets, fmt.Sprintf("label_url=$%d", len(args)+1))
+			args = append(args, url)
+		}
+		if tracking != "" && params.TrackingNumber == nil && !params.ClearTracking {
+			sets = append(sets, fmt.Sprintf("tracking_number=$%d", len(args)+1))
+			args = append(args, tracking)
+		}
+		if len(metaData) > 0 && params.LabelData == nil && !params.ClearLabel {
+			buf, err := json.Marshal(metaData)
+			if err != nil {
+				return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "failed to marshal label metadata")
+			}
+			sets = append(sets, fmt.Sprintf("label_data=$%d", len(args)+1))
+			args = append(args, buf)
+		}
+		now := time.Now().UTC()
+		sets = append(sets, fmt.Sprintf("label_generated_at=$%d", len(args)+1))
+		args = append(args, now)
+	}
+	if len(sets) == 0 {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusBadRequest, "no fulfillment changes supplied")
+	}
+	if params.UpdatedBy != nil {
+		sets = append(sets, fmt.Sprintf("updated_by=$%d", len(args)+1))
+		args = append(args, *params.UpdatedBy)
+	}
+	sets = append(sets, "updated_at=now()")
+	updateQuery := fmt.Sprintf("UPDATE order_fulfillments SET %s WHERE uuid=$%d", strings.Join(sets, ", "), len(args)+1)
+	args = append(args, fulfillmentID)
+	if _, err := tx.Exec(updateQuery, args...); err != nil {
+		return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	if statusChanged {
+		_, _ = recordOrderEvent(tx, meta.OrderUUID, "fulfillment.status", "Fulfillment status updated", params.UpdatedBy, map[string]any{
+			"fulfillmentUuid": fulfillmentID,
+			"previousStatus":  existing.Status,
+			"status":          normalizeFulfillmentStatus(*params.Status),
+		})
+	} else {
+		_, _ = recordOrderEvent(tx, meta.OrderUUID, "fulfillment.updated", "Fulfillment updated", params.UpdatedBy, map[string]any{
+			"fulfillmentUuid": fulfillmentID,
+		})
+	}
+	if err := recalcOrderFulfillmentState(tx, meta.OrderUUID); err != nil {
+		return OrderFulfillment{}, err
+	}
+	var updatedStatus struct {
+		Status string `db:"status"`
+	}
+	if err := tx.Get(&updatedStatus, `SELECT status FROM orders WHERE uuid=$1`, meta.OrderUUID); err == nil && !strings.EqualFold(updatedStatus.Status, meta.Status) {
+		_, _ = recordOrderEvent(tx, meta.OrderUUID, "order.status", fmt.Sprintf("Order status changed from %s to %s after fulfillment update", meta.Status, updatedStatus.Status), params.UpdatedBy, map[string]any{
+			"previousStatus": meta.Status,
+			"status":         updatedStatus.Status,
+		})
+		meta.Status = updatedStatus.Status
+	}
+	fullMap, err := loadOrderFulfillments(tx, []uuid.UUID{meta.OrderUUID})
+	if err != nil {
+		return OrderFulfillment{}, err
+	}
+	for _, f := range fullMap[meta.OrderUUID] {
+		if f.UUID == fulfillmentID {
+			return f, nil
+		}
+	}
+	return OrderFulfillment{}, fiber.NewError(fiber.StatusInternalServerError, "could not load fulfillment")
+}
+
+func recalcOrderFulfillmentState(tx *sqlx.Tx, orderID uuid.UUID) error {
+	var summary struct {
+		Total     sql.NullInt64 `db:"total_quantity"`
+		Fulfilled sql.NullInt64 `db:"fulfilled_quantity"`
+		Shipped   sql.NullInt64 `db:"shipped_quantity"`
+		Delivered sql.NullInt64 `db:"delivered_quantity"`
+	}
+	if err := tx.Get(&summary, `SELECT COALESCE(SUM(oi.quantity),0) AS total_quantity,
+                                       COALESCE(SUM(CASE WHEN f.status <> 'cancelled' THEN fi.quantity ELSE 0 END),0) AS fulfilled_quantity,
+                                       COALESCE(SUM(CASE WHEN f.status IN ('shipped','delivered') THEN fi.quantity ELSE 0 END),0) AS shipped_quantity,
+                                       COALESCE(SUM(CASE WHEN f.status='delivered' THEN fi.quantity ELSE 0 END),0) AS delivered_quantity
+                                FROM order_items oi
+                                LEFT JOIN order_fulfillment_items fi ON fi.order_item_uuid=oi.uuid
+                                LEFT JOIN order_fulfillments f ON f.uuid=fi.fulfillment_uuid
+                                WHERE oi.order_uuid=$1`, orderID); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	total := summary.Total.Int64
+	fulfilled := summary.Fulfilled.Int64
+	shipped := summary.Shipped.Int64
+	delivered := summary.Delivered.Int64
+	var orderRow struct {
+		Status      string     `db:"status"`
+		ShippedAt   *time.Time `db:"shipped_at"`
+		DeliveredAt *time.Time `db:"delivered_at"`
+	}
+	if err := tx.Get(&orderRow, `SELECT status, shipped_at, delivered_at FROM orders WHERE uuid=$1`, orderID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fiber.NewError(fiber.StatusNotFound, "order not found")
+		}
+		return fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	currentStatus := strings.ToLower(strings.TrimSpace(orderRow.Status))
+	if currentStatus == "cancelled" || currentStatus == "refunded" || currentStatus == "partially_refunded" {
+		// Do not override statuses for cancelled or refunded orders.
+		return nil
+	}
+	newStatus := currentStatus
+	now := time.Now().UTC()
+	sets := make([]string, 0, 6)
+	args := make([]any, 0, 6)
+	if total > 0 && delivered >= total {
+		if currentStatus != "delivered" {
+			newStatus = "delivered"
+			sets = append(sets, fmt.Sprintf("status=$%d", len(args)+1))
+			args = append(args, newStatus)
+		}
+		if orderRow.ShippedAt == nil {
+			sets = append(sets, fmt.Sprintf("shipped_at=$%d", len(args)+1))
+			args = append(args, now)
+		}
+		if orderRow.DeliveredAt == nil {
+			sets = append(sets, fmt.Sprintf("delivered_at=$%d", len(args)+1))
+			args = append(args, now)
+		}
+	} else if total > 0 && shipped >= total {
+		if currentStatus != "shipped" {
+			newStatus = "shipped"
+			sets = append(sets, fmt.Sprintf("status=$%d", len(args)+1))
+			args = append(args, newStatus)
+		}
+		if orderRow.ShippedAt == nil {
+			sets = append(sets, fmt.Sprintf("shipped_at=$%d", len(args)+1))
+			args = append(args, now)
+		}
+		if orderRow.DeliveredAt != nil && delivered == 0 {
+			sets = append(sets, "delivered_at=NULL")
+		}
+	} else if fulfilled > 0 {
+		if currentStatus == "pending" {
+			newStatus = "processing"
+			sets = append(sets, fmt.Sprintf("status=$%d", len(args)+1))
+			args = append(args, newStatus)
+		}
+		if shipped == 0 && orderRow.ShippedAt != nil {
+			sets = append(sets, "shipped_at=NULL")
+		}
+		if delivered == 0 && orderRow.DeliveredAt != nil {
+			sets = append(sets, "delivered_at=NULL")
+		}
+	} else {
+		if currentStatus == "processing" {
+			newStatus = "pending"
+			sets = append(sets, fmt.Sprintf("status=$%d", len(args)+1))
+			args = append(args, newStatus)
+		}
+		if orderRow.ShippedAt != nil {
+			sets = append(sets, "shipped_at=NULL")
+		}
+		if orderRow.DeliveredAt != nil {
+			sets = append(sets, "delivered_at=NULL")
+		}
+	}
+	var trackingRow struct {
+		TrackingNumber  sql.NullString `db:"tracking_number"`
+		TrackingURL     sql.NullString `db:"tracking_url"`
+		ShippingCarrier sql.NullString `db:"shipping_carrier"`
+	}
+	if err := tx.Get(&trackingRow, `SELECT tracking_number, tracking_url, shipping_carrier
+                                   FROM order_fulfillments
+                                   WHERE order_uuid=$1 AND status <> 'cancelled' AND tracking_number IS NOT NULL
+                                   ORDER BY created_at ASC
+                                   LIMIT 1`, orderID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return fiber.NewError(fiber.StatusInternalServerError, "db error")
+	} else if err == nil {
+		if trackingRow.TrackingNumber.Valid {
+			sets = append(sets, fmt.Sprintf("tracking_number=$%d", len(args)+1))
+			args = append(args, trackingRow.TrackingNumber.String)
+		} else {
+			sets = append(sets, "tracking_number=NULL")
+		}
+		if trackingRow.TrackingURL.Valid {
+			sets = append(sets, fmt.Sprintf("tracking_url=$%d", len(args)+1))
+			args = append(args, trackingRow.TrackingURL.String)
+		} else {
+			sets = append(sets, "tracking_url=NULL")
+		}
+		if trackingRow.ShippingCarrier.Valid {
+			sets = append(sets, fmt.Sprintf("shipping_carrier=$%d", len(args)+1))
+			args = append(args, trackingRow.ShippingCarrier.String)
+		} else {
+			sets = append(sets, "shipping_carrier=NULL")
+		}
+	} else {
+		sets = append(sets, "tracking_number=NULL", "tracking_url=NULL", "shipping_carrier=NULL")
+	}
+	if len(sets) > 0 {
+		sets = append(sets, "updated_at=now()")
+		updateQuery := fmt.Sprintf("UPDATE orders SET %s WHERE uuid=$%d", strings.Join(uniqueStrings(sets), ", "), len(args)+1)
+		args = append(args, orderID)
+		if _, err := tx.Exec(updateQuery, args...); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "db error")
+		}
+	}
+	return nil
+}
+
+func uniqueStrings(values []string) []string {
+	if len(values) <= 1 {
+		return values
+	}
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		if _, ok := seen[v]; ok {
+			continue
+		}
+		seen[v] = struct{}{}
+		out = append(out, v)
+	}
+	return out
+}
+
 func uuidPtrFromString(value string) *uuid.UUID {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -2516,25 +3440,50 @@ func createManualOrderTx(tx *sqlx.Tx, shop Shop, customerUserUUID uuid.UUID, pre
 		return manualOrderResult{}, fiber.NewError(fiber.StatusBadRequest, "order subtotal must be greater than zero")
 	}
 
+	lines := make([]discountCalculationLine, 0, len(preparedItems))
+	for _, item := range preparedItems {
+		lines = append(lines, discountCalculationLine{
+			ProductUUID: item.ProductUUID,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.PriceCents,
+		})
+	}
+
 	userString := customerUserUUID.String()
 	discountCode := strings.TrimSpace(opts.DiscountCode)
 	var discount *Discount
 	var discountAmount int64
+	productDiscount := int64(0)
+	shippingDiscount := int64(0)
 	var discountCodeStored *string
 	if discountCode != "" {
-		disc, amount, err := applyDiscountInTx(tx, discountCode, shop.UUID, userString, subtotal)
+		disc, effect, err := applyDiscountInTx(tx, discountCode, shop.UUID, userString, lines, subtotal, 0)
 		if err != nil {
 			return manualOrderResult{}, err
 		}
-		if disc != nil && amount > 0 {
+		if disc != nil {
 			discount = disc
-			discountAmount = amount
+			productDiscount = effect.AmountCents
+			if productDiscount < 0 {
+				productDiscount = 0
+			}
+			if productDiscount > subtotal {
+				productDiscount = subtotal
+			}
+			if effect.ShippingDiscountCents > 0 {
+				shippingDiscount = effect.ShippingDiscountCents
+			}
+			discountAmount = productDiscount + shippingDiscount
 			code := strings.ToUpper(strings.TrimSpace(disc.Code))
 			discountCodeStored = &code
 		}
 	}
 
-	remaining := subtotal - discountAmount
+	if discountAmount > subtotal {
+		discountAmount = subtotal
+	}
+
+	remaining := subtotal - productDiscount
 	if remaining < 0 {
 		remaining = 0
 	}
@@ -2969,4 +3918,128 @@ func clearDefaultFlagsTx(tx *sqlx.Tx, user string, shipping, billing bool, exclu
 		}
 	}
 	return nil
+}
+func previewCartPricing(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) error {
+	user := srvAuth.UserID(c)
+	cartID, err := ensureCart(db, user)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	var body struct {
+		DiscountCode string `json:"discountCode"`
+		GiftCardCode string `json:"giftCardCode"`
+	}
+	if err := c.BodyParser(&body); err != nil && err != io.EOF {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid checkout payload"})
+	}
+	discountCode := strings.TrimSpace(body.DiscountCode)
+	giftCardCode := strings.TrimSpace(body.GiftCardCode)
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	defer tx.Rollback()
+
+	items, err := fetchCartPricingRowsForUpdate(tx, cartID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+	}
+	if len(items) == 0 {
+		return c.Status(400).JSON(fiber.Map{"success": false, "message": "cart empty"})
+	}
+
+	subtotal, currency, shopUUID, multiShop, err := computeCartPricingTotals(items)
+	if err != nil {
+		return respondWithError(c, err)
+	}
+	originalSubtotal := subtotal
+
+	lines := make([]discountCalculationLine, 0, len(items))
+	for _, item := range items {
+		lines = append(lines, discountCalculationLine{
+			ProductUUID: item.ProductUUID,
+			Quantity:    item.Quantity,
+			UnitPrice:   item.PriceCents,
+		})
+	}
+
+	shippingCents := int64(0)
+	if !multiShop && shopUUID != uuid.Nil && shippingFlatCents > 0 {
+		shippingCents = shippingFlatCents
+	}
+	originalShipping := shippingCents
+
+	discountAmount := int64(0)
+	shippingDiscount := int64(0)
+	if discountCode != "" {
+		if shopUUID == uuid.Nil || multiShop {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "discounts require items from a single shop"})
+		}
+		_, effect, err := applyDiscountInTx(tx, discountCode, shopUUID, user, lines, subtotal, shippingCents)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		productDiscount := effect.AmountCents
+		if productDiscount < 0 {
+			productDiscount = 0
+		}
+		if productDiscount > subtotal {
+			productDiscount = subtotal
+		}
+		shippingDiscount = effect.ShippingDiscountCents
+		if shippingDiscount < 0 {
+			shippingDiscount = 0
+		}
+		if shippingDiscount > shippingCents {
+			shippingDiscount = shippingCents
+		}
+		discountAmount = productDiscount + shippingDiscount
+		subtotal -= productDiscount
+		if subtotal < 0 {
+			subtotal = 0
+		}
+		if shippingDiscount > 0 {
+			shippingCents -= shippingDiscount
+			if shippingCents < 0 {
+				shippingCents = 0
+			}
+		}
+	}
+
+	totalBeforeGift := subtotal + shippingCents
+
+	giftCardAmount := int64(0)
+	if giftCardCode != "" {
+		if shopUUID == uuid.Nil || multiShop {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "gift cards require items from a single shop"})
+		}
+		_, amount, err := applyGiftCardInTx(tx, giftCardCode, shopUUID, totalBeforeGift)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if amount > totalBeforeGift {
+			amount = totalBeforeGift
+		}
+		giftCardAmount = amount
+		totalBeforeGift -= giftCardAmount
+		if totalBeforeGift < 0 {
+			totalBeforeGift = 0
+		}
+	}
+
+	total := totalBeforeGift
+	if discountAmount > originalSubtotal+originalShipping {
+		discountAmount = originalSubtotal + originalShipping
+	}
+
+	return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
+		"subtotalCents":         originalSubtotal,
+		"discountAmountCents":   discountAmount,
+		"giftCardAmountCents":   giftCardAmount,
+		"shippingCents":         shippingCents,
+		"shippingDiscountCents": shippingDiscount,
+		"totalCents":            total,
+		"currency":              currency,
+	}})
 }

@@ -104,11 +104,11 @@
 - [x] Restocking returned items
 
 ### Fulfillment
-- [ ] Fulfillment status tracking
-- [ ] Shipping label generation (if integrated)
-- [ ] Tracking number management
-- [ ] Multiple fulfillment locations
-- [ ] Partial fulfillments
+- [x] Fulfillment status tracking
+- [x] Shipping label generation (if integrated)
+- [x] Tracking number management
+- [x] Multiple fulfillment locations
+- [x] Partial fulfillments
 
 ---
 
@@ -165,25 +165,25 @@
 ## 6. Discounts & Promotions
 
 ### Discount System
-- [ ] Discount code creation
-- [ ] Percentage discounts
-- [ ] Fixed amount discounts
-- [ ] Free shipping discounts
-- [ ] Buy X Get Y discounts
-- [ ] Minimum purchase requirements
-- [ ] Usage limits (per customer, total)
-- [ ] Date range restrictions
-- [ ] Automatic discounts
-- [ ] Discount code validation
+- [x] Discount code creation
+- [x] Percentage discounts
+- [x] Fixed amount discounts
+- [x] Free shipping discounts
+- [x] Buy X Get Y discounts
+- [x] Minimum purchase requirements
+- [x] Usage limits (per customer, total)
+- [x] Date range restrictions
+- [x] Automatic discounts
+- [x] Discount code validation
 
 ---
 
 ## 7. Marketing
 
 ### Campaigns
-- [ ] Campaign creation
-- [ ] Email campaign system (minimal in-house)
-- [ ] Campaign scheduling
+- [x] Campaign creation
+- [x] Email campaign system (minimal in-house)
+- [x] Campaign scheduling
 - [ ] Campaign tracking
 
 ### Attributions

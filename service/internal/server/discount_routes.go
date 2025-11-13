@@ -23,7 +23,9 @@ func registerDiscountRoutes(app *fiber.App, opts Options, requireAuth fiber.Hand
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
 		}
 		var discounts []Discount
-		if err := opts.DB.Select(&discounts, `SELECT uuid, shop_uuid, name, code, description, discount_type, amount_cents, percentage, starts_at, ends_at,
+		if err := opts.DB.Select(&discounts, `SELECT uuid, shop_uuid, name, code, description, discount_type, amount_cents, percentage,
+                                                     minimum_subtotal_cents, free_shipping, buy_quantity, get_quantity, get_percentage,
+                                                     starts_at, ends_at,
                                                      usage_limit_total, usage_limit_per_customer, auto_apply, status, applies_to, created_at, updated_at
                                               FROM discounts
                                               WHERE shop_uuid=$1
@@ -45,6 +47,7 @@ func registerDiscountRoutes(app *fiber.App, opts Options, requireAuth fiber.Hand
 		if !teamRoleAllowsManagement(role) {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
 		}
+
 		var body struct {
 			Name                  string          `json:"name"`
 			Code                  string          `json:"code"`
@@ -52,6 +55,11 @@ func registerDiscountRoutes(app *fiber.App, opts Options, requireAuth fiber.Hand
 			DiscountType          string          `json:"discountType"`
 			AmountCents           *int64          `json:"amountCents"`
 			Percentage            *float64        `json:"percentage"`
+			MinimumSubtotalCents  *int64          `json:"minimumSubtotalCents"`
+			FreeShipping          bool            `json:"freeShipping"`
+			BuyQuantity           *int            `json:"buyQuantity"`
+			GetQuantity           *int            `json:"getQuantity"`
+			GetPercentage         *float64        `json:"getPercentage"`
 			StartsAt              *time.Time      `json:"startsAt"`
 			EndsAt                *time.Time      `json:"endsAt"`
 			UsageLimitTotal       *int            `json:"usageLimitTotal"`
@@ -69,13 +77,17 @@ func registerDiscountRoutes(app *fiber.App, opts Options, requireAuth fiber.Hand
 		if name == "" || code == "" {
 			return c.Status(400).JSON(fiber.Map{"success": false, "message": "name and code are required"})
 		}
+
 		discountType := strings.ToLower(strings.TrimSpace(body.DiscountType))
 		if discountType == "" {
 			discountType = "percentage"
 		}
-		if discountType != "percentage" && discountType != "amount" {
+		switch discountType {
+		case "percentage", "amount", "free_shipping", "bogo":
+		default:
 			return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid discount type"})
 		}
+
 		amount := int64(0)
 		if body.AmountCents != nil {
 			amount = *body.AmountCents
@@ -90,23 +102,70 @@ func registerDiscountRoutes(app *fiber.App, opts Options, requireAuth fiber.Hand
 		if discountType == "percentage" && percentage <= 0 {
 			return c.Status(400).JSON(fiber.Map{"success": false, "message": "percentage must be greater than zero for percentage discounts"})
 		}
+
+		minSubtotal := int64(0)
+		if body.MinimumSubtotalCents != nil && *body.MinimumSubtotalCents > 0 {
+			minSubtotal = *body.MinimumSubtotalCents
+		}
+
+		freeShipping := body.FreeShipping || discountType == "free_shipping"
+		if discountType == "free_shipping" {
+			freeShipping = true
+		}
+
+		var buyQty *int
+		var getQty *int
+		getPct := 100.0
+		if body.GetPercentage != nil {
+			getPct = *body.GetPercentage
+		}
+		if getPct <= 0 {
+			getPct = 100
+		}
+		if getPct > 100 {
+			getPct = 100
+		}
+
+		if discountType == "bogo" {
+			if body.BuyQuantity == nil || *body.BuyQuantity <= 0 {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "buyQuantity must be greater than zero for buy X get Y discounts"})
+			}
+			if body.GetQuantity == nil || *body.GetQuantity <= 0 {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "getQuantity must be greater than zero for buy X get Y discounts"})
+			}
+			if len(body.ProductUUIDs) == 0 {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "buy X get Y discounts require product targets"})
+			}
+			buy := *body.BuyQuantity
+			get := *body.GetQuantity
+			buyQty = &buy
+			getQty = &get
+		}
+
 		status := normalizeDiscountStatus(body.Status)
 		id := uuid.New()
-		if _, err := opts.DB.Exec(`INSERT INTO discounts(uuid, shop_uuid, name, code, description, discount_type, amount_cents, percentage, starts_at, ends_at,
+		if _, err := opts.DB.Exec(`INSERT INTO discounts(uuid, shop_uuid, name, code, description, discount_type, amount_cents, percentage,
+                                               minimum_subtotal_cents, free_shipping, buy_quantity, get_quantity, get_percentage,
+                                               starts_at, ends_at,
                                                usage_limit_total, usage_limit_per_customer, auto_apply, status, applies_to)
-                                    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
-			id, shop.UUID, name, code, strings.TrimSpace(body.Description), discountType, amount, percentage, body.StartsAt, body.EndsAt, body.UsageLimitTotal, body.UsageLimitPerCustomer, body.AutoApply, status, nullIfEmptyJSON(body.AppliesTo)); err != nil {
+                                    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)`,
+			id, shop.UUID, name, code, strings.TrimSpace(body.Description), discountType, amount, percentage,
+			minSubtotal, freeShipping, buyQty, getQty, getPct,
+			body.StartsAt, body.EndsAt,
+			body.UsageLimitTotal, body.UsageLimitPerCustomer, body.AutoApply, status, nullIfEmptyJSON(body.AppliesTo)); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 		}
+
 		if len(body.ProductUUIDs) > 0 {
-			productIDs, err := parseUUIDList(body.ProductUUIDs)
-			if err != nil {
-				return c.Status(400).JSON(fiber.Map{"success": false, "message": err.Error()})
+			productIDs, parseErr := parseUUIDList(body.ProductUUIDs)
+			if parseErr != nil {
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": parseErr.Error()})
 			}
 			if err := setDiscountProducts(opts.DB, id, shop.UUID, productIDs); err != nil {
-				return c.Status(400).JSON(fiber.Map{"success": false, "message": err.Error()})
+				return respondWithError(c, err)
 			}
 		}
+
 		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"uuid": id}})
 	})
 
@@ -150,11 +209,14 @@ func registerDiscountRoutes(app *fiber.App, opts Options, requireAuth fiber.Hand
 		}
 		if v, ok := body["discountType"].(string); ok {
 			t := strings.ToLower(strings.TrimSpace(v))
-			if t != "" && t != "percentage" && t != "amount" {
+			if t != "" && t != "percentage" && t != "amount" && t != "free_shipping" && t != "bogo" {
 				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid discount type"})
 			}
 			if t != "" {
 				add("discount_type", t)
+				if t == "free_shipping" {
+					add("free_shipping", true)
+				}
 			}
 		}
 		if raw, ok := body["amountCents"]; ok {
@@ -197,6 +259,115 @@ func registerDiscountRoutes(app *fiber.App, opts Options, requireAuth fiber.Hand
 				add("percentage", float64(val))
 			default:
 				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid percentage"})
+			}
+		}
+		if raw, ok := body["minimumSubtotalCents"]; ok {
+			switch val := raw.(type) {
+			case float64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "minimumSubtotalCents cannot be negative"})
+				}
+				add("minimum_subtotal_cents", int64(val))
+			case int:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "minimumSubtotalCents cannot be negative"})
+				}
+				add("minimum_subtotal_cents", int64(val))
+			case int64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "minimumSubtotalCents cannot be negative"})
+				}
+				add("minimum_subtotal_cents", val)
+			case nil:
+				add("minimum_subtotal_cents", 0)
+			default:
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid minimumSubtotalCents"})
+			}
+		}
+		if raw, ok := body["freeShipping"]; ok {
+			switch val := raw.(type) {
+			case bool:
+				add("free_shipping", val)
+			case nil:
+				add("free_shipping", false)
+			}
+		}
+		if raw, ok := body["buyQuantity"]; ok {
+			switch val := raw.(type) {
+			case float64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "buyQuantity must be positive"})
+				}
+				add("buy_quantity", int(val))
+			case int:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "buyQuantity must be positive"})
+				}
+				add("buy_quantity", val)
+			case int64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "buyQuantity must be positive"})
+				}
+				add("buy_quantity", val)
+			case nil:
+				add("buy_quantity", nil)
+			default:
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid buyQuantity"})
+			}
+		}
+		if raw, ok := body["getQuantity"]; ok {
+			switch val := raw.(type) {
+			case float64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "getQuantity must be positive"})
+				}
+				add("get_quantity", int(val))
+			case int:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "getQuantity must be positive"})
+				}
+				add("get_quantity", val)
+			case int64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "getQuantity must be positive"})
+				}
+				add("get_quantity", val)
+			case nil:
+				add("get_quantity", nil)
+			default:
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid getQuantity"})
+			}
+		}
+		if raw, ok := body["getPercentage"]; ok {
+			switch val := raw.(type) {
+			case float64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "getPercentage cannot be negative"})
+				}
+				if val > 100 {
+					val = 100
+				}
+				add("get_percentage", val)
+			case int:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "getPercentage cannot be negative"})
+				}
+				if val > 100 {
+					val = 100
+				}
+				add("get_percentage", float64(val))
+			case int64:
+				if val < 0 {
+					return c.Status(400).JSON(fiber.Map{"success": false, "message": "getPercentage cannot be negative"})
+				}
+				if val > 100 {
+					val = 100
+				}
+				add("get_percentage", float64(val))
+			case nil:
+				add("get_percentage", 100.0)
+			default:
+				return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid getPercentage"})
 			}
 		}
 		if v, ok := body["startsAt"].(string); ok {

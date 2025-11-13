@@ -48,3 +48,17 @@
   - [ ] Add an async job that sends branded reminder emails when a checkout has been inactive for a configured window.
   - [ ] Provide admin toggles per shop to enable reminders and customize cadence/content.
   - [ ] Track follow-up status so the dashboard shows whether outreach has been attempted automatically.
+
+## Extend fulfillment analytics visibility
+- **Description:** The new fulfillment workflow exposes granular status but the Angular dashboards still summarize orders without highlighting fulfillment completion rates or bottlenecks. Adding analytics will help merchants understand pickup/shipping performance.
+- **Tasks:**
+  - [ ] Add fulfillment metrics (pending, ready, shipped, delivered counts and average lead time) to `/v1/my/shops/:slug/metrics`.
+  - [ ] Display fulfillment summary cards in the admin dashboard with drill-down links.
+  - [ ] Provide filters in the orders list to show orders awaiting fulfillment actions.
+
+## Automate campaign delivery worker
+- **Description:** Campaign emails are queued via `campaign_messages`, but no worker actually sends them. A background processor should deliver scheduled messages and update status/error columns.
+- **Tasks:**
+  - [ ] Add a service worker that polls `campaign_messages` for due items and sends email through the configured provider.
+  - [ ] Update message records with send results, retries, and error info.
+  - [ ] Surface delivery stats in the marketing dashboard and expose an admin endpoint for monitoring.

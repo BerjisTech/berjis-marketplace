@@ -172,6 +172,11 @@ type Discount struct {
 	DiscountType          string          `db:"discount_type" json:"discountType"`
 	AmountCents           int64           `db:"amount_cents" json:"amountCents"`
 	Percentage            float64         `db:"percentage" json:"percentage"`
+	MinimumSubtotalCents  int64           `db:"minimum_subtotal_cents" json:"minimumSubtotalCents"`
+	FreeShipping          bool            `db:"free_shipping" json:"freeShipping"`
+	BuyQuantity           *int            `db:"buy_quantity" json:"buyQuantity,omitempty"`
+	GetQuantity           *int            `db:"get_quantity" json:"getQuantity,omitempty"`
+	GetPercentage         float64         `db:"get_percentage" json:"getPercentage"`
 	StartsAt              *time.Time      `db:"starts_at" json:"startsAt,omitempty"`
 	EndsAt                *time.Time      `db:"ends_at" json:"endsAt,omitempty"`
 	UsageLimitTotal       *int            `db:"usage_limit_total" json:"usageLimitTotal,omitempty"`
@@ -217,6 +222,11 @@ type DiscountReportRow struct {
 	DiscountType          string     `db:"discount_type" json:"discountType"`
 	AmountCents           int64      `db:"amount_cents" json:"amountCents"`
 	Percentage            float64    `db:"percentage" json:"percentage"`
+	MinimumSubtotalCents  int64      `db:"minimum_subtotal_cents" json:"minimumSubtotalCents"`
+	FreeShipping          bool       `db:"free_shipping" json:"freeShipping"`
+	BuyQuantity           *int       `db:"buy_quantity" json:"buyQuantity,omitempty"`
+	GetQuantity           *int       `db:"get_quantity" json:"getQuantity,omitempty"`
+	GetPercentage         float64    `db:"get_percentage" json:"getPercentage"`
 	StartsAt              *time.Time `db:"starts_at" json:"startsAt,omitempty"`
 	EndsAt                *time.Time `db:"ends_at" json:"endsAt,omitempty"`
 	UsageLimitTotal       *int       `db:"usage_limit_total" json:"usageLimitTotal,omitempty"`
@@ -237,6 +247,37 @@ type GiftCardReportSummary struct {
 	IssuedCents      int64 `db:"issued_cents" json:"issuedCents"`
 	OutstandingCents int64 `db:"outstanding_cents" json:"outstandingCents"`
 	RedeemedCents    int64 `db:"redeemed_cents" json:"redeemedCents"`
+}
+
+type MarketingCampaign struct {
+	UUID        uuid.UUID       `db:"uuid" json:"uuid"`
+	ShopUUID    uuid.UUID       `db:"shop_uuid" json:"shopUuid"`
+	Name        string          `db:"name" json:"name"`
+	Channel     string          `db:"channel" json:"channel"`
+	Status      string          `db:"status" json:"status"`
+	BudgetCents int64           `db:"budget_cents" json:"budgetCents"`
+	SpendCents  int64           `db:"spend_cents" json:"spendCents"`
+	StartsAt    *time.Time      `db:"starts_at" json:"startsAt,omitempty"`
+	EndsAt      *time.Time      `db:"ends_at" json:"endsAt,omitempty"`
+	Metadata    json.RawMessage `db:"metadata" json:"metadata,omitempty"`
+	CreatedAt   time.Time       `db:"created_at" json:"createdAt"`
+	UpdatedAt   time.Time       `db:"updated_at" json:"updatedAt"`
+}
+
+type CampaignMessage struct {
+	UUID         uuid.UUID       `db:"uuid" json:"uuid"`
+	CampaignUUID uuid.UUID       `db:"campaign_uuid" json:"campaignUuid"`
+	ShopUUID     uuid.UUID       `db:"shop_uuid" json:"shopUuid"`
+	Subject      string          `db:"subject" json:"subject"`
+	Body         string          `db:"body" json:"body"`
+	Status       string          `db:"status" json:"status"`
+	ScheduledAt  time.Time       `db:"scheduled_at" json:"scheduledAt"`
+	SendAfter    *time.Time      `db:"send_after" json:"sendAfter,omitempty"`
+	SentAt       *time.Time      `db:"sent_at" json:"sentAt,omitempty"`
+	Error        *string         `db:"error" json:"error,omitempty"`
+	Metadata     json.RawMessage `db:"metadata" json:"metadata,omitempty"`
+	CreatedAt    time.Time       `db:"created_at" json:"createdAt"`
+	UpdatedAt    time.Time       `db:"updated_at" json:"updatedAt"`
 }
 
 type Supplier struct {
@@ -474,6 +515,42 @@ type OrderLineItem struct {
 	Title       string    `db:"title" json:"title"`
 	Quantity    int       `db:"quantity" json:"quantity"`
 	PriceCents  int64     `db:"price_cents" json:"priceCents"`
+}
+
+type OrderFulfillment struct {
+	UUID             uuid.UUID              `db:"uuid" json:"uuid"`
+	OrderUUID        uuid.UUID              `db:"order_uuid" json:"orderUuid"`
+	ShopUUID         uuid.UUID              `db:"shop_uuid" json:"shopUuid"`
+	LocationUUID     *uuid.UUID             `db:"location_uuid" json:"locationUuid,omitempty"`
+	LocationName     *string                `db:"location_name" json:"locationName,omitempty"`
+	LocationCode     *string                `db:"location_code" json:"locationCode,omitempty"`
+	Status           string                 `db:"status" json:"status"`
+	TrackingNumber   *string                `db:"tracking_number" json:"trackingNumber,omitempty"`
+	TrackingURL      *string                `db:"tracking_url" json:"trackingUrl,omitempty"`
+	ShippingCarrier  *string                `db:"shipping_carrier" json:"shippingCarrier,omitempty"`
+	LabelURL         *string                `db:"label_url" json:"labelUrl,omitempty"`
+	LabelData        json.RawMessage        `db:"label_data" json:"labelData,omitempty"`
+	LabelGeneratedAt *time.Time             `db:"label_generated_at" json:"labelGeneratedAt,omitempty"`
+	Notes            *string                `db:"notes" json:"notes,omitempty"`
+	ShippedAt        *time.Time             `db:"shipped_at" json:"shippedAt,omitempty"`
+	DeliveredAt      *time.Time             `db:"delivered_at" json:"deliveredAt,omitempty"`
+	CancelledAt      *time.Time             `db:"cancelled_at" json:"cancelledAt,omitempty"`
+	CreatedBy        *uuid.UUID             `db:"created_by" json:"createdBy,omitempty"`
+	UpdatedBy        *uuid.UUID             `db:"updated_by" json:"updatedBy,omitempty"`
+	CreatedAt        time.Time              `db:"created_at" json:"createdAt"`
+	UpdatedAt        time.Time              `db:"updated_at" json:"updatedAt"`
+	Items            []OrderFulfillmentItem `db:"-" json:"items"`
+}
+
+type OrderFulfillmentItem struct {
+	UUID            uuid.UUID `db:"uuid" json:"uuid"`
+	FulfillmentUUID uuid.UUID `db:"fulfillment_uuid" json:"fulfillmentUuid"`
+	OrderItemUUID   uuid.UUID `db:"order_item_uuid" json:"orderItemUuid"`
+	ProductUUID     uuid.UUID `db:"product_uuid" json:"productUuid"`
+	Quantity        int       `db:"quantity" json:"quantity"`
+	OrderQuantity   int       `db:"order_quantity" json:"orderQuantity"`
+	ProductTitle    string    `db:"product_title" json:"productTitle"`
+	PriceCents      int64     `db:"price_cents" json:"priceCents"`
 }
 
 type SalesPoint struct {

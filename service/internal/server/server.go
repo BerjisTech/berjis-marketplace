@@ -118,6 +118,7 @@ func New(opts Options) *fiber.App {
 	registerCartRoutes(app, opts, requireAuth)
 	registerSearchRoutes(app, opts, requireAuth)
 	registerProfileRoutes(app, opts, requireAuth)
+	registerMarketingRoutes(app, opts, requireAuth)
 
 	return app
 }

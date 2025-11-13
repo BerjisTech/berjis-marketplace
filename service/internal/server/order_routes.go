@@ -1070,6 +1070,236 @@ func registerOrderRoutes(app *fiber.App, opts Options, requireAuth fiber.Handler
 		return c.JSON(fiber.Map{"success": true, "data": orders})
 	})
 
+	app.Get("/v1/my/shops/:slug/orders/:orderUuid/fulfillments", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsView(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		orderValue := strings.TrimSpace(c.Params("orderUuid"))
+		orderID, err := uuid.Parse(orderValue)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if meta.ShopUUID != shop.UUID {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "order not found"})
+		}
+		fulfillments, err := loadOrderFulfillments(opts.DB, []uuid.UUID{orderID})
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": fulfillments[orderID]})
+	})
+
+	app.Post("/v1/my/shops/:slug/orders/:orderUuid/fulfillments", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		orderValue := strings.TrimSpace(c.Params("orderUuid"))
+		orderID, err := uuid.Parse(orderValue)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if meta.ShopUUID != shop.UUID {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "order not found"})
+		}
+		var body struct {
+			Items []struct {
+				OrderItemUUID string `json:"orderItemUuid"`
+				Quantity      int    `json:"quantity"`
+			} `json:"items"`
+			LocationUUID    string                   `json:"locationUuid"`
+			Status          string                   `json:"status"`
+			TrackingNumber  string                   `json:"trackingNumber"`
+			TrackingURL     string                   `json:"trackingUrl"`
+			ShippingCarrier string                   `json:"shippingCarrier"`
+			LabelURL        string                   `json:"labelUrl"`
+			LabelData       map[string]any           `json:"labelData"`
+			LabelRequest    *fulfillmentLabelRequest `json:"labelRequest"`
+			Notes           string                   `json:"notes"`
+		}
+		if err := c.BodyParser(&body); err != nil && err != io.EOF {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid fulfillment payload"})
+		}
+		items := make([]fulfillmentItemInput, 0, len(body.Items))
+		for idx, item := range body.Items {
+			itemID, parseErr := uuid.Parse(strings.TrimSpace(item.OrderItemUUID))
+			if parseErr != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": fmt.Sprintf("invalid order item id at position %d", idx)})
+			}
+			items = append(items, fulfillmentItemInput{
+				OrderItemUUID: itemID,
+				Quantity:      item.Quantity,
+			})
+		}
+		var locationUUID *uuid.UUID
+		if trimmed := strings.TrimSpace(body.LocationUUID); trimmed != "" {
+			locID, parseErr := uuid.Parse(trimmed)
+			if parseErr != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid location id"})
+			}
+			locationUUID = &locID
+		}
+		params := fulfillmentCreateParams{
+			Items:        items,
+			LocationUUID: locationUUID,
+			Status:       body.Status,
+			LabelData:    body.LabelData,
+			LabelRequest: body.LabelRequest,
+			CreatedBy:    uuidPtrFromString(srvAuth.UserID(c)),
+		}
+		if trimmed := strings.TrimSpace(body.TrackingNumber); trimmed != "" {
+			tracking := trimmed
+			params.TrackingNumber = &tracking
+		}
+		if trimmed := strings.TrimSpace(body.TrackingURL); trimmed != "" {
+			trackingURL := trimmed
+			params.TrackingURL = &trackingURL
+		}
+		if trimmed := strings.TrimSpace(body.ShippingCarrier); trimmed != "" {
+			carrier := trimmed
+			params.ShippingCarrier = &carrier
+		}
+		if trimmed := strings.TrimSpace(body.LabelURL); trimmed != "" {
+			labelURL := trimmed
+			params.LabelURL = &labelURL
+		}
+		if trimmed := strings.TrimSpace(body.Notes); trimmed != "" {
+			notes := trimmed
+			params.Notes = &notes
+		}
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+		created, err := createOrderFulfillmentTx(tx, meta, params)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": created})
+	})
+
+	app.Patch("/v1/my/shops/:slug/orders/:orderUuid/fulfillments/:fulfillmentUuid", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		orderValue := strings.TrimSpace(c.Params("orderUuid"))
+		orderID, err := uuid.Parse(orderValue)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid order id"})
+		}
+		meta, err := loadOrderMeta(opts.DB, orderID)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if meta.ShopUUID != shop.UUID {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"success": false, "message": "order not found"})
+		}
+		fulfillmentValue := strings.TrimSpace(c.Params("fulfillmentUuid"))
+		fulfillmentID, err := uuid.Parse(fulfillmentValue)
+		if err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid fulfillment id"})
+		}
+		var body struct {
+			Status          *string                  `json:"status"`
+			TrackingNumber  *string                  `json:"trackingNumber"`
+			TrackingURL     *string                  `json:"trackingUrl"`
+			ShippingCarrier *string                  `json:"shippingCarrier"`
+			LocationUUID    *string                  `json:"locationUuid"`
+			LabelURL        *string                  `json:"labelUrl"`
+			LabelData       map[string]any           `json:"labelData"`
+			LabelRequest    *fulfillmentLabelRequest `json:"labelRequest"`
+			Notes           *string                  `json:"notes"`
+			ClearTracking   bool                     `json:"clearTracking"`
+			ClearLabel      bool                     `json:"clearLabel"`
+		}
+		if err := c.BodyParser(&body); err != nil && err != io.EOF {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid fulfillment payload"})
+		}
+		params := fulfillmentUpdateParams{
+			LabelData:     body.LabelData,
+			LabelRequest:  body.LabelRequest,
+			ClearTracking: body.ClearTracking,
+			ClearLabel:    body.ClearLabel,
+			UpdatedBy:     uuidPtrFromString(srvAuth.UserID(c)),
+		}
+		if body.Status != nil {
+			status := strings.TrimSpace(*body.Status)
+			params.Status = &status
+		}
+		if body.TrackingNumber != nil {
+			value := strings.TrimSpace(*body.TrackingNumber)
+			params.TrackingNumber = &value
+		}
+		if body.TrackingURL != nil {
+			value := strings.TrimSpace(*body.TrackingURL)
+			params.TrackingURL = &value
+		}
+		if body.ShippingCarrier != nil {
+			value := strings.TrimSpace(*body.ShippingCarrier)
+			params.ShippingCarrier = &value
+		}
+		if body.LocationUUID != nil {
+			trimmed := strings.TrimSpace(*body.LocationUUID)
+			if trimmed == "" {
+				zero := uuid.Nil
+				params.LocationUUID = &zero
+			} else {
+				locID, parseErr := uuid.Parse(trimmed)
+				if parseErr != nil {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"success": false, "message": "invalid location id"})
+				}
+				params.LocationUUID = &locID
+			}
+		}
+		if body.LabelURL != nil {
+			value := strings.TrimSpace(*body.LabelURL)
+			params.LabelURL = &value
+		}
+		if body.Notes != nil {
+			value := strings.TrimSpace(*body.Notes)
+			params.Notes = &value
+		}
+		tx, err := opts.DB.Beginx()
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		defer tx.Rollback()
+		updated, err := updateOrderFulfillmentTx(tx, meta, fulfillmentID, params)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if err := tx.Commit(); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+		return c.JSON(fiber.Map{"success": true, "data": updated})
+	})
+
 	app.Get("/v1/my/shops/:slug/metrics", requireAuth, func(c *fiber.Ctx) error {
 		slug := c.Params("slug")
 		shop, role, err := ensureShopAccess(c, opts.DB, slug)
