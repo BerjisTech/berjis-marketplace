@@ -44,39 +44,34 @@
       <button class="rounded-full h-9 w-9 grid place-items-center border border-blue-900/20 dark:border-slate-700"
         (click)="openAI()"><span class="material-symbols-outlined text-[18px]">smart_toy</span></button>
       <div class="relative">
-      <button
-        type="button"
-        class="relative h-9 w-9 overflow-hidden rounded-full border border-blue-900/20 bg-white/80 text-xs font-semibold uppercase text-blue-900 shadow-sm transition hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100"
-        (click)="toggleUserMenu()"
-        [attr.aria-expanded]="userMenuOpen()"
-        aria-haspopup="true"
-        aria-label="Open account menu">
-        <ng-container *ngIf="profile()?.avatarUrl; else profileInitialsTpl">
-          <img [src]="profile()?.avatarUrl" alt="" class="h-full w-full object-cover" />
-        </ng-container>
-      </button>
-      <ng-template #profileInitialsTpl>
-        <span>{{ profileInitials() }}</span>
-      </ng-template>
-      <div
-        class="absolute right-0 mt-2 w-52 rounded-xl border border-blue-900/20 bg-white p-2 shadow-brand dark:border-slate-700 dark:bg-slate-950"
-        *ngIf="userMenuOpen()">
+        <button type="button"
+          class="relative h-9 w-9 overflow-hidden rounded-full border border-blue-900/20 bg-white/80 text-xs font-semibold uppercase text-blue-900 shadow-sm transition hover:border-blue-400 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-100"
+          (click)="toggleUserMenu()" [attr.aria-expanded]="userMenuOpen()" aria-haspopup="true"
+          aria-label="Open account menu">
+          <ng-container *ngIf="profile()?.avatarUrl; else profileInitialsTpl">
+            <img [src]="profile()?.avatarUrl" alt="" class="h-full w-full object-cover" />
+          </ng-container>
+        </button>
+        <ng-template #profileInitialsTpl>
+          <span>{{ profileInitials() }}</span>
+        </ng-template>
         <div
-          *ngIf="profile()"
-          class="mb-2 rounded-lg bg-blue-50/70 p-3 text-left text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
-          <div class="font-medium text-blue-900 dark:text-white">{{ profileName() || 'Account' }}</div>
-          <div class="text-xs text-slate-500 dark:text-slate-400">{{ profileEmail() }}</div>
+          class="absolute right-0 mt-2 w-52 rounded-xl border border-blue-900/20 bg-white p-2 shadow-brand dark:border-slate-700 dark:bg-slate-950"
+          *ngIf="userMenuOpen()">
+          <div *ngIf="profile()"
+            class="mb-2 rounded-lg bg-blue-50/70 p-3 text-left text-sm text-slate-600 dark:bg-slate-900/60 dark:text-slate-300">
+            <div class="font-medium text-blue-900 dark:text-white">{{ profileName() || 'Account' }}</div>
+            <div class="text-xs text-slate-500 dark:text-slate-400">{{ profileEmail() }}</div>
+          </div>
+          <div *ngIf="profileLoading() && !profile()" class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
+            Loading profile&hellip;
+          </div>
+          <a routerLink="/dashboard/profile"
+            class="block rounded-lg px-3 py-2 text-sm hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Account
+            settings</a>
+          <a routerLink="/auth/logout"
+            class="block rounded-lg px-3 py-2 text-sm hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Sign out</a>
         </div>
-        <div *ngIf="profileLoading() && !profile()" class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
-          Loading profile&hellip;
-        </div>
-        <a
-          routerLink="/dashboard/profile"
-          class="block rounded-lg px-3 py-2 text-sm hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Account settings</a>
-        <a
-          routerLink="/auth/logout"
-          class="block rounded-lg px-3 py-2 text-sm hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Sign out</a>
-      </div>
       </div>
       <app-dark-mode-toggle></app-dark-mode-toggle>
     </div>
@@ -93,89 +88,124 @@
       </div>
       <nav class="flex-1 p-2 flex flex-col gap-1">
         <!-- Home -->
-        <a routerLink="/dashboard" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">home</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Home</span>
         </a>
         <!-- Orders -->
-        <a routerLink="/dashboard/orders" (click)="open('orders')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/orders" (click)="open('orders')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">receipt_long</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Orders</span>
-          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]" [class.rotate-90]="openGroup()==='orders'">chevron_right</span>
+          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]"
+            [class.rotate-90]="openGroup()==='orders'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='orders'" class="pl-9 flex flex-col gap-1">
-          <a routerLink="/dashboard/orders/draft" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Draft</a>
-          <a routerLink="/dashboard/orders/abandoned-checkouts" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Abandoned checkouts</a>
-          <a routerLink="/dashboard/orders/returns" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Returns</a>
+          <a routerLink="/dashboard/orders/draft"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Draft</a>
+          <a routerLink="/dashboard/orders/abandoned-checkouts"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Abandoned checkouts</a>
+          <a routerLink="/dashboard/orders/returns"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Returns</a>
         </div>
         <!-- Products -->
-        <a routerLink="/dashboard/products" (click)="open('products')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/products" (click)="open('products')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">inventory_2</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Products</span>
-          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]" [class.rotate-90]="openGroup()==='products'">chevron_right</span>
+          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]"
+            [class.rotate-90]="openGroup()==='products'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='products'" class="pl-9 flex flex-col gap-1">
-          <a routerLink="/dashboard/products/collections" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Collections</a>
-          <a routerLink="/dashboard/products/inventory" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Inventory</a>
-          <a routerLink="/dashboard/products/purchase-orders" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Purchase orders</a>
-          <a routerLink="/dashboard/products/transfers" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Transfers</a>
-          <a routerLink="/dashboard/products/gift-cards" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Gift cards</a>
-          <a routerLink="/dashboard/products/new" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Add product</a>
+          <a routerLink="/dashboard/products/collections"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Collections</a>
+          <a routerLink="/dashboard/products/inventory"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Inventory</a>
+          <a routerLink="/dashboard/products/purchase-orders"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Purchase orders</a>
+          <a routerLink="/dashboard/products/transfers"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Transfers</a>
+          <a routerLink="/dashboard/products/gift-cards"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Gift cards</a>
+          <a routerLink="/dashboard/products/new"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Add product</a>
         </div>
         <!-- Customers -->
-        <a routerLink="/dashboard/customers" (click)="open('customers')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/customers" (click)="open('customers')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">group</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Customers</span>
-          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]" [class.rotate-90]="openGroup()==='customers'">chevron_right</span>
+          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]"
+            [class.rotate-90]="openGroup()==='customers'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='customers'" class="pl-9 flex flex-col gap-1">
-          <a routerLink="/dashboard/customers/segments" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Segments</a>
+          <a routerLink="/dashboard/customers/segments"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Segments</a>
         </div>
         <!-- Marketing -->
-        <a routerLink="/dashboard/marketing" (click)="open('marketing')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/marketing" (click)="open('marketing')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">campaign</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Marketing</span>
-          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]" [class.rotate-90]="openGroup()==='marketing'">chevron_right</span>
+          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]"
+            [class.rotate-90]="openGroup()==='marketing'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='marketing'" class="pl-9 flex flex-col gap-1">
-          <a routerLink="/dashboard/marketing/campaigns" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Campaigns</a>
-          <a routerLink="/dashboard/marketing/attributions" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Attributions</a>
-          <a routerLink="/dashboard/marketing/automations" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Automations</a>
+          <a routerLink="/dashboard/marketing/campaigns"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Campaigns</a>
+          <a routerLink="/dashboard/marketing/attributions"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Attributions</a>
+          <a routerLink="/dashboard/marketing/automations"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Automations</a>
         </div>
         <!-- Discounts -->
-        <a routerLink="/dashboard/discounts" (click)="open('discounts')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/discounts" (click)="open('discounts')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">sell</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Discounts</span>
         </a>
         <!-- Content -->
-        <a routerLink="/dashboard/content" (click)="open('content')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/content" (click)="open('content')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">article</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Content</span>
-          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]" [class.rotate-90]="openGroup()==='content'">chevron_right</span>
+          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]"
+            [class.rotate-90]="openGroup()==='content'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='content'" class="pl-9 flex flex-col gap-1">
-          <a routerLink="/dashboard/content/files" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Files</a>
-          <a routerLink="/dashboard/content/menus" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Menus</a>
-          <a routerLink="/dashboard/content/blog-posts" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Blog posts</a>
+          <a routerLink="/dashboard/content/files"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Files</a>
+          <a routerLink="/dashboard/content/menus"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Menus</a>
+          <a routerLink="/dashboard/content/blog-posts"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Blog posts</a>
         </div>
         <!-- Markets -->
-        <a routerLink="/dashboard/markets" (click)="open('markets')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/markets" (click)="open('markets')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">public</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Markets</span>
-          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]" [class.rotate-90]="openGroup()==='markets'">chevron_right</span>
+          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]"
+            [class.rotate-90]="openGroup()==='markets'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='markets'" class="pl-9 flex flex-col gap-1">
-          <a routerLink="/dashboard/markets/catalogs" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Catalogs</a>
+          <a routerLink="/dashboard/markets/catalogs"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Catalogs</a>
         </div>
         <!-- Analytics -->
-        <a routerLink="/dashboard/analytics" (click)="open('analytics')" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
+        <a routerLink="/dashboard/analytics" (click)="open('analytics')"
+          class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-blue-50/60 dark:hover:bg-slate-900/60">
           <span class="material-symbols-outlined text-[20px]">monitoring</span>
           <span [class.hidden]="navCollapsed()" class="text-sm">Analytics</span>
-          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]" [class.rotate-90]="openGroup()==='analytics'">chevron_right</span>
+          <span [class.hidden]="navCollapsed()" class="ms-auto material-symbols-outlined text-[18px]"
+            [class.rotate-90]="openGroup()==='analytics'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='analytics'" class="pl-9 flex flex-col gap-1">
-          <a routerLink="/dashboard/analytics/reports" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Reports</a>
-          <a routerLink="/dashboard/analytics/live-view" class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Live view</a>
+          <a routerLink="/dashboard/analytics/reports"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Reports</a>
+          <a routerLink="/dashboard/analytics/live-view"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Live view</a>
         </div>
       </nav>
       <div class="p-2 mt-auto">
@@ -193,9 +223,9 @@
     </aside>
 
     <!-- Dashboard Content (scrollable) -->
-    <main class="min-w-0 h-full relative overflow-x-hidden overflow-y-auto">
-      <!-- Scrollable area -->
-      <div class="absolute left-0 right-0 top-12 bottom-0 overflow-y-auto px-[clamp(1rem,6vw,3rem)] py-6">       <router-outlet></router-outlet>     </div>   </main>
+    <main class="min-w-0 h-full p-4 relative overflow-x-hidden overflow-y-auto">
+      <router-outlet></router-outlet>
+    </main>
 
     <!-- Right Sidebar (Tools) -->
     <aside
