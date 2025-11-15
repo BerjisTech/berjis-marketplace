@@ -10,6 +10,6 @@ bootstrapApplication(AppComponent, {
   providers: [
     provideHttpClient(withFetch()),
     provideRouter(routes),
-    { provide: CORE_AUTH_API_BASE, useValue: environment.apiBase }
+    { provide: CORE_AUTH_API_BASE, useValue: environment.coreApi }
   ]
 }).catch(err => console.error(err));

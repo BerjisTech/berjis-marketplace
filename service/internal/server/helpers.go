@@ -792,6 +792,22 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 	if err := linkAttributionToOrder(tx, user, shopUUID, orderID); err != nil {
 		return respondWithError(c, err)
 	}
+	if userUUID != nil && shopUUID != uuid.Nil {
+		metaConfirmation := map[string]any{
+			"type":      "order_confirmation",
+			"orderUuid": orderID.String(),
+		}
+		if err := enqueueAutomationEmailTx(tx, shopUUID, *userUUID, "Thanks for your order!", "Your order has been received and is now being processed.", 2*time.Minute, metaConfirmation); err != nil {
+			return respondWithError(c, err)
+		}
+		metaFollow := map[string]any{
+			"type":      "post_purchase",
+			"orderUuid": orderID.String(),
+		}
+		if err := enqueueAutomationEmailTx(tx, shopUUID, *userUUID, "How was your purchase?", "We'd love your feedback on your recent order.", 72*time.Hour, metaFollow); err != nil {
+			return respondWithError(c, err)
+		}
+	}
 
 	creationMeta := map[string]any{
 		"subtotalCents":         subtotal,
@@ -2596,6 +2612,7 @@ type orderMeta struct {
 	OrderUUID        uuid.UUID `db:"uuid"`
 	ShopUUID         uuid.UUID `db:"shop_uuid"`
 	ShopSlug         string    `db:"slug"`
+	UserUUID         uuid.UUID `db:"user_uuid"`
 	Status           string    `db:"status"`
 	TotalCents       int64     `db:"total_cents"`
 	RefundTotalCents int64     `db:"refund_total_cents"`
@@ -2603,7 +2620,7 @@ type orderMeta struct {
 
 func loadOrderMeta(db *sqlx.DB, id uuid.UUID) (orderMeta, error) {
 	var meta orderMeta
-	if err := db.Get(&meta, `SELECT o.uuid, s.uuid AS shop_uuid, s.slug, o.status, o.total_cents, o.refund_total_cents
+	if err := db.Get(&meta, `SELECT o.uuid, s.uuid AS shop_uuid, s.slug, o.user_uuid, o.status, o.total_cents, o.refund_total_cents
                                FROM orders o
                                JOIN order_items oi ON oi.order_uuid=o.uuid
                                JOIN products p ON p.uuid=oi.product_uuid
@@ -3327,6 +3344,67 @@ func uniqueStrings(values []string) []string {
 	return out
 }
 
+func ensureAutomationCampaignTx(tx *sqlx.Tx, shop uuid.UUID) (uuid.UUID, error) {
+	var campaignID uuid.UUID
+	err := tx.Get(&campaignID, `SELECT uuid FROM marketing_campaigns WHERE shop_uuid=$1 AND channel='automation' LIMIT 1`, shop)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			campaignID = uuid.New()
+			if _, err := tx.Exec(`INSERT INTO marketing_campaigns(uuid, shop_uuid, name, channel, status, budget_cents, spend_cents)
+                                   VALUES($1,$2,$3,'automation','active',0,0)`,
+				campaignID, shop, "Automation"); err != nil {
+				return uuid.Nil, err
+			}
+		} else {
+			return uuid.Nil, err
+		}
+	}
+	return campaignID, nil
+}
+
+func enqueueAutomationEmailTx(tx *sqlx.Tx, shop uuid.UUID, user uuid.UUID, subject, body string, delay time.Duration, metadata map[string]any) error {
+	if user == uuid.Nil {
+		return nil
+	}
+	campaignID, err := ensureAutomationCampaignTx(tx, shop)
+	if err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	metaType, _ := metadata["type"].(string)
+	metaType = strings.ToLower(strings.TrimSpace(metaType))
+	metadata["type"] = metaType
+	metadata["userUuid"] = user.String()
+	metaBytes, err := json.Marshal(metadata)
+	if err != nil {
+		return fiber.NewError(fiber.StatusBadRequest, "invalid metadata")
+	}
+	if metaType != "" {
+		var existing int
+		if err := tx.Get(&existing, `SELECT COUNT(1)
+                                     FROM campaign_messages
+                                     WHERE campaign_uuid=$1
+                                       AND metadata->>'type'=$2
+                                       AND metadata->>'userUuid'=$3
+                                       AND status IN ('scheduled','queued')`,
+			campaignID, metaType, user.String()); err != nil {
+			return fiber.NewError(fiber.StatusInternalServerError, "db error")
+		}
+		if existing > 0 {
+			return nil
+		}
+	}
+	scheduled := time.Now().UTC().Add(delay)
+	if _, err := tx.Exec(`INSERT INTO campaign_messages(uuid, campaign_uuid, shop_uuid, subject, body, status, scheduled_at, send_after, metadata)
+                           VALUES($1,$2,$3,$4,$5,'scheduled',$6,NULL,$7)`,
+		uuid.New(), campaignID, shop, subject, body, scheduled, nullIfEmptyJSON(metaBytes)); err != nil {
+		return fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+	return nil
+}
+
 func saveAttributionVisit(db *sqlx.DB, shop uuid.UUID, user string, input attributionVisitInput) (MarketingAttribution, error) {
 	user = strings.TrimSpace(user)
 	if user == "" {
@@ -3339,9 +3417,19 @@ func saveAttributionVisit(db *sqlx.DB, shop uuid.UUID, user string, input attrib
 	if shop == uuid.Nil {
 		return MarketingAttribution{}, fiber.NewError(fiber.StatusBadRequest, "shop required")
 	}
-	normalize := func(value string) string {
-		return strings.TrimSpace(value)
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return MarketingAttribution{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
 	}
+	defer tx.Rollback()
+
+	var priorCount int
+	if err := tx.Get(&priorCount, `SELECT COUNT(1) FROM marketing_attributions WHERE user_uuid=$1 AND shop_uuid=$2`, userUUID, shop); err != nil {
+		return MarketingAttribution{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+
+	normalize := func(value string) string { return strings.TrimSpace(value) }
 	source := normalize(input.Source)
 	medium := normalize(input.Medium)
 	campaign := normalize(input.Campaign)
@@ -3349,12 +3437,36 @@ func saveAttributionVisit(db *sqlx.DB, shop uuid.UUID, user string, input attrib
 	content := normalize(input.Content)
 	referrer := normalize(input.Referrer)
 	landing := normalize(input.LandingPage)
+
 	var attribution MarketingAttribution
-	err = db.Get(&attribution, `INSERT INTO marketing_attributions(uuid, shop_uuid, user_uuid, order_uuid, source, medium, campaign, term, content, referrer, landing_page, metadata)
-                                 VALUES(uuid_generate_v4(),$1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10)
-                                 RETURNING uuid, shop_uuid, user_uuid, order_uuid, source, medium, campaign, term, content, referrer, landing_page, metadata, created_at`,
-		shop, userUUID, nullableString(source), nullableString(medium), nullableString(campaign), nullableString(term), nullableString(content), nullableString(referrer), nullableString(landing), nullIfEmptyJSON(input.Metadata))
-	if err != nil {
+	if err := tx.Get(&attribution, `INSERT INTO marketing_attributions(uuid, shop_uuid, user_uuid, order_uuid, source, medium, campaign, term, content, referrer, landing_page, metadata)
+                                   VALUES(uuid_generate_v4(),$1,$2,NULL,$3,$4,$5,$6,$7,$8,$9,$10)
+                                   RETURNING uuid, shop_uuid, user_uuid, order_uuid, source, medium, campaign, term, content, referrer, landing_page, metadata, created_at`,
+		shop,
+		userUUID,
+		nullableString(source),
+		nullableString(medium),
+		nullableString(campaign),
+		nullableString(term),
+		nullableString(content),
+		nullableString(referrer),
+		nullableString(landing),
+		nullIfEmptyJSON(input.Metadata)); err != nil {
+		return MarketingAttribution{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
+	}
+
+	if priorCount == 0 {
+		metaStep1 := map[string]any{"type": "welcome_series_step1"}
+		if err := enqueueAutomationEmailTx(tx, shop, userUUID, "Welcome to Berjis Marketplace", "We're glad you're here! Explore the latest products today.", 15*time.Minute, metaStep1); err != nil {
+			return MarketingAttribution{}, err
+		}
+		metaStep2 := map[string]any{"type": "welcome_series_step2"}
+		if err := enqueueAutomationEmailTx(tx, shop, userUUID, "Need any help getting started?", "Here are tips and collections we think you'll love.", 72*time.Hour, metaStep2); err != nil {
+			return MarketingAttribution{}, err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
 		return MarketingAttribution{}, fiber.NewError(fiber.StatusInternalServerError, "db error")
 	}
 	return attribution, nil
@@ -3676,6 +3788,20 @@ func createManualOrderTx(tx *sqlx.Tx, shop Shop, customerUserUUID uuid.UUID, pre
 		}
 	}
 	if err := linkAttributionToOrder(tx, userString, shop.UUID, orderID); err != nil {
+		return manualOrderResult{}, err
+	}
+	metaConfirmation := map[string]any{
+		"type":      "order_confirmation",
+		"orderUuid": orderID.String(),
+	}
+	if err := enqueueAutomationEmailTx(tx, shop.UUID, customerUserUUID, "Order confirmed", "Your order has been confirmed and is on its way!", 5*time.Minute, metaConfirmation); err != nil {
+		return manualOrderResult{}, err
+	}
+	metaFollow := map[string]any{
+		"type":      "post_purchase",
+		"orderUuid": orderID.String(),
+	}
+	if err := enqueueAutomationEmailTx(tx, shop.UUID, customerUserUUID, "We'd love your feedback", "Share your thoughts about your recent order.", 72*time.Hour, metaFollow); err != nil {
 		return manualOrderResult{}, err
 	}
 
@@ -4115,6 +4241,23 @@ func previewCartPricing(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) erro
 	total := totalBeforeGift
 	if discountAmount > originalSubtotal+originalShipping {
 		discountAmount = originalSubtotal + originalShipping
+	}
+
+	if userUUID := uuidPtrFromString(user); userUUID != nil && shopUUID != uuid.Nil {
+		meta := map[string]any{
+			"type":     "abandoned_cart",
+			"cartUuid": cartID.String(),
+			"shopUuid": shopUUID.String(),
+			"subtotal": subtotal,
+			"currency": currency,
+		}
+		if err := enqueueAutomationEmailTx(tx, shopUUID, *userUUID, "Did you forget something?", "Items are still waiting in your cart—complete your checkout now.", 2*time.Hour, meta); err != nil {
+			return respondWithError(c, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 
 	return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
