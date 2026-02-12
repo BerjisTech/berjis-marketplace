@@ -4,17 +4,23 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-bg-light-start: #eff6ff; /* blue-50 */
-  --color-bg-light-end: #f8fafc;   /* slate-50 */
-  --color-text-primary: #0f172a;   /* slate-900 */
-  --color-text-accent: #1e3a8a;    /* blue-900 */
-  --color-link: #60a5fa;           /* blue-400 */
-  --color-shadow-light: rgba(30,64,175,0.15);
-  --color-bg-dark-start: #1e3a8a;  /* blue-900 */
-  --color-bg-dark-end: #0f172a;    /* slate-900 */
-  --color-text-dark: #f8fafc;      /* slate-50 */
+  /* ── Light: white + neon blue ── */
+  --color-bg-light-start: #ffffff;
+  --color-bg-light-end: #f0f9ff;
+  --color-text-primary: #0f172a;
+  --color-text-accent: #00bcd4;
+  --color-link: #00d4ff;
+  --color-shadow-light: rgba(0, 212, 255, 0.12);
+  /* ── Dark: black + gold ── */
+  --color-bg-dark-start: #000000;
+  --color-bg-dark-end: #0a0a0a;
+  --color-text-dark: #f8fafc;
   --color-gold: #f5c542;
-  --color-shadow-dark: rgba(2,6,23,0.6);
+  --color-shadow-dark: rgba(0, 0, 0, 0.6);
+  /* ── Accent tokens ── */
+  --accent: #00d4ff;
+  --accent-hover: #00bcd4;
+  --accent-text: #0891b2;
 }
 
 @layer base {
@@ -23,9 +29,9 @@
     --app-bg-base: var(--color-bg-light-start);
     --app-bg-surface: var(--color-bg-light-end);
     --app-text-primary: var(--color-text-primary);
-    --app-text-muted: #475569;
+    --app-text-muted: #6b7280;
     --app-link: var(--color-link);
-    --app-border: rgba(148, 163, 184, 0.25);
+    --app-border: rgba(0, 212, 255, 0.12);
     --app-shadow: 0 18px 48px var(--color-shadow-light);
   }
 
@@ -35,10 +41,14 @@
     --app-bg-base: var(--color-bg-dark-start);
     --app-bg-surface: var(--color-bg-dark-end);
     --app-text-primary: var(--color-text-dark);
-    --app-text-muted: #cbd5e1;
-    --app-link: #a5b4fc;
-    --app-border: rgba(37, 99, 235, 0.35);
+    --app-text-muted: rgba(248,250,252,0.6);
+    --app-link: var(--color-gold);
+    --app-border: rgba(245, 197, 66, 0.1);
     --app-shadow: 0 28px 72px var(--color-shadow-dark);
+
+    --accent: #f5c542;
+    --accent-hover: #fbbf24;
+    --accent-text: #f5c542;
   }
 
   html,
@@ -62,11 +72,7 @@
   }
 
   a:hover {
-    color: #3b82f6;
-  }
-
-  .dark a:hover {
-    color: #bfdbfe;
+    color: var(--accent-hover);
   }
 }
 
@@ -83,50 +89,50 @@
     border-radius: 1.25rem;
     border: 1px solid var(--app-border);
     backdrop-filter: blur(14px);
-    background-color: rgba(255, 255, 255, 0.78);
+    background-color: rgba(255, 255, 255, 0.85);
     box-shadow: var(--app-shadow);
   }
 
   .dark .surface-card {
-    background-color: rgba(15, 23, 42, 0.82);
+    background-color: rgba(10, 10, 10, 0.85);
   }
 }
 
 .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold transition; min-height: 44px; }
-.btn-primary { @apply bg-blue-900 text-white hover:bg-blue-950; }
-.dark .btn-primary { @apply bg-[color:var(--color-gold)] text-slate-100 hover:bg-amber-400; }
+.btn-primary { @apply bg-[color:var(--accent)] text-white hover:bg-[color:var(--accent-hover)]; }
+.dark .btn-primary { @apply bg-[color:var(--color-gold)] text-slate-900 hover:bg-amber-400; }
 
 .btn {
-  box-shadow: 0 6px 18px rgba(30, 64, 175, 0.12);
+  box-shadow: 0 6px 18px rgba(0, 212, 255, 0.12);
   transform: translateY(0);
 }
 
 .btn:hover,
 .btn:focus-visible {
-  box-shadow: 0 0 22px rgba(251, 191, 36, 0.28);
+  box-shadow: 0 0 22px rgba(0, 212, 255, 0.25);
   transform: translateY(-1px);
 }
 
 .dark .btn {
-  box-shadow: 0 10px 24px rgba(12, 74, 110, 0.35);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
 }
 
 .dark .btn:hover,
 .dark .btn:focus-visible {
-  box-shadow: 0 0 24px rgba(252, 211, 77, 0.35);
+  box-shadow: 0 0 24px rgba(245, 197, 66, 0.3);
 }
 
 .skip-link {
   position: absolute;
   left: -999px;
   top: 1rem;
-  background: #fbbf24;
+  background: #f5c542;
   color: #0f172a;
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
   font-weight: 600;
   z-index: 1000;
-  box-shadow: 0 0 16px rgba(251, 191, 36, 0.4);
+  box-shadow: 0 0 16px rgba(245, 197, 66, 0.4);
 }
 
 .skip-link:focus {
