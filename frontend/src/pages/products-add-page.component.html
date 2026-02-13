@@ -1,0 +1,92 @@
+<div class="px-[clamp(1rem,5vw,4rem)] py-10">
+  <div class="mb-6">
+    <a routerLink="/dashboard/products" class="text-sm text-blue-700 hover:underline">&larr; Back to products</a>
+    <h1 class="mt-3 text-3xl font-semibold text-blue-900 dark:text-white">Add or import products</h1>
+    <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+      Choose how you want to populate your catalog. You can import a CSV, load demo data, or open the manual product form.
+    </p>
+  </div>
+
+  <div *ngIf="loadingShops()" class="notice info mb-4">Loading your shops...</div>
+  <div *ngIf="!loadingShops() && shops().length === 0" class="notice info mb-4">
+    You don't have any shops yet. Create a shop first from the dashboard overview.
+  </div>
+
+  <div *ngIf="shops().length" class="mb-6">
+    <label for="shop-select" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Active shop</label>
+    <select
+      id="shop-select"
+      class="mt-2 h-11 w-full rounded-xl border border-blue-900/20 bg-white/90 px-4 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100 sm:w-80"
+      [ngModel]="activeShopSlug()"
+      (ngModelChange)="changeShop($event)"
+    >
+      <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>
+    </select>
+  </div>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <section class="rounded-3xl border border-blue-900/15 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+      <h2 class="text-xl font-semibold text-blue-900 dark:text-white">Import CSV or use demo data</h2>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        Download the template, fill in your catalog, and upload it. Need something to test quickly? Import 50 demo products with one click.
+      </p>
+      <ol class="mt-4 list-decimal space-y-2 pl-4 text-sm text-slate-600 dark:text-slate-300">
+        <li>Download the CSV template.</li>
+        <li>Add your product details, leaving optional columns blank if you don't need them.</li>
+        <li>Return here to upload the CSV or load the demo catalog.</li>
+      </ol>
+      <div class="mt-6 flex flex-wrap gap-3">
+        <a
+          [href]="templateUrl"
+          download
+          class="btn border border-blue-900/20 bg-white text-blue-900 hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+        >
+          Download template
+        </a>
+        <button
+          type="button"
+          class="btn border border-blue-900/20 bg-white text-blue-900 hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+          (click)="openFilePicker()"
+          [disabled]="!activeShopSlug() || uploading()"
+        >
+          {{ uploading() ? 'Uploading CSV…' : 'Upload CSV' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary"
+          (click)="importDemoProducts()"
+          [disabled]="!activeShopSlug() || importingDemo()"
+        >
+          {{ importingDemo() ? 'Importing demo products…' : 'Import 50 demo products' }}
+        </button>
+      </div>
+      <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        CSV uploads and demo imports will use the selected shop above.
+      </p>
+      <input type="file" accept=".csv" class="hidden" #fileInput (change)="handleFile($event)" />
+    </section>
+
+    <section class="rounded-3xl border border-blue-900/15 bg-white/90 p-6 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+      <h2 class="text-xl font-semibold text-blue-900 dark:text-white">Create products manually</h2>
+      <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
+        Use the full product editor to add descriptions, media, inventory levels, and pricing one item at a time.
+      </p>
+      <a
+        routerLink="/dashboard/products/new"
+        [queryParams]="createProductQuery()"
+        class="btn btn-primary mt-4 inline-flex items-center justify-center"
+      >
+        Open product form
+      </a>
+      <p class="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        You can return here anytime to import additional products or load the demo catalog again.
+      </p>
+    </section>
+  </div>
+
+  <div *ngIf="message()" class="notice success mt-6">
+    {{ message() }}
+    <a routerLink="/dashboard/products" class="ml-2 text-sm font-semibold text-blue-900 underline dark:text-blue-200">View products</a>
+  </div>
+  <div *ngIf="error()" class="notice error mt-6">{{ error() }}</div>
+</div>

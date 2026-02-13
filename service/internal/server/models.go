@@ -32,7 +32,7 @@ type Product struct {
 	ImageURL     *string          `db:"image_url" json:"imageUrl,omitempty"`
 	Category     string           `db:"category" json:"category"`
 	CategoryUUID *uuid.UUID       `db:"category_uuid" json:"categoryUuid,omitempty"`
-	Images       []string         `db:"images" json:"images"`
+	Images       pq.StringArray   `db:"images" json:"images"`
 	Rating       float32          `db:"rating" json:"rating"`
 	ReviewCount  int64            `db:"review_count" json:"reviewCount"`
 	CreatedAt    time.Time        `db:"created_at" json:"createdAt"`

@@ -30,6 +30,7 @@ func main() {
 		UploadsPublicBase: cfg.UploadsPublicBase,
 		TaxRatePercent:    cfg.TaxRatePercent,
 		ShippingFlatCents: cfg.ShippingFlatCents,
+		MaxShopsPerUser:   cfg.MaxShopsPerUser,
 	})
 
 	addr := ":" + cfg.Port

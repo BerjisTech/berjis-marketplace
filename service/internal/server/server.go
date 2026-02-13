@@ -25,6 +25,7 @@ type Options struct {
 	UploadsPublicBase string
 	TaxRatePercent    float64
 	ShippingFlatCents int64
+	MaxShopsPerUser   int
 }
 
 func New(opts Options) *fiber.App {

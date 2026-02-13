@@ -62,4 +62,22 @@ export class ProductService {
       withCredentials: true,
     });
   }
+
+  importProductsCsv(shopSlug: string, file: File): Observable<ApiResponse<Record<string, unknown>>> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<ApiResponse<Record<string, unknown>>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/products/import`,
+      formData,
+      { withCredentials: true },
+    );
+  }
+
+  importDemoProducts(shopSlug: string): Observable<ApiResponse<{ created: number }>> {
+    return this.http.post<ApiResponse<{ created: number }>>(
+      `${this.api}/v1/my/shops/${encodeURIComponent(shopSlug)}/products/import-demo`,
+      {},
+      { withCredentials: true },
+    );
+  }
 }

@@ -12,9 +12,15 @@ import (
 	"strings"
 
 	srvAuth "github.com/berjistech/berjis-ecosystem/marketplace/service/internal/auth"
+	"github.com/jmoiron/sqlx"
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	pq "github.com/lib/pq"
+)
+
+const (
+	demoProductSlugPrefix = "demo-product-"
+	demoProductsCount     = 50
 )
 
 func registerShopProductRoutes(app *fiber.App, opts Options, requireAuth fiber.Handler) {
@@ -40,11 +46,14 @@ func registerShopProductRoutes(app *fiber.App, opts Options, requireAuth fiber.H
 		allowed := srvAuth.HasAnyAppRole(c, srvAuth.RoleOwner, srvAuth.RoleManager) ||
 			srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleAdmin) ||
 			srvAuth.HasPlatformRole(c, srvAuth.PlatformRoleSupport)
-		if !allowed {
+		if !allowed && opts.MaxShopsPerUser > 0 {
 			var owned int
 			_ = opts.DB.Get(&owned, `SELECT COUNT(1) FROM shops WHERE owner_uuid=$1`, owner)
-			if owned > 0 {
-				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+			if owned >= opts.MaxShopsPerUser {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"success": false,
+					"message": fmt.Sprintf("shop limit reached (max %d)", opts.MaxShopsPerUser),
+				})
 			}
 		}
 		id := uuid.New()
@@ -582,6 +591,36 @@ func registerShopProductRoutes(app *fiber.App, opts Options, requireAuth fiber.H
 		}})
 	})
 
+	app.Post("/v1/my/shops/:slug/products/import-demo", requireAuth, func(c *fiber.Ctx) error {
+		slug := c.Params("slug")
+		shop, role, err := ensureShopAccess(c, opts.DB, slug)
+		if err != nil {
+			return respondWithError(c, err)
+		}
+		if !teamRoleAllowsManagement(role) {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"success": false, "message": "insufficient permissions"})
+		}
+		if err := ensureDemoCategories(opts.DB, shop.UUID); err != nil {
+			log.Printf("ensure demo categories error: %v", err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "could not seed categories"})
+		}
+		pattern := demoProductSlugPrefix + "%"
+		if _, err := opts.DB.Exec(`DELETE FROM products WHERE shop_uuid=$1 AND slug LIKE $2`, shop.UUID, pattern); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"success": false, "message": "could not reset demo products"})
+		}
+		created := 0
+		for _, input := range generateDemoProductsPayload() {
+			if _, _, err := createProductWithVariants(opts.DB, shop, input); err != nil {
+				return writeErrorResponse(c, err)
+			}
+			created++
+		}
+		if err := refreshAutomaticCollectionsForShop(opts.DB, shop.UUID); err != nil {
+			log.Printf("automatic collection refresh error: %v", err)
+		}
+		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{"created": created}})
+	})
+
 	app.Get("/v1/my/shops/:slug/categories", requireAuth, func(c *fiber.Ctx) error {
 		slug := c.Params("slug")
 		shop, role, err := ensureShopAccess(c, opts.DB, slug)
@@ -767,4 +806,93 @@ func registerShopProductRoutes(app *fiber.App, opts Options, requireAuth fiber.H
 		return c.JSON(fiber.Map{"success": true})
 	})
 
+}
+
+func ensureDemoCategories(db *sqlx.DB, shopUUID uuid.UUID) error {
+	categories := []struct {
+		slug        string
+		name        string
+		description string
+	}{
+		{"apparel", "Apparel", "Clothing, footwear, and accessories."},
+		{"home", "Home", "Household essentials, decor, and organization."},
+		{"beauty", "Beauty", "Self-care, skincare, and cosmetics."},
+		{"outdoor", "Outdoor", "Adventure, travel, and backyard gear."},
+		{"kitchen", "Kitchen", "Cookware, tools, and entertaining items."},
+		{"tech", "Tech", "Gadgets, devices, and electronics."},
+	}
+	for idx, cat := range categories {
+		if _, err := db.Exec(`INSERT INTO categories (uuid, shop_uuid, name, slug, description, sort_order, is_active)
+		                      VALUES ($1,$2,$3,$4,$5,$6,true)
+		                      ON CONFLICT (shop_uuid, slug) DO UPDATE
+		                      SET name=EXCLUDED.name,
+		                          description=EXCLUDED.description,
+		                          sort_order=EXCLUDED.sort_order,
+		                          is_active=true,
+		                          updated_at=now()`,
+			uuid.New(),
+			shopUUID,
+			cat.name,
+			cat.slug,
+			cat.description,
+			idx,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func generateDemoProductsPayload() []ProductCreateInput {
+	adjectives := []string{"Aurora", "Summit", "Coastal", "Lumen", "Grove", "Atlas", "Beacon", "Cinder", "Harvest", "Nimbus"}
+	productTypes := []string{"Bottle", "Backpack", "Notebook", "Blanket", "Speaker", "Planter", "Sneaker", "Candle", "Jacket", "Watch"}
+	categories := []string{"apparel", "home", "beauty", "outdoor", "kitchen", "tech"}
+	descriptions := []string{
+		"Ready-to-ship sample item built for merchandising tests.",
+		"Great for experimenting with inventory management.",
+		"Use to demo pricing, discounts, and checkout flows.",
+	}
+
+	payload := make([]ProductCreateInput, 0, demoProductsCount)
+	for i := 1; i <= demoProductsCount; i++ {
+		title := fmt.Sprintf("%s %s", adjectives[(i-1)%len(adjectives)], productTypes[(i-1)%len(productTypes)])
+		category := categories[(i-1)%len(categories)]
+		summary := fmt.Sprintf("%s (%s demo #%02d)", descriptions[(i-1)%len(descriptions)], titleWord(category), i)
+		imageURL := fmt.Sprintf("https://placehold.co/600x600?text=Demo+%02d", i)
+		payload = append(payload, ProductCreateInput{
+			Title:      title,
+			Slug:       makeDemoSlug(i),
+			Summary:    summary,
+			PriceCents: int64(1800 + (i * 45)),
+			Currency:   "USD",
+			Stock:      int64(40 + (i % 35)),
+			ImageURL:   stringPtr(imageURL),
+			Images:     []string{imageURL},
+			Published:  true,
+			Category:   category,
+		})
+	}
+	return payload
+}
+
+func makeDemoSlug(index int) string {
+	suffix := strings.Split(uuid.NewString(), "-")[0]
+	return fmt.Sprintf("%s%02d-%s", demoProductSlugPrefix, index, strings.ToLower(suffix))
+}
+
+func titleWord(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return trimmed
+	}
+	lower := strings.ToLower(trimmed)
+	if len(lower) == 1 {
+		return strings.ToUpper(lower)
+	}
+	return strings.ToUpper(lower[:1]) + lower[1:]
+}
+
+func stringPtr(value string) *string {
+	v := value
+	return &v
 }

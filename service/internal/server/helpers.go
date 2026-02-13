@@ -1501,9 +1501,9 @@ func upsertDefaultInventory(db *sqlx.DB, shop uuid.UUID, product uuid.UUID, quan
 		quantity = 0
 	}
 	_, err := db.Exec(`INSERT INTO inventory_levels (shop_uuid, product_uuid, location_uuid, quantity, reserved, safety_stock)
-                       VALUES ($1,$2,NULL,$3,0,0)
-                       ON CONFLICT ON CONSTRAINT inventory_levels_product_default_idx
-                       DO UPDATE SET quantity=EXCLUDED.quantity, updated_at=now()`,
+	                       VALUES ($1,$2,NULL,$3,0,0)
+	                       ON CONFLICT (product_uuid) WHERE location_uuid IS NULL
+	                       DO UPDATE SET quantity=EXCLUDED.quantity, updated_at=now()`,
 		shop, product, quantity)
 	return err
 }

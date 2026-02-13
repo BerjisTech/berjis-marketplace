@@ -1,12 +1,13 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { environment } from '../environments/environment';
 import { firstValueFrom } from 'rxjs';
 import { ApiResponse, ProductService, ProductSummary } from '../app/core/services/product.service';
 import { ModalComponent } from '../app/shared/components/modal/modal.component';
+import { ShopStateService } from '../app/core/services/shop-state.service';
 
 @Component({
   standalone: true,
@@ -15,12 +16,13 @@ import { ModalComponent } from '../app/shared/components/modal/modal.component';
   templateUrl: './products-overview-page.component.html',
   styleUrls: ['./products-overview-page.component.css'],
 })
-export class ProductsOverviewPageComponent implements OnInit {
+export class ProductsOverviewPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly products = inject(ProductService);
+  private readonly shopState = inject(ShopStateService);
   readonly api = environment.apiBase;
-  shops = signal<ShopSummary[]>([]);
-  shopSlug = signal<string>('');
+  readonly shops = this.shopState.shops;
+  readonly activeShopSlug = this.shopState.activeShopSlug;
   items = signal<ProductSummary[]>([]);
   loading = signal<boolean>(false);
   q = signal<string>('');
@@ -40,37 +42,25 @@ export class ProductsOverviewPageComponent implements OnInit {
 
   readonly hasProducts = computed(() => !this.loading() && this.items().length > 0);
 
-  ngOnInit(): void {
-    this.bootstrap();
-  }
-
-  bootstrap(): void {
-    this.loading.set(true);
-    this.http
-      .get<ApiResponse<ShopSummary[]>>(`${this.api}/v1/my/shops`, { withCredentials: true })
-      .subscribe({
-        next: (response) => {
-          const list = response?.data ?? [];
-          this.shops.set(list);
-          const current = this.shopSlug();
-          const initial = current && list.some((shop) => shop.slug === current) ? current : list[0]?.slug ?? '';
-          this.shopSlug.set(initial);
-          if (initial) {
-            this.load();
-          } else {
-            this.loading.set(false);
-          }
-        },
-        error: () => {
-          this.loading.set(false);
-          this.error.set('Could not load shops.');
-        },
-      });
-  }
-
-  load(): void {
-    const slug = this.shopSlug();
+  private readonly syncActiveShop = effect(() => {
+    const slug = this.shopState.activeShopSlug();
     if (!slug) {
+      return;
+    }
+    this.load(slug);
+  });
+
+  ngOnInit(): void {
+    this.shopState.ensureLoaded();
+  }
+
+  ngOnDestroy(): void {
+    this.syncActiveShop.destroy();
+  }
+
+  load(slug?: string): void {
+    const target = slug ?? this.shopState.activeShopSlug();
+    if (!target) {
       this.items.set([]);
       return;
     }
@@ -78,7 +68,7 @@ export class ProductsOverviewPageComponent implements OnInit {
     this.error.set('');
     const params = this.q() ? `?q=${encodeURIComponent(this.q())}` : '';
     this.http
-      .get<ApiResponse<ProductSummary[]>>(`${this.api}/v1/my/shops/${slug}/products${params}`, {
+      .get<ApiResponse<ProductSummary[]>>(`${this.api}/v1/my/shops/${target}/products${params}`, {
         withCredentials: true,
       })
       .subscribe({
@@ -94,10 +84,9 @@ export class ProductsOverviewPageComponent implements OnInit {
   }
 
   changeShop(slug: string): void {
-    this.shopSlug.set(slug);
+    this.shopState.setActiveShopSlug(slug);
     this.message.set('');
     this.error.set('');
-    this.load();
   }
 
   changeQuery(value: string): void {
@@ -184,13 +173,6 @@ export class ProductsOverviewPageComponent implements OnInit {
     }
     return Math.round(parsed * 100);
   }
-}
-
-export interface ShopSummary {
-  uuid: string;
-  name: string;
-  slug: string;
-  description?: string;
 }
 
 interface ProductEditDraft {

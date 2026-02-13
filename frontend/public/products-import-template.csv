@@ -1,0 +1,6 @@
+title,slug,summary,price_cents,currency,stock,category,category_uuid,image_url,published,images,variants
+"Sample Tee","sample-tee","Lightweight cotton t-shirt for demos",2500,USD,120,apparel,,https://placehold.co/600x600?text=Tee,true,"[\"https://placehold.co/600x600?text=Tee\"]","[]"
+"Sample Mug","sample-mug","Ceramic mug perfect for onboarding",1500,USD,80,home,,https://placehold.co/600x600?text=Mug,true,"[\"https://placehold.co/600x600?text=Mug\"]","[]"
+"Sample Backpack","sample-backpack","Spacious daypack you can use to test imports",5200,USD,45,outdoor,,https://placehold.co/600x600?text=Pack,true,"[]","[]"
+"Sample Candle","sample-candle","Scented candle placeholder product",2800,USD,60,home,,https://placehold.co/600x600?text=Candle,true,"[]","[]"
+"Sample Speaker","sample-speaker","Bluetooth speaker with demo specs",8900,USD,30,tech,,https://placehold.co/600x600?text=Speaker,true,"[]","[]"

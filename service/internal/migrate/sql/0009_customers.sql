@@ -13,8 +13,17 @@ CREATE TABLE IF NOT EXISTS customers (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-ALTER TABLE customers
-  ADD CONSTRAINT customers_shop_email_unique UNIQUE (shop_uuid, email);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'customers_shop_email_unique'
+      AND conrelid = 'customers'::regclass
+  ) THEN
+    ALTER TABLE customers
+      ADD CONSTRAINT customers_shop_email_unique UNIQUE (shop_uuid, email);
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS customers_shop_idx ON customers(shop_uuid);
 CREATE INDEX IF NOT EXISTS customers_user_idx ON customers(user_uuid);

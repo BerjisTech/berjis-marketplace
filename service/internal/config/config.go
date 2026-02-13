@@ -15,6 +15,7 @@ type Config struct {
 	UploadsPublicBase string
 	TaxRatePercent    float64
 	ShippingFlatCents int64
+	MaxShopsPerUser   int
 }
 
 func getenv(k, def string) string {
@@ -53,5 +54,6 @@ func Load() Config {
 		UploadsPublicBase: getenv("UPLOADS_PUBLIC_BASE", "/uploads"),
 		TaxRatePercent:    getenvFloat("TAX_RATE_PERCENT", 8.5),
 		ShippingFlatCents: getenvInt64("SHIPPING_FLAT_CENTS", 1500),
+		MaxShopsPerUser:   int(getenvInt64("MAX_SHOPS_PER_USER", 0)),
 	}
 }

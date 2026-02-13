@@ -1,10 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { environment } from '../environments/environment';
 import { ApiResponse, ProductSummary } from '../app/core/services/product.service';
 import { OrderService, ShopMetrics } from '../app/core/services/order.service';
+import { ShopStateService } from '../app/core/services/shop-state.service';
 
 @Component({
   standalone: true,
@@ -13,13 +14,14 @@ import { OrderService, ShopMetrics } from '../app/core/services/order.service';
   templateUrl: './dashboard-overview-page.component.html',
   styleUrls: ['./dashboard-overview-page.component.css'],
 })
-export class DashboardOverviewPageComponent implements OnInit {
+export class DashboardOverviewPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly ordersService = inject(OrderService);
   private readonly api = environment.apiBase;
+  private readonly shopState = inject(ShopStateService);
 
-  readonly shops = signal<ShopSummary[]>([]);
-  readonly selectedShopSlug = signal<string>('');
+  readonly shops = this.shopState.shops;
+  readonly activeShopSlug = this.shopState.activeShopSlug;
   readonly products = signal<ProductSummary[]>([]);
   readonly metrics = signal<ShopMetrics | null>(null);
   readonly loading = signal<boolean>(false);
@@ -54,39 +56,30 @@ export class DashboardOverviewPageComponent implements OnInit {
     return `${path} L${this.chartWidth},${this.chartHeight} L0,${this.chartHeight} Z`;
   });
 
+  private readonly syncActiveShop = effect(() => {
+    const slug = this.shopState.activeShopSlug();
+    if (!slug) {
+      this.products.set([]);
+      this.metrics.set(null);
+      this.loading.set(false);
+      return;
+    }
+    this.loadData(slug);
+  });
+
   ngOnInit(): void {
-    this.bootstrap();
+    this.shopState.ensureLoaded();
   }
 
-  bootstrap(): void {
-    this.loading.set(true);
-    this.http
-      .get<ApiResponse<ShopSummary[]>>(`${this.api}/v1/my/shops`, { withCredentials: true })
-      .subscribe({
-        next: (response) => {
-          const shops = response?.data ?? [];
-          this.shops.set(shops);
-          const slug = shops[0]?.slug ?? '';
-          this.selectedShopSlug.set(slug);
-          if (slug) {
-            this.loadData(slug);
-          } else {
-            this.loading.set(false);
-          }
-        },
-        error: () => {
-          this.loading.set(false);
-          this.error.set('Could not load dashboard data.');
-        },
-      });
+  ngOnDestroy(): void {
+    this.syncActiveShop.destroy();
   }
 
   changeShop(slug: string): void {
     if (!slug) {
       return;
     }
-    this.selectedShopSlug.set(slug);
-    this.loadData(slug);
+    this.shopState.setActiveShopSlug(slug);
   }
 
   private loadData(slug: string): void {
@@ -137,11 +130,4 @@ export class DashboardOverviewPageComponent implements OnInit {
     const sanitized = name.trim().toLowerCase();
     return /(my\s+shop|new\s+shop|untitled|demo\s+shop|store|shop\s*\d+)/.test(sanitized);
   }
-}
-
-interface ShopSummary {
-  uuid: string;
-  name: string;
-  slug: string;
-  description?: string;
 }

@@ -9,7 +9,7 @@
     <div class="flex flex-wrap items-center gap-2">
       <select
         class="h-10 min-w-[200px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
-        [value]="selectedShopSlug()"
+        [value]="activeShopSlug()"
         (change)="changeShop($event.target.value)"
       >
         <option *ngFor="let shop of shops()" [value]="shop.slug">{{ shop.name }}</option>

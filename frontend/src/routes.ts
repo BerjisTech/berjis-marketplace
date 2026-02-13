@@ -17,6 +17,8 @@ import { ProductsPurchaseOrdersPageComponent } from './pages/products-purchase-o
 import { ProductsTransfersPageComponent } from './pages/products-transfers-page.component';
 import { ProductsGiftCardsPageComponent } from './pages/products-gift-cards-page.component';
 import { ProductsNewPageComponent } from './pages/products-new-page.component';
+import { ProductsAddPageComponent } from './pages/products-add-page.component';
+import { ProductsCategoriesPageComponent } from './pages/products-categories-page.component';
 
 import { CustomersOverviewPageComponent } from './pages/customers-overview-page.component';
 import { CustomersSegmentsPageComponent } from './pages/customers-segments-page.component';
@@ -66,6 +68,8 @@ import { GetStartedPageComponent } from './pages/get-started-page.component';
 import { UserFacingPagesComponent } from './app/components/user-facing-pages/user-facing-pages.component';
 import { InviteAcceptPageComponent } from './pages/invite-accept-page.component';
 import { authGuard } from './app/core/guards/auth.guard';
+import { hasShopGuard } from './app/core/guards/has-shop.guard';
+import { hasProductsGuard } from './app/core/guards/has-products.guard';
 
 export const routes: Routes = [
   {
@@ -81,7 +85,7 @@ export const routes: Routes = [
       { path: 'category/:id', component: CategoryPageComponent },
     ]
   },
-  { path: 'dashboard', component: DashboardPageComponent, canActivate: [authGuard], canActivateChild: [authGuard], children: [
+  { path: 'dashboard', component: DashboardPageComponent, canActivate: [authGuard, hasShopGuard], canActivateChild: [authGuard], children: [
     { path: '', pathMatch: 'full', component: DashboardOverviewPageComponent },
     // Orders
     { path: 'orders', component: OrdersOverviewPageComponent },
@@ -89,8 +93,10 @@ export const routes: Routes = [
     { path: 'orders/abandoned-checkouts', component: OrdersAbandonedCheckoutsPageComponent },
     { path: 'orders/returns', component: OrdersReturnsPageComponent },
     // Products
-    { path: 'products', component: ProductsOverviewPageComponent },
+    { path: 'products/add', component: ProductsAddPageComponent },
+    { path: 'products', component: ProductsOverviewPageComponent, canActivate: [hasProductsGuard] },
     { path: 'products/new', component: ProductsNewPageComponent },
+    { path: 'products/categories', component: ProductsCategoriesPageComponent },
     { path: 'products/collections', component: ProductsCollectionsPageComponent },
     { path: 'products/inventory', component: ProductsInventoryPageComponent },
     { path: 'products/purchase-orders', component: ProductsPurchaseOrdersPageComponent },

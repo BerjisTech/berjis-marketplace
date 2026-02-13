@@ -7,9 +7,9 @@
       <ng-container *ngIf="shops().length > 1">
         <select
           class="h-9 rounded-full border border-blue-900/15 dark:border-slate-700 bg-white/80 dark:bg-slate-950/70 px-4 text-sm"
-          (change)="onShopChange($event)">
-          <option *ngFor="let s of shops()" [selected]="s.slug===selectedShopSlug()" [value]="s.slug">{{ s.name }}
-          </option>
+          [ngModel]="activeShopSlug()"
+          (ngModelChange)="onShopChange($event)">
+          <option *ngFor="let s of shops()" [value]="s.slug">{{ s.name }}</option>
         </select>
       </ng-container>
       <div class="relative flex-1">
@@ -118,6 +118,8 @@
             [class.rotate-90]="openGroup()==='products'">chevron_right</span>
         </a>
         <div [class.hidden]="navCollapsed() || openGroup()!=='products'" class="pl-9 flex flex-col gap-1">
+          <a routerLink="/dashboard/products/categories"
+            class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Categories</a>
           <a routerLink="/dashboard/products/collections"
             class="text-sm px-3 py-1 rounded hover:bg-blue-50/60 dark:hover:bg-slate-900/60">Collections</a>
           <a routerLink="/dashboard/products/inventory"

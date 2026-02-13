@@ -7,7 +7,7 @@
     <div class="flex flex-wrap items-center gap-2">
       <select
         class="h-10 min-w-[180px] rounded-full border border-blue-900/20 bg-white/90 px-3 text-sm dark:border-slate-700 dark:bg-slate-950/60 dark:text-slate-100"
-        [ngModel]="shopSlug()"
+        [ngModel]="activeShopSlug()"
         (ngModelChange)="changeShop($event)"
       >
         <option *ngFor="let s of shops()" [value]="s.slug">{{ s.name }}</option>
@@ -28,6 +28,12 @@
     <a routerLink="/dashboard/products/purchase-orders" class="chip-link">Purchase orders</a>
     <a routerLink="/dashboard/products/transfers" class="chip-link">Transfers</a>
     <a routerLink="/dashboard/products/gift-cards" class="chip-link">Gift cards</a>
+    <a routerLink="/dashboard/products/categories" class="chip-link">Categories</a>
+  </div>
+
+  <div class="rounded-2xl border border-dashed border-blue-900/20 bg-white/80 px-4 py-3 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-200">
+    Tag products with reusable categories to power storefront filters.
+    <a routerLink="/dashboard/products/categories" class="font-semibold text-blue-700 underline dark:text-blue-300 ml-1">Manage categories</a>
   </div>
 
   <div *ngIf="message()" class="notice success">{{ message() }}</div>
@@ -77,6 +83,7 @@
           <tr *ngIf="!loading() && items().length === 0">
             <td colspan="5" class="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-300">
               No products found for this shop.
+              <a routerLink="/dashboard/products/add" class="ml-1 text-blue-700 underline dark:text-blue-300">Add or import products</a>.
             </td>
           </tr>
           <tr *ngIf="loading()">

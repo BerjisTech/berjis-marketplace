@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
@@ -7,6 +7,7 @@ import { environment } from '../environments/environment';
 import { DarkModeToggleComponent } from '../app/components/dark-mode-toggle/dark-mode-toggle.component';
 import { ProfileService, UserProfile } from '../app/core/services/profile.service';
 import { ApiResponse, CreateProductPayload, ProductSummary } from '../app/core/services/product.service';
+import { ShopStateService, ShopSummary } from '../app/core/services/shop-state.service';
 
 @Component({
   standalone: true,
@@ -19,9 +20,10 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private readonly http = inject(HttpClient);
   private readonly api = environment.apiBase;
   private readonly profileService = inject(ProfileService);
+  private readonly shopState = inject(ShopStateService);
 
-  shops = signal<ShopSummary[]>([]);
-  selectedShopSlug = signal<string>('');
+  readonly shops = this.shopState.shops;
+  readonly activeShopSlug = this.shopState.activeShopSlug;
   products = signal<ProductSummary[]>([]);
   // layout
   navCollapsed = signal<boolean>(false);
@@ -44,33 +46,50 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   newShop = { name: '', slug: '', description: '' };
   newProduct: CreateProductPayload = { title: '', slug: '', summary: '', priceCents: 0, currency: 'USD', stock: 0, published: true, category: '' };
   uploadBusy = signal(false);
+  private readonly syncActiveShop = effect(() => {
+    const slug = this.shopState.activeShopSlug();
+    if (!slug) {
+      this.products.set([]);
+      return;
+    }
+    this.loadProducts(slug);
+  });
 
   ngOnInit(): void {
-    this.loadShops();
+    this.shopState.ensureLoaded();
     this.loadProfile();
   }
   ngOnDestroy(): void {
     if (this.searchTimer) {
       clearTimeout(this.searchTimer);
     }
+    this.syncActiveShop.destroy();
   }
 
   loadShops(): void {
     this.http.get<ApiResponse<ShopSummary[]>>(`${this.api}/v1/my/shops`, { withCredentials: true }).subscribe(response => {
       const shops = response?.data ?? [];
-      this.shops.set(shops);
-      if (shops.length && !this.selectedShopSlug()) {
-        this.selectedShopSlug.set(shops[0].slug);
-        this.loadProducts();
+      this.shopState.applyShops(shops);
+      const active = this.shopState.activeShopSlug();
+      if (active) {
+        this.loadProducts(active);
+      } else {
+        this.products.set([]);
       }
     });
   }
-  loadProducts(): void {
-    const slug = this.selectedShopSlug(); if(!slug) return;
+  loadProducts(slug: string): void {
+    if(!slug) {
+      this.products.set([]);
+      return;
+    }
     this.http.get<ApiResponse<ProductSummary[]>>(`${this.api}/v1/my/shops/${slug}/products`, { withCredentials: true })
       .subscribe(r => this.products.set(r?.data ?? []));
   }
-  onShopChange(ev: Event){ const value = (ev.target as HTMLSelectElement).value; this.selectedShopSlug.set(value); this.loadProducts(); }
+  onShopChange(ev: Event){
+    const value = (ev.target as HTMLSelectElement).value;
+    this.shopState.setActiveShopSlug(value);
+  }
   onSearchChange(v: string){
     this.searchQ.set(v);
     if (this.searchTimer) clearTimeout(this.searchTimer);
@@ -91,7 +110,14 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   
   createShop(){
     const b = this.newShop; if(!b.name || !b.slug) return;
-    this.http.post<unknown>(`${this.api}/v1/shops`, b, { withCredentials: true }).subscribe(()=>{ this.newShop = { name:'', slug:'', description:'' }; this.loadShops(); });
+    const desiredSlug = (b.slug || '').trim().toLowerCase();
+    this.http.post<unknown>(`${this.api}/v1/shops`, b, { withCredentials: true }).subscribe(()=>{
+      this.newShop = { name:'', slug:'', description:'' };
+      if (desiredSlug) {
+        this.shopState.setActiveShopSlug(desiredSlug);
+      }
+      this.loadShops();
+    });
   }
   async onFile(ev: Event){
     const input = ev.target as HTMLInputElement; const file = input.files?.[0]; if(!file) return;
@@ -103,14 +129,27 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     } finally { this.uploadBusy.set(false); }
   }
   createProduct(){
-    const slug = this.selectedShopSlug(); if(!slug) return; const b = { ...this.newProduct, shopSlug: slug };
-    this.http.post(`${this.api}/v1/products`, b, { withCredentials: true }).subscribe(()=>{ this.newProduct = { title:'', slug:'', summary:'', priceCents:0, currency:'USD', stock:0, published:true, category:'' }; this.loadProducts(); });
+    const slug = this.shopState.activeShopSlug(); if(!slug) return; const b = { ...this.newProduct, shopSlug: slug };
+    this.http.post(`${this.api}/v1/products`, b, { withCredentials: true }).subscribe(()=>{
+      this.newProduct = { title:'', slug:'', summary:'', priceCents:0, currency:'USD', stock:0, published:true, category:'' };
+      this.loadProducts(slug);
+    });
   }
   togglePublish(p: ProductSummary){
-    this.http.patch(`${this.api}/v1/products/${p.uuid}`, { published: !p.published }, { withCredentials: true }).subscribe(()=>{ this.loadProducts(); });
+    const slug = this.shopState.activeShopSlug();
+    this.http.patch(`${this.api}/v1/products/${p.uuid}`, { published: !p.published }, { withCredentials: true }).subscribe(()=>{
+      if (slug) {
+        this.loadProducts(slug);
+      }
+    });
   }
   deleteProduct(p: ProductSummary){
-    this.http.delete(`${this.api}/v1/products/${p.uuid}`, { withCredentials: true }).subscribe(()=> this.loadProducts());
+    const slug = this.shopState.activeShopSlug();
+    this.http.delete(`${this.api}/v1/products/${p.uuid}`, { withCredentials: true }).subscribe(()=>{
+      if (slug) {
+        this.loadProducts(slug);
+      }
+    });
   }
   openAI(){ this.toolsOpen.set(true); }
 
@@ -161,13 +200,6 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   toggleUserMenu(): void {
     this.userMenuOpen.set(!this.userMenuOpen());
   }
-}
-
-export interface ShopSummary {
-  uuid: string;
-  name: string;
-  slug: string;
-  description?: string;
 }
 
 export interface DashboardSearchResults {
