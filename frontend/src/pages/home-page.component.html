@@ -35,7 +35,7 @@
           <ng-container *ngFor="let p of products().slice(0,4)">
             <a [routerLink]="['/product', p.uuid]" class="group rounded-2xl bg-white/80 dark:bg-slate-950/70 border border-blue-900/20 dark:border-slate-800 overflow-hidden hover:shadow-brand transition">
               <div class="aspect-4/3 bg-blue-100 dark:bg-slate-900">
-                <img *ngIf="p.imageUrl" [src]="p.imageUrl" [attr.alt]="p.title || 'Product image'" class="w-full h-full object-cover group-hover:scale-[1.02] transition"/>
+                <img *ngIf="p.imageUrl" [src]="p.imageUrl" [attr.alt]="p.title || 'Product image'" class="w-full h-full object-cover group-hover:scale-[1.02] transition" loading="lazy" />
               </div>
               <div class="p-3">
                 <div class="text-xs text-slate-600 dark:text-slate-400 mb-1">{{ p.shopName }}</div>
@@ -67,7 +67,7 @@
       </ng-container>
     </div>
     <ng-template #loadingTpl>
-      <div class="text-slate-600 dark:text-slate-400">Loading catalog…</div>
+      <app-skeleton *ngFor="let s of [1,2,3,4,5,6,7,8]" type="card"></app-skeleton>
     </ng-template>
   </section>
 

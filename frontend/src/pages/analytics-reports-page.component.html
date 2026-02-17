@@ -1,3 +1,194 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Reports</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for analytics reports.</p>
+<div class="py-4 space-y-6 max-w-4xl">
+  <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Reports</h1>
+  <p class="text-sm text-slate-600 dark:text-slate-300">Generate detailed reports for your store.</p>
 
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+
+  <!-- Filters -->
+  <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-3">
+    <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Report parameters</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">From</label>
+        <input type="date" [(ngModel)]="dateFrom" name="dateFrom"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">To</label>
+        <input type="date" [(ngModel)]="dateTo" name="dateTo"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Report type</label>
+        <select [(ngModel)]="reportType" name="reportType"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white">
+          @for (t of reportTypes; track t) {
+            <option [value]="t">{{ t }}</option>
+          }
+        </select>
+      </div>
+      <div class="flex items-end gap-2">
+        <button type="button" (click)="generateReport()" [disabled]="loading()"
+          class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition">
+          {{ loading() ? 'Generating...' : 'Generate' }}
+        </button>
+        <button type="button" (click)="exportCsv()"
+          class="rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          [disabled]="loading()">
+          Export CSV
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sales report results -->
+  @if (salesData()) {
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Sales Summary</h2>
+      </div>
+      <div class="grid grid-cols-3 gap-4 p-4">
+        <div class="text-center">
+          <p class="text-lg font-semibold text-blue-900 dark:text-white">${{ fmt(salesData()!.totalRevenueCents) }}</p>
+          <p class="text-xs text-slate-500">Revenue</p>
+        </div>
+        <div class="text-center">
+          <p class="text-lg font-semibold text-blue-900 dark:text-white">{{ salesData()!.ordersCount }}</p>
+          <p class="text-xs text-slate-500">Orders</p>
+        </div>
+        <div class="text-center">
+          <p class="text-lg font-semibold text-blue-900 dark:text-white">${{ fmt(salesData()!.averageOrderValueCents) }}</p>
+          <p class="text-xs text-slate-500">AOV</p>
+        </div>
+      </div>
+      @if (salesData()!.series?.length) {
+        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+          <thead class="bg-slate-50 dark:bg-slate-800">
+            <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <th class="px-4 py-3">Date</th>
+              <th class="px-4 py-3 text-right">Revenue</th>
+              <th class="px-4 py-3 text-right">Orders</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+            @for (pt of salesData()!.series; track pt.date) {
+              <tr class="text-slate-700 dark:text-slate-200">
+                <td class="px-4 py-3">{{ pt.date?.split('T')?.[0] }}</td>
+                <td class="px-4 py-3 text-right">${{ fmt(pt.revenueCents) }}</td>
+                <td class="px-4 py-3 text-right">{{ pt.ordersCount }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+
+  <!-- Top products report results -->
+  @if (topProducts().length) {
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Top Products</h2>
+      </div>
+      <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-800">
+          <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <th class="px-4 py-3">#</th>
+            <th class="px-4 py-3">Product</th>
+            <th class="px-4 py-3 text-right">Units Sold</th>
+            <th class="px-4 py-3 text-right">Revenue</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+          @for (p of topProducts(); track p.productUuid; let idx = $index) {
+            <tr class="text-slate-700 dark:text-slate-200">
+              <td class="px-4 py-3 text-slate-400">{{ idx + 1 }}</td>
+              <td class="px-4 py-3 font-medium">{{ p.title }}</td>
+              <td class="px-4 py-3 text-right">{{ p.unitsSold }}</td>
+              <td class="px-4 py-3 text-right">${{ fmt(p.revenueCents) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Customer report results -->
+  @if (customerData()) {
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Customer Breakdown</h2>
+      </div>
+      <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-800">
+          <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <th class="px-4 py-3">Metric</th>
+            <th class="px-4 py-3 text-right">Value</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+          <tr class="text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium">New Customers</td>
+            <td class="px-4 py-3 text-right">{{ customerData()!.newCustomers }}</td>
+          </tr>
+          <tr class="text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium">Returning Customers</td>
+            <td class="px-4 py-3 text-right">{{ customerData()!.returningCustomers }}</td>
+          </tr>
+          <tr class="text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium">Total Customers</td>
+            <td class="px-4 py-3 text-right">{{ customerData()!.totalCustomers }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Conversion report results -->
+  @if (conversionData()) {
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Conversion Funnel</h2>
+      </div>
+      <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+        <thead class="bg-slate-50 dark:bg-slate-800">
+          <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+            <th class="px-4 py-3">Stage</th>
+            <th class="px-4 py-3 text-right">Count</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+          <tr class="text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium">Product Views</td>
+            <td class="px-4 py-3 text-right">{{ conversionData()!.productViews }}</td>
+          </tr>
+          <tr class="text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium">Add to Cart</td>
+            <td class="px-4 py-3 text-right">{{ conversionData()!.addToCarts }}</td>
+          </tr>
+          <tr class="text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium">Checkouts Started</td>
+            <td class="px-4 py-3 text-right">{{ conversionData()!.checkoutsStarted }}</td>
+          </tr>
+          <tr class="text-slate-700 dark:text-slate-200">
+            <td class="px-4 py-3 font-medium">Checkouts Completed</td>
+            <td class="px-4 py-3 text-right">{{ conversionData()!.checkoutsCompleted }}</td>
+          </tr>
+          <tr class="text-slate-700 dark:text-slate-200 font-semibold">
+            <td class="px-4 py-3">Conversion Rate</td>
+            <td class="px-4 py-3 text-right">{{ conversionData()!.conversionRate | number:'1.1-1' }}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <!-- Empty state -->
+  @if (!loading() && !salesData() && !topProducts().length && !customerData() && !conversionData() && !error()) {
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-8 text-center">
+      <p class="text-sm text-slate-500 dark:text-slate-400">Select parameters and generate a report to view results.</p>
+    </div>
+  }
+</div>

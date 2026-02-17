@@ -1,6 +1,21 @@
-<section class="mt-6 flex items-center justify-center gap-3">
-  <button class="rounded-full border px-4 h-10" [class.opacity-50]="page<=1" [disabled]="page<=1" (click)="prev.emit()">Previous</button>
-  <div class="text-sm">Page {{ page }}</div>
-  <button class="rounded-full border px-4 h-10" [class.opacity-50]="!hasNext" [disabled]="!hasNext" (click)="next.emit()">Next</button>
-</section>
+<section class="mt-6 flex items-center justify-center gap-2">
+  <button class="rounded-full border px-4 h-10 text-sm" [class.opacity-50]="page<=1" [disabled]="page<=1" (click)="prev.emit()">Previous</button>
 
+  <ng-container *ngIf="totalPages > 0; else simplePageDisplay">
+    <ng-container *ngFor="let p of pages">
+      <span *ngIf="p === '...'" class="px-2 text-sm text-slate-400">&hellip;</span>
+      <button *ngIf="p !== '...'"
+        class="rounded-full border h-10 w-10 text-sm transition"
+        [class.bg-blue-600]="p === page" [class.text-white]="p === page"
+        [class.dark:bg-amber-500]="p === page" [class.dark:text-black]="p === page"
+        [class.hover:border-blue-400]="p !== page"
+        [disabled]="p === page"
+        (click)="goToPage.emit(p)">{{ p }}</button>
+    </ng-container>
+  </ng-container>
+  <ng-template #simplePageDisplay>
+    <div class="text-sm px-2">Page {{ page }}</div>
+  </ng-template>
+
+  <button class="rounded-full border px-4 h-10 text-sm" [class.opacity-50]="!hasNext" [disabled]="!hasNext" (click)="next.emit()">Next</button>
+</section>

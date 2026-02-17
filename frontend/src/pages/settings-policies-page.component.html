@@ -1,3 +1,54 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Policies</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Refund, privacy, terms of service, and other policies.</p>
+<div class="py-4 space-y-6 max-w-2xl">
+  <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Policies</h1>
+  <p class="text-sm text-slate-600 dark:text-slate-300">Define your store policies displayed to customers.</p>
 
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+  @if (saved()) {
+    <p class="text-sm text-green-600 dark:text-green-400">Policies saved.</p>
+  }
+
+  @if (loading()) {
+    <div class="space-y-4">
+      @for (i of [1,2,3,4]; track i) {
+        <div class="h-24 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+      }
+    </div>
+  } @else {
+    <form (ngSubmit)="save()" class="space-y-4">
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-2">
+        <label class="block text-sm font-semibold text-blue-900 dark:text-white">Refund policy</label>
+        <textarea [(ngModel)]="refundPolicy" name="refundPolicy" rows="6"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none resize-none"
+          placeholder="Describe your refund and return policy..."></textarea>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-2">
+        <label class="block text-sm font-semibold text-blue-900 dark:text-white">Privacy policy</label>
+        <textarea [(ngModel)]="privacyPolicy" name="privacyPolicy" rows="6"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none resize-none"
+          placeholder="Describe how you collect and use customer data..."></textarea>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-2">
+        <label class="block text-sm font-semibold text-blue-900 dark:text-white">Terms of service</label>
+        <textarea [(ngModel)]="termsOfService" name="termsOfService" rows="6"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none resize-none"
+          placeholder="Define your terms of service..."></textarea>
+      </div>
+
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-2">
+        <label class="block text-sm font-semibold text-blue-900 dark:text-white">Shipping policy</label>
+        <textarea [(ngModel)]="shippingPolicy" name="shippingPolicy" rows="6"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none resize-none"
+          placeholder="Describe your shipping and delivery policy..."></textarea>
+      </div>
+
+      <button type="submit" [disabled]="saving()"
+        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition">
+        {{ saving() ? 'Saving...' : 'Save' }}
+      </button>
+    </form>
+  }
+</div>

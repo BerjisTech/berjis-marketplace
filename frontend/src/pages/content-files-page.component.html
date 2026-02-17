@@ -1,3 +1,77 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Files</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for file management.</p>
+<div class="py-4 space-y-6 max-w-4xl">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Files</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">Manage uploaded files and media.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" (click)="toggleView()"
+        class="rounded-lg border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition">
+        {{ viewMode() === 'grid' ? 'List view' : 'Grid view' }}
+      </button>
+      <button type="button" (click)="upload()"
+        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition">
+        Upload file
+      </button>
+    </div>
+  </div>
 
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="text-sm text-green-600 dark:text-green-400">{{ message() }}</p>
+  }
+
+  @if (loading()) {
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      @for (i of [1,2,3,4]; track i) {
+        <div class="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+      }
+    </div>
+  } @else {
+    @if (files().length > 0) {
+      @if (viewMode() === 'grid') {
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          @for (file of files(); track file.id) {
+            <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-2">
+              <div class="h-20 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <span class="text-2xl text-slate-400">&#128196;</span>
+              </div>
+              <p class="text-sm font-medium text-slate-900 dark:text-white truncate">{{ file.name }}</p>
+              <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                <span>{{ file.size }}</span>
+                <span>{{ file.date }}</span>
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+          <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+            <thead class="bg-slate-50 dark:bg-slate-800">
+              <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                <th class="px-4 py-3">Name</th>
+                <th class="px-4 py-3">Size</th>
+                <th class="px-4 py-3">Date</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+              @for (file of files(); track file.id) {
+                <tr class="text-slate-700 dark:text-slate-200">
+                  <td class="px-4 py-3 font-medium">{{ file.name }}</td>
+                  <td class="px-4 py-3">{{ file.size }}</td>
+                  <td class="px-4 py-3">{{ file.date }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    } @else {
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-8 text-center">
+        <p class="text-sm text-slate-500 dark:text-slate-400">No files uploaded yet. Click upload to add your first file.</p>
+      </div>
+    }
+  }
+</div>

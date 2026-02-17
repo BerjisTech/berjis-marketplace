@@ -62,6 +62,7 @@ import { SettingsMetafieldsAndMetaobjectsPageComponent } from './pages/settings-
 import { SettingsLanguagesPageComponent } from './pages/settings-languages-page.component';
 import { SettingsCustomerPrivacyPageComponent } from './pages/settings-customer-privacy-page.component';
 import { SettingsPoliciesPageComponent } from './pages/settings-policies-page.component';
+import { SettingsWebhooksPageComponent } from './pages/settings-webhooks-page.component';
 import { CategoryPageComponent } from './pages/category-page.component';
 import { NewShopPageComponent } from './pages/new-shop-page.component';
 import { GetStartedPageComponent } from './pages/get-started-page.component';
@@ -146,6 +147,7 @@ export const routes: Routes = [
     { path: 'settings/languages', component: SettingsLanguagesPageComponent },
     { path: 'settings/customer-privacy', component: SettingsCustomerPrivacyPageComponent },
     { path: 'settings/policies', component: SettingsPoliciesPageComponent },
+    { path: 'settings/webhooks', component: SettingsWebhooksPageComponent },
   ] },
   { path: 'invite/:token', component: InviteAcceptPageComponent },
   { path: 'dashboard/shops/new', component: NewShopPageComponent },

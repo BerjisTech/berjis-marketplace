@@ -1603,15 +1603,16 @@ func registerOrderRoutes(app *fiber.App, opts Options, requireAuth fiber.Handler
 		defer tx.Rollback()
 
 		var row struct {
-			Status           string     `db:"status"`
-			TotalCents       int64      `db:"total_cents"`
-			RefundTotalCents int64      `db:"refund_total_cents"`
-			DiscountUUID     *uuid.UUID `db:"discount_uuid"`
-			DiscountAmount   int64      `db:"discount_amount_cents"`
-			GiftCardUUID     *uuid.UUID `db:"gift_card_uuid"`
-			GiftCardAmount   int64      `db:"gift_card_amount_cents"`
+			Status                 string     `db:"status"`
+			TotalCents             int64      `db:"total_cents"`
+			RefundTotalCents       int64      `db:"refund_total_cents"`
+			DiscountUUID           *uuid.UUID `db:"discount_uuid"`
+			DiscountAmount         int64      `db:"discount_amount_cents"`
+			GiftCardUUID           *uuid.UUID `db:"gift_card_uuid"`
+			GiftCardAmount         int64      `db:"gift_card_amount_cents"`
+			StripePaymentIntentID  *string    `db:"stripe_payment_intent_id"`
 		}
-		if err := tx.Get(&row, `SELECT status, total_cents, refund_total_cents, discount_uuid, discount_amount_cents, gift_card_uuid, gift_card_amount_cents
+		if err := tx.Get(&row, `SELECT status, total_cents, refund_total_cents, discount_uuid, discount_amount_cents, gift_card_uuid, gift_card_amount_cents, stripe_payment_intent_id
                                 FROM orders
                                 WHERE uuid=$1
                                 FOR UPDATE`, orderID); err != nil {
@@ -1718,6 +1719,19 @@ func registerOrderRoutes(app *fiber.App, opts Options, requireAuth fiber.Handler
 
 		if err := tx.Commit(); err != nil {
 			return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
+		}
+
+		// Issue Stripe refund if applicable (after DB commit, best-effort)
+		stripeRefundAmount := amount - giftCardRefund
+		if opts.StripeClient != nil && row.StripePaymentIntentID != nil && *row.StripePaymentIntentID != "" && stripeRefundAmount > 0 {
+			shopUUID := meta.ShopUUID
+			secretKey := getShopStripeKey(opts.DB, shopUUID, opts.StripeClient.SecretKey)
+			sc := opts.StripeClient
+			sc.SecretKey = secretKey
+			idempotencyKey := fmt.Sprintf("refund-%s-%d", orderID.String(), newRefundTotal)
+			if _, err := sc.CreateRefund(*row.StripePaymentIntentID, stripeRefundAmount, idempotencyKey); err != nil {
+				log.Printf("stripe refund failed for order %s: %v", orderID, err)
+			}
 		}
 
 		return c.JSON(fiber.Map{"success": true, "data": fiber.Map{

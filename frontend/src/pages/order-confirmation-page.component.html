@@ -1,10 +1,85 @@
 <div class="min-h-screen pt-16 px-[clamp(1rem,6vw,3rem)] pb-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
-  <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-6 text-center">
-    <div class="text-2xl font-bold text-blue-900 dark:text-white">Thank you for your order!</div>
-    <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">Your order ID is <span class="font-mono">{{ id }}</span>.</div>
-    <div class="mt-4">
-      <a routerLink="/" class="btn btn-primary rounded-full h-10 px-5">Continue shopping</a>
-    </div>
-  </div>
-</div>
+  @if (!loading()) {
+    <div class="max-w-2xl mx-auto">
+      <div class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-6 text-center mb-6">
+        <div class="text-3xl mb-2">&#10003;</div>
+        <div class="text-2xl font-bold text-blue-900 dark:text-white">Thank you for your order!</div>
+        <div class="mt-2 text-sm text-slate-600 dark:text-slate-300">Your order ID is <span class="font-mono">{{ id }}</span>.</div>
+      </div>
 
+      @if (order(); as o) {
+        <!-- Order Items -->
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 mb-4">
+          <h2 class="text-sm font-semibold text-blue-900 dark:text-white mb-3">Items</h2>
+          @for (item of o.items; track item.title) {
+            <div class="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+              @if (item.imageUrl) {
+                <img [src]="item.imageUrl" class="w-12 h-12 rounded object-cover" loading="lazy" alt="" />
+              }
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{{ item.title }}</div>
+                <div class="text-xs text-slate-500">Qty: {{ item.quantity }}</div>
+              </div>
+              <div class="text-sm text-slate-700 dark:text-slate-200">{{ (item.priceCents * item.quantity / 100) | number:'1.2-2' }} {{ item.currency }}</div>
+            </div>
+          }
+        </div>
+
+        <!-- Totals -->
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 mb-4">
+          <div class="flex justify-between text-sm py-1">
+            <span class="text-slate-600 dark:text-slate-400">Subtotal</span>
+            <span>{{ (o.subtotalCents / 100) | number:'1.2-2' }} {{ o.currency }}</span>
+          </div>
+          @if (o.shippingCents > 0) {
+            <div class="flex justify-between text-sm py-1">
+              <span class="text-slate-600 dark:text-slate-400">Shipping</span>
+              <span>{{ (o.shippingCents / 100) | number:'1.2-2' }} {{ o.currency }}</span>
+            </div>
+          }
+          @if (o.taxCents > 0) {
+            <div class="flex justify-between text-sm py-1">
+              <span class="text-slate-600 dark:text-slate-400">Tax</span>
+              <span>{{ (o.taxCents / 100) | number:'1.2-2' }} {{ o.currency }}</span>
+            </div>
+          }
+          <div class="flex justify-between font-semibold text-blue-900 dark:text-white border-t border-slate-200 dark:border-slate-700 pt-2 mt-2">
+            <span>Total</span>
+            <span>{{ (o.totalCents / 100) | number:'1.2-2' }} {{ o.currency }}</span>
+          </div>
+        </div>
+
+        <!-- Shipping Address -->
+        @if (o.shippingAddress; as addr) {
+          <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 mb-4">
+            <h2 class="text-sm font-semibold text-blue-900 dark:text-white mb-2">Shipping Address</h2>
+            <div class="text-sm text-slate-600 dark:text-slate-300 space-y-0.5">
+              @if (addr.name) { <div>{{ addr.name }}</div> }
+              @if (addr.line1) { <div>{{ addr.line1 }}</div> }
+              @if (addr.line2) { <div>{{ addr.line2 }}</div> }
+              <div>{{ addr.city }}{{ addr.state ? ', ' + addr.state : '' }} {{ addr.postalCode }}</div>
+              @if (addr.country) { <div>{{ addr.country }}</div> }
+            </div>
+          </div>
+        }
+
+        <!-- Payment -->
+        <div class="rounded-xl border border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-4 mb-4">
+          <h2 class="text-sm font-semibold text-blue-900 dark:text-white mb-2">Payment</h2>
+          <div class="text-sm text-slate-600 dark:text-slate-300">
+            Status: <span class="font-medium capitalize">{{ o.status }}</span>
+          </div>
+        </div>
+      }
+
+      <div class="text-center mt-6">
+        <a routerLink="/" class="btn btn-primary rounded-full h-10 px-5">Continue shopping</a>
+      </div>
+    </div>
+  } @else {
+    <div class="max-w-2xl mx-auto space-y-4">
+      <app-skeleton type="card"></app-skeleton>
+      <app-skeleton type="text"></app-skeleton>
+    </div>
+  }
+</div>

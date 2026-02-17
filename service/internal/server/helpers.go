@@ -603,7 +603,8 @@ func clearCart(c *fiber.Ctx, db *sqlx.DB) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
-func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) error {
+func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, opts Options) error {
+	shippingFlatCents := opts.ShippingFlatCents
 	user := srvAuth.UserID(c)
 	userUUID := uuidPtrFromString(user)
 	cartID, err := ensureCart(db, user)
@@ -612,14 +613,21 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 	}
 
 	var body struct {
-		DiscountCode string `json:"discountCode"`
-		GiftCardCode string `json:"giftCardCode"`
+		DiscountCode     string          `json:"discountCode"`
+		GiftCardCode     string          `json:"giftCardCode"`
+		ShippingRateUUID string          `json:"shippingRateUuid"`
+		Shipping         json.RawMessage `json:"shipping"`
+		ShippingCountry  string          `json:"shippingCountry"`
+		ShippingRegion   string          `json:"shippingRegion"`
 	}
 	if err := c.BodyParser(&body); err != nil && err != io.EOF {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid checkout payload"})
 	}
 	discountCode := strings.TrimSpace(body.DiscountCode)
 	giftCardCode := strings.TrimSpace(body.GiftCardCode)
+	shippingRateID := strings.TrimSpace(body.ShippingRateUUID)
+	shippingCountry := strings.TrimSpace(strings.ToUpper(body.ShippingCountry))
+	shippingRegion := strings.TrimSpace(strings.ToUpper(body.ShippingRegion))
 
 	tx, err := db.Beginx()
 	if err != nil {
@@ -655,10 +663,31 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 	shippingDiscount := int64(0)
 
 	shippingCents := int64(0)
-	if !multiShop && shopUUID != uuid.Nil && shippingFlatCents > 0 {
+	var shippingRateUUIDValue any
+	if shippingRateID != "" {
+		rateUUID, err := uuid.Parse(shippingRateID)
+		if err == nil && rateUUID != uuid.Nil {
+			rate, err := lookupShippingRate(db, rateUUID)
+			if err != nil {
+				return respondWithError(c, err)
+			}
+			shippingCents = rate.PriceCents
+			// Apply free-above threshold
+			if rate.FreeAboveCents != nil && subtotal >= *rate.FreeAboveCents {
+				shippingCents = 0
+			}
+			shippingRateUUIDValue = rateUUID
+		}
+	} else if !multiShop && shopUUID != uuid.Nil && shippingFlatCents > 0 {
 		shippingCents = shippingFlatCents
 	}
 	originalShipping := shippingCents
+
+	// Store shipping address as JSONB
+	var shippingAddressValue any
+	if len(body.Shipping) > 0 {
+		shippingAddressValue = string(body.Shipping)
+	}
 
 	if discountCode != "" {
 		if shopUUID == uuid.Nil || multiShop {
@@ -731,6 +760,35 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 
 	total := totalBeforeGift
 
+	// --- Tax calculation ---
+	taxRatePercent := float64(0)
+	taxCents := int64(0)
+	if shopUUID != uuid.Nil && !multiShop {
+		taxRatePercent = resolveTaxRate(opts, shopUUID, shippingCountry, shippingRegion)
+		// Compute taxable amount: line items that are not tax-exempt, after discount
+		taxableAmount := int64(0)
+		for _, item := range items {
+			var exempt bool
+			if err := db.Get(&exempt, `SELECT is_tax_exempt FROM products WHERE uuid=$1`, item.ProductUUID); err != nil {
+				exempt = false
+			}
+			if !exempt {
+				taxableAmount += int64(item.Quantity) * item.PriceCents
+			}
+		}
+		// Subtract product discount proportionally from taxable amount
+		if productDiscount > 0 && subtotal > 0 {
+			// Scale discount to taxable portion
+			taxableDiscount := int64(math.Round(float64(productDiscount) * float64(taxableAmount) / float64(subtotal)))
+			taxableAmount -= taxableDiscount
+			if taxableAmount < 0 {
+				taxableAmount = 0
+			}
+		}
+		taxCents = int64(math.Round(float64(taxableAmount) * taxRatePercent / 100.0))
+	}
+	total += taxCents
+
 	var shopValue any
 	if shopUUID != uuid.Nil && !multiShop {
 		shopValue = shopUUID
@@ -752,20 +810,31 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 		giftCardUUIDValue = giftCard.UUID
 	}
 
-	if _, err := tx.Exec(`INSERT INTO orders(uuid,user_uuid,shop_uuid,subtotal_cents,total_cents,currency,status,discount_uuid,discount_code,discount_amount_cents,gift_card_uuid,gift_card_code,gift_card_amount_cents)
-                          VALUES($1,$2,$3,$4,$5,$6,'pending',$7,$8,$9,$10,$11,$12)`,
+	orderStatus := "awaiting_payment"
+	if opts.StripeClient == nil {
+		orderStatus = "pending"
+	}
+
+	if _, err := tx.Exec(`INSERT INTO orders(uuid,user_uuid,shop_uuid,subtotal_cents,total_cents,currency,status,discount_uuid,discount_code,discount_amount_cents,gift_card_uuid,gift_card_code,gift_card_amount_cents,shipping_rate_uuid,shipping_cents,shipping_address,tax_cents,tax_rate_percent)
+                          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
 		orderID,
 		user,
 		shopValue,
 		subtotal,
 		total,
 		currency,
+		orderStatus,
 		discountUUIDValue,
 		discountCodeStored,
 		discountAmount,
 		giftCardUUIDValue,
 		giftCardCodeStored,
-		giftCardAmount); err != nil {
+		giftCardAmount,
+		shippingRateUUIDValue,
+		shippingCents,
+		shippingAddressValue,
+		taxCents,
+		taxRatePercent); err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 
@@ -815,6 +884,8 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 		"currency":              currency,
 		"shippingCents":         shippingCents,
 		"originalShippingCents": originalShipping,
+		"taxCents":              taxCents,
+		"taxRatePercent":        taxRatePercent,
 	}
 	if discountAmount > 0 {
 		creationMeta["discountAmountCents"] = discountAmount
@@ -844,16 +915,34 @@ func createOrderFromCart(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) err
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 
-	return c.JSON(fiber.Map{"success": true, "data": fiber.Map{
+	responseData := fiber.Map{
 		"uuid":                  orderID,
 		"subtotalCents":         subtotal,
 		"discountAmountCents":   discountAmount,
 		"giftCardAmountCents":   giftCardAmount,
 		"shippingCents":         shippingCents,
 		"shippingDiscountCents": shippingDiscount,
+		"taxCents":              taxCents,
+		"taxRatePercent":        taxRatePercent,
 		"totalCents":            total,
 		"currency":              currency,
-	}})
+		"status":                orderStatus,
+	}
+
+	// Create Stripe PaymentIntent if Stripe is configured and amount > 0
+	if opts.StripeClient != nil && total > 0 && shopUUID != uuid.Nil {
+		clientSecret, piID, err := createStripePaymentIntent(opts, orderID, shopUUID, total, currency)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"success": false, "message": "payment processing error: " + err.Error()})
+		}
+		if clientSecret != "" {
+			responseData["clientSecret"] = clientSecret
+			responseData["stripePaymentIntentId"] = piID
+			responseData["stripePublishableKey"] = opts.StripePublishableKey
+		}
+	}
+
+	return c.JSON(fiber.Map{"success": true, "data": responseData})
 }
 
 func fetchCartPricingRowsForUpdate(tx *sqlx.Tx, cart uuid.UUID) ([]cartPricingRow, error) {
@@ -4129,21 +4218,26 @@ func clearDefaultFlagsTx(tx *sqlx.Tx, user string, shipping, billing bool, exclu
 	}
 	return nil
 }
-func previewCartPricing(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) error {
+func previewCartPricing(c *fiber.Ctx, db *sqlx.DB, opts Options) error {
+	shippingFlatCents := opts.ShippingFlatCents
 	user := srvAuth.UserID(c)
 	cartID, err := ensureCart(db, user)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"success": false, "message": "db error"})
 	}
 	var body struct {
-		DiscountCode string `json:"discountCode"`
-		GiftCardCode string `json:"giftCardCode"`
+		DiscountCode    string `json:"discountCode"`
+		GiftCardCode    string `json:"giftCardCode"`
+		ShippingCountry string `json:"shippingCountry"`
+		ShippingRegion  string `json:"shippingRegion"`
 	}
 	if err := c.BodyParser(&body); err != nil && err != io.EOF {
 		return c.Status(400).JSON(fiber.Map{"success": false, "message": "invalid checkout payload"})
 	}
 	discountCode := strings.TrimSpace(body.DiscountCode)
 	giftCardCode := strings.TrimSpace(body.GiftCardCode)
+	shippingCountry := strings.TrimSpace(strings.ToUpper(body.ShippingCountry))
+	shippingRegion := strings.TrimSpace(strings.ToUpper(body.ShippingRegion))
 
 	tx, err := db.Beginx()
 	if err != nil {
@@ -4243,6 +4337,34 @@ func previewCartPricing(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) erro
 		discountAmount = originalSubtotal + originalShipping
 	}
 
+	// --- Tax calculation for preview ---
+	taxRatePercent := float64(0)
+	taxCents := int64(0)
+	if shopUUID != uuid.Nil && !multiShop {
+		taxRatePercent = resolveTaxRate(opts, shopUUID, shippingCountry, shippingRegion)
+		taxableAmount := int64(0)
+		for _, item := range items {
+			var exempt bool
+			if err := db.Get(&exempt, `SELECT is_tax_exempt FROM products WHERE uuid=$1`, item.ProductUUID); err != nil {
+				exempt = false
+			}
+			if !exempt {
+				taxableAmount += int64(item.Quantity) * item.PriceCents
+			}
+		}
+		// Subtract product discount proportionally from taxable amount
+		productDiscountOnly := discountAmount - shippingDiscount
+		if productDiscountOnly > 0 && originalSubtotal > 0 {
+			taxableDiscount := int64(math.Round(float64(productDiscountOnly) * float64(taxableAmount) / float64(originalSubtotal)))
+			taxableAmount -= taxableDiscount
+			if taxableAmount < 0 {
+				taxableAmount = 0
+			}
+		}
+		taxCents = int64(math.Round(float64(taxableAmount) * taxRatePercent / 100.0))
+	}
+	total += taxCents
+
 	if userUUID := uuidPtrFromString(user); userUUID != nil && shopUUID != uuid.Nil {
 		meta := map[string]any{
 			"type":     "abandoned_cart",
@@ -4266,6 +4388,8 @@ func previewCartPricing(c *fiber.Ctx, db *sqlx.DB, shippingFlatCents int64) erro
 		"giftCardAmountCents":   giftCardAmount,
 		"shippingCents":         shippingCents,
 		"shippingDiscountCents": shippingDiscount,
+		"taxCents":              taxCents,
+		"taxRatePercent":        taxRatePercent,
 		"totalCents":            total,
 		"currency":              currency,
 	}})

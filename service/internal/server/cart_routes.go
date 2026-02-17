@@ -11,7 +11,7 @@ func registerCartRoutes(app *fiber.App, opts Options, requireAuth fiber.Handler)
 	app.Put("/v1/cart/items/:id", requireAuth, func(c *fiber.Ctx) error { return updateCartItem(c, opts.DB) })
 	app.Delete("/v1/cart/items/:id", requireAuth, func(c *fiber.Ctx) error { return deleteCartItem(c, opts.DB) })
 	app.Delete("/v1/cart", requireAuth, func(c *fiber.Ctx) error { return clearCart(c, opts.DB) })
-	app.Post("/v1/cart/preview", requireAuth, func(c *fiber.Ctx) error { return previewCartPricing(c, opts.DB, opts.ShippingFlatCents) })
+	app.Post("/v1/cart/preview", requireAuth, func(c *fiber.Ctx) error { return previewCartPricing(c, opts.DB, opts) })
 	app.Post("/v1/cart/validate-discount", requireAuth, func(c *fiber.Ctx) error {
 		return validateDiscountCodeForCart(c, opts.DB, opts.ShippingFlatCents)
 	})
@@ -21,7 +21,7 @@ func registerCartRoutes(app *fiber.App, opts Options, requireAuth fiber.Handler)
 	app.Put("/v1/wishlist", requireAuth, func(c *fiber.Ctx) error { return replaceWishlist(c, opts.DB) })
 
 	// Orders minimal endpoints
-	app.Post("/v1/orders", requireAuth, func(c *fiber.Ctx) error { return createOrderFromCart(c, opts.DB, opts.ShippingFlatCents) })
+	app.Post("/v1/orders", requireAuth, func(c *fiber.Ctx) error { return createOrderFromCart(c, opts.DB, opts) })
 	app.Get("/v1/orders", requireAuth, func(c *fiber.Ctx) error { return listOrders(c, opts.DB) })
 	app.Get("/v1/orders/:id", requireAuth, func(c *fiber.Ctx) error { return getOrder(c, opts.DB) })
 

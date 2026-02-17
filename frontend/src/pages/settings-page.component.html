@@ -1,22 +1,13 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Settings</h1>
-<div class="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
-  <a routerLink="/dashboard/profile" class="rounded-lg border px-3 py-2">Account profile</a>
-  <a routerLink="/dashboard/settings/general" class="rounded-lg border px-3 py-2">General</a>
-  <a routerLink="/dashboard/settings/plan" class="rounded-lg border px-3 py-2">Plan</a>
-  <a routerLink="/dashboard/settings/billing" class="rounded-lg border px-3 py-2">Billing</a>
-  <a routerLink="/dashboard/settings/users" class="rounded-lg border px-3 py-2">Users</a>
-  <a routerLink="/dashboard/settings/payments" class="rounded-lg border px-3 py-2">Payments</a>
-  <a routerLink="/dashboard/settings/checkout" class="rounded-lg border px-3 py-2">Checkout</a>
-  <a routerLink="/dashboard/settings/customer-accounts" class="rounded-lg border px-3 py-2">Customer accounts</a>
-  <a routerLink="/dashboard/settings/shipping-and-delivery" class="rounded-lg border px-3 py-2">Shipping and delivery</a>
-  <a routerLink="/dashboard/settings/taxes-and-duties" class="rounded-lg border px-3 py-2">Taxes and duties</a>
-  <a routerLink="/dashboard/settings/locations" class="rounded-lg border px-3 py-2">Locations</a>
-  <a routerLink="/dashboard/settings/apps-and-sales-channels" class="rounded-lg border px-3 py-2">Apps and sales channels</a>
-  <a routerLink="/dashboard/settings/domains" class="rounded-lg border px-3 py-2">Domains</a>
-  <a routerLink="/dashboard/settings/customer-events" class="rounded-lg border px-3 py-2">Customer events</a>
-  <a routerLink="/dashboard/settings/notifications" class="rounded-lg border px-3 py-2">Notifications</a>
-  <a routerLink="/dashboard/settings/metafields-and-metaobjects" class="rounded-lg border px-3 py-2">Metafields and metaobjects</a>
-  <a routerLink="/dashboard/settings/languages" class="rounded-lg border px-3 py-2">Languages</a>
-  <a routerLink="/dashboard/settings/customer-privacy" class="rounded-lg border px-3 py-2">Customer privacy</a>
-  <a routerLink="/dashboard/settings/policies" class="rounded-lg border px-3 py-2">Policies</a>
+<div class="py-4">
+  <h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-2">Settings</h1>
+  <p class="text-sm text-slate-600 dark:text-slate-300 mb-6">Configure your store preferences, payments, and policies.</p>
+  <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+    @for (s of sections; track s.route) {
+      <a [routerLink]="s.route"
+        class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 hover:border-blue-400 dark:hover:border-blue-600 transition group">
+        <p class="text-sm font-medium text-blue-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-300">{{ s.label }}</p>
+        <p class="text-xs text-slate-500 mt-0.5">{{ s.desc }}</p>
+      </a>
+    }
+  </div>
 </div>

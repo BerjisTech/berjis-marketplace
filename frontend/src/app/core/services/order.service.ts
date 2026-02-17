@@ -41,6 +41,10 @@ export interface CreateManualOrderResponse {
 interface OrderResponseData {
   uuid?: string;
   id?: string;
+  clientSecret?: string;
+  stripePublishableKey?: string;
+  stripePaymentIntentId?: string;
+  status?: string;
 }
 
 interface OrderApiResponse {
@@ -261,7 +265,12 @@ export class OrderService {
   private readonly api = environment.apiBase;
   private readonly http = inject(HttpClient);
 
-  async createOrder(body: CreateOrderPayload): Promise<{ id: string }> {
+  async createOrder(body: CreateOrderPayload): Promise<{
+    id: string;
+    clientSecret?: string;
+    stripePublishableKey?: string;
+    status?: string;
+  }> {
     const res = await firstValueFrom(
       this.http.post<OrderApiResponse>(`${this.api}/v1/orders`, body, { withCredentials: true })
     );
@@ -269,7 +278,12 @@ export class OrderService {
     if (!apiId) {
       throw new Error('Order creation failed');
     }
-    return { id: apiId };
+    return {
+      id: apiId,
+      clientSecret: res?.data?.clientSecret,
+      stripePublishableKey: res?.data?.stripePublishableKey,
+      status: res?.data?.status,
+    };
   }
 
   listShopOrders(shopSlug: string): Observable<ApiResponse<ShopOrder[]>> {

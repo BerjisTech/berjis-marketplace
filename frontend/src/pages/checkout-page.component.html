@@ -1,10 +1,11 @@
 <div class="min-h-screen pt-16 px-[clamp(1rem,6vw,3rem)] pb-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
+  <app-breadcrumbs [items]="[{label: 'Home', url: '/'}, {label: 'Cart', url: '/cart'}, {label: 'Checkout'}]"></app-breadcrumbs>
   <h1 class="text-2xl font-bold text-blue-900 dark:text-white mb-4">Checkout</h1>
   <div class="mb-4 text-sm">
     <span [class.font-semibold]="step()==='shipping'">1. Shipping</span>
-    <span class="mx-2">→</span>
+    <span class="mx-2">&rarr;</span>
     <span [class.font-semibold]="step()==='payment'">2. Payment</span>
-    <span class="mx-2">→</span>
+    <span class="mx-2">&rarr;</span>
     <span [class.font-semibold]="step()==='review'">3. Review</span>
   </div>
 
@@ -67,61 +68,27 @@
         </div>
       </form>
 
-      <form *ngIf="step()==='payment'" #paymentForm="ngForm" class="rounded-xl border p-4 space-y-4" (ngSubmit)="advanceFromPayment(paymentForm)">
+      <div *ngIf="step()==='payment'" class="rounded-xl border p-4 space-y-4">
         <div class="text-lg font-semibold mb-3">Payment</div>
-        <div class="grid md:grid-cols-2 gap-3">
-          <div class="md:col-span-2">
-            <input class="rounded border px-3 py-2 w-full" placeholder="Name on card" [(ngModel)]="payment.cardName" name="cardName" required
-              [class.border-rose-400]="fieldInvalid(paymentForm, 'cardName')"
-              [attr.aria-invalid]="fieldInvalid(paymentForm, 'cardName') ? 'true' : null"
-              [attr.aria-describedby]="fieldInvalid(paymentForm, 'cardName') ? 'payment-cardName-error' : null" />
-            <p *ngIf="fieldInvalid(paymentForm, 'cardName')" id="payment-cardName-error" class="form-error">Cardholder name is required.</p>
-          </div>
-          <div class="md:col-span-2">
-            <input class="rounded border px-3 py-2 w-full" placeholder="Card number" [(ngModel)]="payment.cardNumber" name="cardNumber" required inputmode="numeric" pattern="^[0-9\\s]{12,23}$"
-              [class.border-rose-400]="fieldInvalid(paymentForm, 'cardNumber')"
-              [attr.aria-invalid]="fieldInvalid(paymentForm, 'cardNumber') ? 'true' : null"
-              [attr.aria-describedby]="fieldInvalid(paymentForm, 'cardNumber') ? 'payment-cardNumber-error' : null" />
-            <p *ngIf="fieldInvalid(paymentForm, 'cardNumber')" id="payment-cardNumber-error" class="form-error">
-              <span *ngIf="hasError(paymentForm, 'cardNumber', 'required')">Card number is required.</span>
-              <span *ngIf="!hasError(paymentForm, 'cardNumber', 'required')">Card number must be 12-23 digits.</span>
-            </p>
-          </div>
-          <div>
-            <input class="rounded border px-3 py-2 w-full" placeholder="MM/YY" [(ngModel)]="payment.exp" name="exp" required pattern="^(0[1-9]|1[0-2])\\/[0-9]{2}$"
-              [class.border-rose-400]="fieldInvalid(paymentForm, 'exp')"
-              [attr.aria-invalid]="fieldInvalid(paymentForm, 'exp') ? 'true' : null"
-              [attr.aria-describedby]="fieldInvalid(paymentForm, 'exp') ? 'payment-exp-error' : null" />
-            <p *ngIf="fieldInvalid(paymentForm, 'exp')" id="payment-exp-error" class="form-error">
-              <span *ngIf="hasError(paymentForm, 'exp', 'required')">Expiry date is required.</span>
-              <span *ngIf="!hasError(paymentForm, 'exp', 'required')">Use MM/YY format (e.g., 04/27).</span>
-            </p>
-          </div>
-          <div>
-            <input class="rounded border px-3 py-2 w-full" placeholder="CVC" [(ngModel)]="payment.cvc" name="cvc" required pattern="^[0-9]{3,4}$"
-              [class.border-rose-400]="fieldInvalid(paymentForm, 'cvc')"
-              [attr.aria-invalid]="fieldInvalid(paymentForm, 'cvc') ? 'true' : null"
-              [attr.aria-describedby]="fieldInvalid(paymentForm, 'cvc') ? 'payment-cvc-error' : null" />
-            <p *ngIf="fieldInvalid(paymentForm, 'cvc')" id="payment-cvc-error" class="form-error">
-              <span *ngIf="hasError(paymentForm, 'cvc', 'required')">CVC is required.</span>
-              <span *ngIf="!hasError(paymentForm, 'cvc', 'required')">CVC must be 3 or 4 digits.</span>
-            </p>
-          </div>
+        <div class="rounded border border-blue-900/20 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">
+          <div id="card-element" class="min-h-[40px]"></div>
         </div>
+        <p *ngIf="stripeError()" class="text-sm text-rose-500 mt-1">{{ stripeError() }}</p>
+        <p class="text-xs text-slate-500 mt-1">Card data is handled securely by Stripe. We never see your card number.</p>
         <div class="mt-4 flex items-center gap-2">
           <button type="button" class="rounded-full border px-4 h-10" (click)="back()">Back</button>
-          <button class="btn btn-primary">Review order</button>
+          <button class="btn btn-primary" (click)="advanceFromPayment()">Review order</button>
         </div>
-      </form>
+      </div>
 
       <div *ngIf="step()==='review'" class="rounded-xl border p-4">
         <div class="text-lg font-semibold mb-3">Review</div>
         <div class="text-sm mb-3">Shipping to {{ shipping.name }}, {{ shipping.address }}, {{ shipping.city }}, {{ shipping.country }} {{ shipping.zip }}</div>
-        <div class="text-sm mb-3">Payment method: Mock card ending in {{ payment.cardNumber.slice(-4) || '0000' }}</div>
+        <div class="text-sm mb-3">Payment method: Card via Stripe</div>
         <div *ngIf="orderError()" class="mt-3 text-sm text-rose-500">{{ orderError() }}</div>
         <div class="mt-3 flex items-center gap-2">
           <button type="button" class="rounded-full border px-4 h-10" (click)="back()">Back</button>
-          <button class="btn btn-primary" [disabled]="placing()" (click)="placeOrder()">{{ placing() ? 'Placing…' : 'Place order' }}</button>
+          <button class="btn btn-primary" [disabled]="placing()" (click)="placeOrder()">{{ placing() ? 'Placing&hellip;' : 'Place order' }}</button>
         </div>
       </div>
     </div>
@@ -129,11 +96,11 @@
       <div class="text-lg font-semibold text-blue-900 dark:text-white mb-3">Order Summary</div>
       <div class="space-y-2 max-h-64 overflow-y-auto pr-1">
         <div *ngFor="let it of items()" class="flex items-center justify-between text-sm">
-          <div>{{ it.title }} <span class="text-xs text-slate-500">× {{ it.quantity }}</span></div>
+          <div>{{ it.title }} <span class="text-xs text-slate-500">&times; {{ it.quantity }}</span></div>
           <div>{{ ((it.priceCents*it.quantity)/100) | number:'1.2-2' }} {{ it.currency }}</div>
         </div>
       </div>
-      <div *ngIf="previewLoading()" class="mt-3 text-xs text-blue-500">Updating totals…</div>
+      <div *ngIf="previewLoading()" class="mt-3 text-xs text-blue-500">Updating totals&hellip;</div>
       <div *ngIf="previewError()" class="mt-2 text-xs text-rose-500">{{ previewError() }}</div>
       <div class="mt-4">
         <label for="checkout-discount-code" class="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Discount code</label>

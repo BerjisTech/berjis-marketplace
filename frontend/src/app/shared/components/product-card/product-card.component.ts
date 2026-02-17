@@ -4,11 +4,12 @@ import { RouterLink } from '@angular/router';
 import { WishlistService } from '../../../core/services/wishlist.service';
 import { ToastService } from '../toast/toast.service';
 import { ProductSummary } from '../../../core/services/product.service';
+import { StarRatingComponent } from '../star-rating/star-rating.component';
 
 @Component({
   standalone: true,
   selector: 'app-product-card',
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, StarRatingComponent],
   templateUrl: './product-card.component.html',
   styleUrls: ['./product-card.component.css']
 })

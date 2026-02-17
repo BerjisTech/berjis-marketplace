@@ -6,6 +6,7 @@ import { ProductCardComponent } from '../app/shared/components/product-card/prod
 import { PaginationComponent } from '../app/shared/components/pagination/pagination.component';
 import { HttpClient } from '@angular/common/http';
 import { FiltersRailComponent } from '../app/shared/components/filters-rail/filters-rail.component';
+import { SkeletonComponent } from '../app/shared/components/skeleton/skeleton.component';
 import { QueryParamsService } from '../app/core/services/query-params.service';
 import { environment } from '../environments/environment';
 import { forkJoin, firstValueFrom } from 'rxjs';
@@ -15,7 +16,7 @@ import { CollectionService, CollectionSummary } from '../app/core/services/colle
 @Component({
   standalone: true,
   selector: 'app-home-page',
-  imports: [CommonModule, RouterLink, FormsModule, ProductCardComponent, FiltersRailComponent, PaginationComponent],
+  imports: [CommonModule, RouterLink, FormsModule, ProductCardComponent, FiltersRailComponent, PaginationComponent, SkeletonComponent],
   templateUrl: './home-page.component.html',
   styleUrls: ['./home-page.component.css']
 })

@@ -9,11 +9,13 @@ import { QueryParamsService } from '../app/core/services/query-params.service';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../environments/environment';
 import { ApiResponse, ProductSummary } from '../app/core/services/product.service';
+import { BreadcrumbsComponent } from '../app/shared/components/breadcrumbs/breadcrumbs.component';
+import { SeoService } from '../app/core/services/seo.service';
 
 @Component({
   standalone: true,
   selector: 'app-shop-page',
-  imports: [CommonModule, FormsModule, RouterLink, ProductCardComponent, FiltersRailComponent, PaginationComponent],
+  imports: [CommonModule, FormsModule, RouterLink, ProductCardComponent, FiltersRailComponent, PaginationComponent, BreadcrumbsComponent],
   templateUrl: './shop-page.component.html',
   styleUrls: ['./shop-page.component.css']
 })
@@ -22,6 +24,7 @@ export class ShopPageComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
   private readonly qps = inject(QueryParamsService);
+  private readonly seo = inject(SeoService);
   readonly api = environment.apiBase;
   shop = signal<ShopDetail | null>(null);
   products = signal<ProductSummary[]>([]);
@@ -37,7 +40,12 @@ export class ShopPageComponent implements OnInit {
   ngOnInit(): void {
     this.qps.normalizeListing(this.router, this.route);
     const slug = this.route.snapshot.paramMap.get('slug')!;
-    this.http.get<ApiResponse<ShopDetail>>(`${this.api}/v1/shops/${slug}`).subscribe(r => this.shop.set(r.data ?? null));
+    this.http.get<ApiResponse<ShopDetail>>(`${this.api}/v1/shops/${slug}`).subscribe(r => {
+      this.shop.set(r.data ?? null);
+      if (r.data) {
+        this.seo.set({ title: r.data.name, description: r.data.description || `Shop ${r.data.name} on Berjis Marketplace` });
+      }
+    });
     this.route.queryParamMap.subscribe(qp => {
       this.q.set(qp.get('q') || '');
       this.minPrice.set(qp.get('minPrice') || '');

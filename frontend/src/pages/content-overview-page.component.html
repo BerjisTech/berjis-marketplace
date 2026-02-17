@@ -1,10 +1,34 @@
-<div class="py-4">
-  <h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Content Overview</h1>
-  <div class="flex flex-wrap gap-2">
-    <a routerLink="/dashboard/content/files" class="rounded-full border px-3 py-1">Files</a>
-    <a routerLink="/dashboard/content/menus" class="rounded-full border px-3 py-1">Menus</a>
-    <a routerLink="/dashboard/content/blog-posts" class="rounded-full border px-3 py-1">Blog posts</a>
+<div class="py-4 space-y-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Content overview</h1>
+    <div class="flex gap-2">
+      <a routerLink="/dashboard/content/files" class="rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Files</a>
+      <a routerLink="/dashboard/content/menus" class="rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Menus</a>
+      <a routerLink="/dashboard/content/blog-posts" class="rounded-full border border-slate-300 dark:border-slate-700 px-3 py-1 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition">Blog posts</a>
+    </div>
   </div>
-  <p class="mt-6 text-sm text-slate-600 dark:text-slate-300">Skeleton for content management.</p>
-</div>
 
+  <p class="text-sm text-slate-600 dark:text-slate-300">Manage your store's content, files, and navigation.</p>
+
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      @for (i of [1,2,3,4]; track i) {
+        <div class="h-24 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800"></div>
+      }
+    </div>
+  } @else {
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      @for (item of counts(); track item.label) {
+        <a [routerLink]="item.link"
+          class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 hover:border-blue-300 dark:hover:border-blue-600 transition block">
+          <p class="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">{{ item.label }}</p>
+          <p class="mt-2 text-2xl font-semibold text-blue-900 dark:text-white">{{ item.count }}</p>
+        </a>
+      }
+    </div>
+  }
+</div>

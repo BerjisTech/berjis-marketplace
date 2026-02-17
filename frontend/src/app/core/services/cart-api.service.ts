@@ -37,6 +37,8 @@ export interface CartPreviewTotals {
   subtotalCents: number;
   discountAmountCents: number;
   giftCardAmountCents: number;
+  taxCents: number;
+  taxRatePercent: number;
   totalCents: number;
   currency: string;
 }

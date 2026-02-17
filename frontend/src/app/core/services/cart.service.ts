@@ -78,6 +78,8 @@ export class CartService {
       subtotalCents: subtotal,
       discountAmountCents: 0,
       giftCardAmountCents: 0,
+      taxCents: 0,
+      taxRatePercent: 0,
       totalCents: subtotal,
       currency,
     };
@@ -117,6 +119,8 @@ export class CartService {
     const subtotal = Number(response?.data?.subtotalCents ?? this.totalCents());
     const discountAmount = Number(response?.data?.discountAmountCents ?? 0);
     const giftCardAmount = Number(response?.data?.giftCardAmountCents ?? 0);
+    const taxCents = Number(response?.data?.taxCents ?? 0);
+    const taxRatePercent = Number(response?.data?.taxRatePercent ?? 0);
     const total = Number(
       response?.data?.totalCents ?? Math.max(0, subtotal - discountAmount - giftCardAmount),
     );
@@ -124,6 +128,8 @@ export class CartService {
       subtotalCents: subtotal,
       discountAmountCents: discountAmount,
       giftCardAmountCents: giftCardAmount,
+      taxCents,
+      taxRatePercent,
       totalCents: total,
       currency,
     };

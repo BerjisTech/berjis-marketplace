@@ -1,3 +1,66 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Customer privacy</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Consent, cookies, and data retention settings.</p>
+<div class="py-4 space-y-6 max-w-2xl">
+  <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Customer privacy</h1>
+  <p class="text-sm text-slate-600 dark:text-slate-300">GDPR compliance, cookie consent, and data collection settings.</p>
 
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+  @if (saved()) {
+    <p class="text-sm text-green-600 dark:text-green-400">Privacy settings saved.</p>
+  }
+
+  @if (loading()) {
+    <div class="space-y-4">
+      @for (i of [1,2,3]; track i) {
+        <div class="h-12 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+      }
+    </div>
+  } @else {
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-4">
+      <h2 class="text-sm font-semibold text-blue-900 dark:text-white">GDPR settings</h2>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" [checked]="cookieConsent()" (change)="cookieConsent.set(!cookieConsent())"
+          class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+        <div>
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Cookie consent banner</span>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Show a cookie consent banner to visitors.</p>
+        </div>
+      </label>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" [checked]="dataCollectionNotice()" (change)="dataCollectionNotice.set(!dataCollectionNotice())"
+          class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+        <div>
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Data collection notice</span>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Inform customers about data collection practices at checkout.</p>
+        </div>
+      </label>
+
+      <label class="flex items-center gap-3 cursor-pointer">
+        <input type="checkbox" [checked]="rightToDelete()" (change)="rightToDelete.set(!rightToDelete())"
+          class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+        <div>
+          <span class="text-sm font-medium text-slate-700 dark:text-slate-300">Right to delete</span>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Allow customers to request deletion of their personal data.</p>
+        </div>
+      </label>
+    </div>
+
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Privacy policy</h2>
+      <div>
+        <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Privacy policy URL</label>
+        <input type="url" [(ngModel)]="privacyPolicyUrl" name="privacyPolicyUrl"
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white focus:border-blue-500 focus:outline-none"
+          placeholder="https://example.com/privacy">
+        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">Link to your external privacy policy page.</p>
+      </div>
+    </div>
+
+    <button type="button" (click)="save()" [disabled]="saving()"
+      class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-50 transition">
+      {{ saving() ? 'Saving...' : 'Save' }}
+    </button>
+  }
+</div>

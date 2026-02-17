@@ -569,6 +569,52 @@ type OrderFulfillmentItem struct {
 	PriceCents      int64     `db:"price_cents" json:"priceCents"`
 }
 
+type PaymentSetting struct {
+	UUID                 uuid.UUID `db:"uuid" json:"uuid"`
+	ShopUUID             uuid.UUID `db:"shop_uuid" json:"shopUuid"`
+	Provider             string    `db:"provider" json:"provider"`
+	StripePublishableKey string    `db:"stripe_publishable_key" json:"stripePublishableKey"`
+	StripeSecretKey      string    `db:"stripe_secret_key" json:"stripeSecretKey"`
+	StripeWebhookSecret  string    `db:"stripe_webhook_secret" json:"stripeWebhookSecret"`
+	IsActive             bool      `db:"is_active" json:"isActive"`
+	CreatedAt            time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt            time.Time `db:"updated_at" json:"updatedAt"`
+}
+
+type PaymentIntent struct {
+	UUID                   uuid.UUID `db:"uuid" json:"uuid"`
+	OrderUUID              uuid.UUID `db:"order_uuid" json:"orderUuid"`
+	ShopUUID               uuid.UUID `db:"shop_uuid" json:"shopUuid"`
+	StripePaymentIntentID  string    `db:"stripe_payment_intent_id" json:"stripePaymentIntentId"`
+	ClientSecret           string    `db:"client_secret" json:"-"`
+	AmountCents            int64     `db:"amount_cents" json:"amountCents"`
+	Currency               string    `db:"currency" json:"currency"`
+	Status                 string    `db:"status" json:"status"`
+	CreatedAt              time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt              time.Time `db:"updated_at" json:"updatedAt"`
+}
+
+type TaxSettings struct {
+	UUID               uuid.UUID `db:"uuid" json:"uuid"`
+	ShopUUID           uuid.UUID `db:"shop_uuid" json:"shopUuid"`
+	AutoCalculate      bool      `db:"auto_calculate" json:"autoCalculate"`
+	DefaultRatePercent float64   `db:"default_rate_percent" json:"defaultRatePercent"`
+	PricesIncludeTax   bool      `db:"prices_include_tax" json:"pricesIncludeTax"`
+	CreatedAt          time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt          time.Time `db:"updated_at" json:"updatedAt"`
+}
+
+type TaxZone struct {
+	UUID        uuid.UUID `db:"uuid" json:"uuid"`
+	ShopUUID    uuid.UUID `db:"shop_uuid" json:"shopUuid"`
+	CountryCode string    `db:"country_code" json:"countryCode"`
+	RegionCode  string    `db:"region_code" json:"regionCode"`
+	RatePercent float64   `db:"rate_percent" json:"ratePercent"`
+	Name        string    `db:"name" json:"name"`
+	CreatedAt   time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt   time.Time `db:"updated_at" json:"updatedAt"`
+}
+
 type SalesPoint struct {
 	Date       string `json:"date"`
 	TotalCents int64  `json:"totalCents"`
@@ -610,4 +656,57 @@ type UserAddress struct {
 	IsDefaultBilling  bool      `db:"is_default_billing" json:"isDefaultBilling"`
 	CreatedAt         time.Time `db:"created_at" json:"createdAt"`
 	UpdatedAt         time.Time `db:"updated_at" json:"updatedAt"`
+}
+
+type Webhook struct {
+	UUID      uuid.UUID      `db:"uuid" json:"uuid"`
+	ShopUUID  uuid.UUID      `db:"shop_uuid" json:"shopUuid"`
+	URL       string         `db:"url" json:"url"`
+	Secret    string         `db:"secret" json:"secret"`
+	Events    pq.StringArray `db:"events" json:"events"`
+	IsActive  bool           `db:"is_active" json:"isActive"`
+	CreatedAt time.Time      `db:"created_at" json:"createdAt"`
+	UpdatedAt time.Time      `db:"updated_at" json:"updatedAt"`
+}
+
+type WebhookDelivery struct {
+	UUID           uuid.UUID        `db:"uuid" json:"uuid"`
+	WebhookUUID    uuid.UUID        `db:"webhook_uuid" json:"webhookUuid"`
+	EventType      string           `db:"event_type" json:"eventType"`
+	Payload        json.RawMessage  `db:"payload" json:"payload"`
+	ResponseStatus *int             `db:"response_status" json:"responseStatus,omitempty"`
+	ResponseBody   *string          `db:"response_body" json:"responseBody,omitempty"`
+	Attempt        int              `db:"attempt" json:"attempt"`
+	Status         string           `db:"status" json:"status"`
+	NextRetryAt    *time.Time       `db:"next_retry_at" json:"nextRetryAt,omitempty"`
+	Error          *string          `db:"error" json:"error,omitempty"`
+	CreatedAt      time.Time        `db:"created_at" json:"createdAt"`
+	UpdatedAt      time.Time        `db:"updated_at" json:"updatedAt"`
+}
+
+type ShopEmailSettings struct {
+	UUID           uuid.UUID `db:"uuid" json:"uuid"`
+	ShopUUID       uuid.UUID `db:"shop_uuid" json:"shopUuid"`
+	Provider       string    `db:"provider" json:"provider"`
+	SMTPHost       string    `db:"smtp_host" json:"smtpHost"`
+	SMTPPort       int       `db:"smtp_port" json:"smtpPort"`
+	SMTPUsername   string    `db:"smtp_username" json:"smtpUsername"`
+	SMTPPassword   string    `db:"smtp_password" json:"smtpPassword,omitempty"`
+	SendGridAPIKey string    `db:"sendgrid_api_key" json:"sendgridApiKey,omitempty"`
+	FromEmail      string    `db:"from_email" json:"fromEmail"`
+	FromName       string    `db:"from_name" json:"fromName"`
+	IsActive       bool      `db:"is_active" json:"isActive"`
+	CreatedAt      time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt      time.Time `db:"updated_at" json:"updatedAt"`
+}
+
+type NotificationPreference struct {
+	UUID            uuid.UUID `db:"uuid" json:"uuid"`
+	ShopUUID        uuid.UUID `db:"shop_uuid" json:"shopUuid"`
+	EventType       string    `db:"event_type" json:"eventType"`
+	Enabled         bool      `db:"enabled" json:"enabled"`
+	TemplateSubject *string   `db:"template_subject" json:"templateSubject,omitempty"`
+	TemplateBody    *string   `db:"template_body" json:"templateBody,omitempty"`
+	CreatedAt       time.Time `db:"created_at" json:"createdAt"`
+	UpdatedAt       time.Time `db:"updated_at" json:"updatedAt"`
 }

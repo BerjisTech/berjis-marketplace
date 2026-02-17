@@ -4,19 +4,12 @@
       Berjis Marketplace
     </a>
 
-    <form class="order-2 flex w-full flex-wrap items-center gap-2 md:flex-1 md:flex-nowrap" (submit)="$event.preventDefault(); applyQuery()">
-      <input
-        class="w-full flex-1 min-h-[44px] rounded-full border border-transparent bg-white/80 px-4 text-sm text-slate-900 shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-400/70 dark:bg-slate-900/70 dark:text-slate-100 dark:focus:border-amber-400 dark:focus:ring-amber-400/60"
-        placeholder="Search products, shops."
-        aria-label="Search products and shops"
-        [ngModel]="q()"
-        (ngModelChange)="q.set($event)"
-        name="q"
-      />
-      <button type="submit" class="btn btn-primary rounded-full px-6">
+    <div class="order-2 flex w-full items-center gap-2 md:flex-1 md:flex-nowrap">
+      <app-search-autocomplete class="flex-1" placeholder="Search products, shops..." (search)="q.set($event); applyQuery()"></app-search-autocomplete>
+      <button type="button" class="btn btn-primary rounded-full px-6" (click)="applyQuery()">
         Search
       </button>
-    </form>
+    </div>
 
     <div *ngIf="showFilterControls()" class="order-3 flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
       <button

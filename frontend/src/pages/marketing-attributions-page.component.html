@@ -1,3 +1,58 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Attributions</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for attribution models.</p>
+<div class="py-4 space-y-6 max-w-4xl">
+  <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Attributions</h1>
+  <p class="text-sm text-slate-600 dark:text-slate-300">Understand which channels drive conversions.</p>
 
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+
+  <!-- Attribution model selector -->
+  <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+    <div class="flex items-center gap-3">
+      <label class="text-sm font-medium text-slate-700 dark:text-slate-300">Attribution model</label>
+      <select [(ngModel)]="attributionModel" name="attributionModel" (ngModelChange)="onModelChange()"
+        class="rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-white">
+        @for (m of models; track m) {
+          <option [value]="m">{{ m }}</option>
+        }
+      </select>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="space-y-4">
+      @for (i of [1,2,3]; track i) {
+        <div class="h-12 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+      }
+    </div>
+  } @else {
+    @if (channels().length > 0) {
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+          <thead class="bg-slate-50 dark:bg-slate-800">
+            <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <th class="px-4 py-3">Channel</th>
+              <th class="px-4 py-3">Visits</th>
+              <th class="px-4 py-3">Conversions</th>
+              <th class="px-4 py-3">Revenue</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+            @for (ch of channels(); track ch.channel) {
+              <tr class="text-slate-700 dark:text-slate-200">
+                <td class="px-4 py-3 font-medium">{{ ch.channel }}</td>
+                <td class="px-4 py-3">{{ ch.visits }}</td>
+                <td class="px-4 py-3">{{ ch.conversions }}</td>
+                <td class="px-4 py-3">{{ ch.revenue }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-8 text-center">
+        <p class="text-sm text-slate-500 dark:text-slate-400">No attribution data available yet.</p>
+      </div>
+    }
+  }
+</div>

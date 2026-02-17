@@ -16,6 +16,8 @@ export interface ProductSummary {
   summary?: string;
   category?: string;
   images?: string[];
+  avgRating?: number;
+  reviewCount?: number;
 }
 
 export interface ApiResponse<T> {

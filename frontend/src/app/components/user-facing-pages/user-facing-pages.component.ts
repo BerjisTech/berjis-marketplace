@@ -8,11 +8,12 @@ import { CartService } from '../../core/services/cart.service';
 import { WishlistService } from '../../core/services/wishlist.service';
 import { MiniCartComponent } from '../../shared/components/mini-cart/mini-cart.component';
 import { ToastContainerComponent } from '../../shared/components/toast/toast-container.component';
+import { SearchAutocompleteComponent } from '../../shared/components/search-autocomplete/search-autocomplete.component';
 
 @Component({
   selector: 'app-user-facing-pages',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, DarkModeToggleComponent, CommonModule, FormsModule, MiniCartComponent, ToastContainerComponent],
+  imports: [RouterOutlet, RouterLink, DarkModeToggleComponent, CommonModule, FormsModule, MiniCartComponent, ToastContainerComponent, SearchAutocompleteComponent],
   templateUrl: './user-facing-pages.component.html',
   styleUrl: './user-facing-pages.component.css'
 })

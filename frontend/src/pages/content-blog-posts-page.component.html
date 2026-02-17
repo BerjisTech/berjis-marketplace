@@ -1,3 +1,71 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Blog Posts</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Skeleton for blog posts.</p>
+<div class="py-4 space-y-6 max-w-4xl">
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Blog posts</h1>
+      <p class="text-sm text-slate-600 dark:text-slate-300">Manage blog content for your store.</p>
+    </div>
+    <button type="button" (click)="createPost()"
+      class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-500 transition">
+      Create post
+    </button>
+  </div>
 
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+  @if (message()) {
+    <p class="text-sm text-green-600 dark:text-green-400">{{ message() }}</p>
+  }
+
+  <!-- Status filter -->
+  <div class="flex gap-2">
+    @for (s of statuses; track s) {
+      <button type="button" (click)="statusFilter = s"
+        class="rounded-lg px-3 py-1.5 text-sm font-medium transition"
+        [ngClass]="statusFilter === s
+          ? 'bg-blue-600 text-white'
+          : 'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'">
+        {{ s === 'all' ? 'All' : s }}
+      </button>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="space-y-4">
+      @for (i of [1,2,3]; track i) {
+        <div class="h-12 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+      }
+    </div>
+  } @else {
+    @if (filteredPosts().length > 0) {
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+          <thead class="bg-slate-50 dark:bg-slate-800">
+            <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <th class="px-4 py-3">Title</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Date</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+            @for (post of filteredPosts(); track post.id) {
+              <tr class="text-slate-700 dark:text-slate-200">
+                <td class="px-4 py-3 font-medium">{{ post.title }}</td>
+                <td class="px-4 py-3">
+                  <span class="rounded-full px-2 py-1 text-xs font-medium" [ngClass]="statusClass(post.status)">
+                    {{ post.status }}
+                  </span>
+                </td>
+                <td class="px-4 py-3">{{ post.date }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-8 text-center">
+        <p class="text-sm text-slate-500 dark:text-slate-400">No blog posts yet. Create your first post to engage your audience.</p>
+      </div>
+    }
+  }
+</div>

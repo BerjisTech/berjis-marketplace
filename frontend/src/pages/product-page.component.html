@@ -1,29 +1,55 @@
 <div class="min-h-screen px-[clamp(1rem,6vw,3rem)] py-10 text-[color:var(--color-text-primary)] dark:text-[color:var(--color-text-dark)]">
-  <ng-container *ngIf="!loading(); else loadingTpl">
+  @if (!loading()) {
+    <app-breadcrumbs [items]="breadcrumbs()"></app-breadcrumbs>
+
     <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <!-- Image Gallery -->
       <div>
-        <div class="aspect-[4/3] rounded-xl bg-blue-100 dark:bg-slate-900 overflow-hidden shadow-brand">
-          <img *ngIf="(selectedImage()||product()?.imageUrl) as img" [src]="img" [attr.alt]="product()?.title || 'Product image'" class="w-full h-full object-cover"/>
+        <div class="aspect-[4/3] rounded-xl bg-blue-100 dark:bg-slate-900 overflow-hidden shadow-brand cursor-pointer" (click)="openLightbox(0)">
+          @if ((selectedImage() || product()?.imageUrl); as img) {
+            <img [src]="img" [attr.alt]="product()?.title || 'Product image'" class="w-full h-full object-cover" loading="lazy" />
+          }
         </div>
-        <div class="mt-3 flex gap-2" *ngIf="product()?.images?.length">
-          <button *ngFor="let i of product()?.images" (click)="selectedImage.set(i)" type="button" class="rounded-lg overflow-hidden border border-blue-900/20 dark:border-slate-700 focus:ring-2 focus:ring-amber-400">
-            <img [src]="i" [attr.alt]="product()?.title || 'Product image thumbnail'" class="w-16 h-16 object-cover"/>
-          </button>
-        </div>
+        @if (product()?.images?.length) {
+          <div class="mt-3 flex gap-2">
+            @for (i of product()?.images; track i; let idx = $index) {
+              <button (click)="selectedImage.set(i)" type="button" class="rounded-lg overflow-hidden border border-blue-900/20 dark:border-slate-700 focus:ring-2 focus:ring-amber-400">
+                <img [src]="i" [attr.alt]="product()?.title || 'Product image thumbnail'" class="w-16 h-16 object-cover" loading="lazy" />
+              </button>
+            }
+          </div>
+        }
       </div>
+
+      <!-- Product Info -->
       <div>
         <div class="text-sm text-slate-600 dark:text-slate-400 mb-2">
           <a [routerLink]="['/shop', product()?.shopSlug]" class="rounded-full px-2 py-0.5 border border-blue-900/25 dark:border-slate-700 bg-blue-50 dark:bg-slate-900/60">{{ product()?.shopName }}</a>
         </div>
         <h1 class="text-2xl font-bold text-blue-900 dark:text-white">{{ product()?.title }}</h1>
+
+        <!-- Rating summary -->
+        @if (reviewCount() > 0) {
+          <div class="mt-2 flex items-center gap-2">
+            <app-star-rating [rating]="avgRating()" [interactive]="false"></app-star-rating>
+            <span class="text-sm text-slate-500 dark:text-slate-400">({{ reviewCount() }} {{ reviewCount() === 1 ? 'review' : 'reviews' }})</span>
+          </div>
+        }
+
         <p class="mt-2 text-slate-700 dark:text-slate-200">{{ product()?.summary }}</p>
         <div class="mt-4 text-xl font-semibold text-blue-900 dark:text-white">{{ (displayPriceCents()/100) | number:'1.2-2' }} {{ product()?.currency }}</div>
-        <div class="mt-3" *ngIf="product()?.variants?.length">
-          <label class="block text-sm mb-1" for="product-variant-select">Variant</label>
-          <select id="product-variant-select" class="h-10 rounded-full border px-3" [ngModel]="selectedVariantId()" (ngModelChange)="selectedVariantId.set($event)">
-            <option *ngFor="let v of product()?.variants" [value]="v.id">{{ v.title }}</option>
-          </select>
-        </div>
+
+        @if (product()?.variants?.length) {
+          <div class="mt-3">
+            <label class="block text-sm mb-1" for="product-variant-select">Variant</label>
+            <select id="product-variant-select" class="h-10 rounded-full border px-3" [ngModel]="selectedVariantId()" (ngModelChange)="selectedVariantId.set($event)">
+              @for (v of product()?.variants; track v.id) {
+                <option [value]="v.id">{{ v.title }}</option>
+              }
+            </select>
+          </div>
+        }
+
         <div class="mt-4 flex items-center gap-3">
           <label class="text-sm" for="product-quantity-input">Qty</label>
           <input id="product-quantity-input" type="number" min="1" class="w-20 rounded-full border px-3 h-10" [ngModel]="quantity()" (ngModelChange)="quantity.set(Math.max(1, +$event||1))" />
@@ -33,26 +59,119 @@
             Wishlist
           </button>
         </div>
-        <div class="mt-4 text-xs text-slate-500" *ngIf="product()?.stock===0">Out of stock</div>
-        <div class="mt-8 prose prose-sm dark:prose-invert max-w-none" *ngIf="product()?.description" [innerHTML]="product()?.description"></div>
+        @if (product()?.stock === 0) {
+          <div class="mt-4 text-xs text-slate-500">Out of stock</div>
+        }
+
+        @if (product()?.description) {
+          <div class="mt-8 prose prose-sm dark:prose-invert max-w-none" [innerHTML]="product()?.description"></div>
+        }
       </div>
     </div>
 
+    <!-- Reviews Section -->
     <section class="mt-12">
-      <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Related products</h2>
-      <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
-        <a *ngFor="let p of related()" [routerLink]="['/product', p.uuid]" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-3 hover:shadow-brand transition">
-          <div class="aspect-4/3 rounded-lg bg-blue-100 dark:bg-slate-900 overflow-hidden mb-3">
-            <img *ngIf="p.imageUrl" [src]="p.imageUrl" [attr.alt]="p.title || 'Product image'" class="w-full h-full object-cover"/>
-          </div>
-          <div class="text-sm font-medium text-blue-900 dark:text-white truncate">{{ p.title }}</div>
-          <div class="text-xs text-slate-700 dark:text-slate-200">{{ (p.priceCents/100) | number:'1.2-2' }} {{ p.currency }}</div>
-        </a>
+      <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Customer Reviews</h2>
+
+      @if (reviews().length > 0) {
+        <div class="space-y-4 mb-6">
+          @for (review of reviews(); track review.uuid) {
+            <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+              <div class="flex items-center gap-2 mb-1">
+                <app-star-rating [rating]="review.rating" [interactive]="false"></app-star-rating>
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ review.userName }}</span>
+                @if (review.isVerifiedPurchase) {
+                  <span class="text-xs text-green-600 dark:text-green-400">Verified Purchase</span>
+                }
+              </div>
+              @if (review.title) {
+                <div class="font-medium text-slate-800 dark:text-slate-100">{{ review.title }}</div>
+              }
+              @if (review.body) {
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">{{ review.body }}</p>
+              }
+              <div class="mt-2 text-xs text-slate-400">{{ review.createdAt | date:'mediumDate' }}</div>
+            </div>
+          }
+        </div>
+      } @else {
+        <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">No reviews yet. Be the first to review this product.</p>
+      }
+
+      <!-- Write a Review -->
+      <div class="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+        <h3 class="text-sm font-semibold text-blue-900 dark:text-white mb-3">Write a Review</h3>
+        <div class="mb-3">
+          <app-star-rating [rating]="newReviewRating()" [interactive]="true" (rated)="newReviewRating.set($event)"></app-star-rating>
+        </div>
+        <input type="text" placeholder="Review title (optional)" [(ngModel)]="newReviewTitle"
+          class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm mb-2" />
+        <textarea placeholder="Your review..." [(ngModel)]="newReviewBody" rows="3"
+          class="w-full rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm mb-3"></textarea>
+        <button class="btn btn-primary text-sm" type="button" [disabled]="newReviewRating() === 0 || submittingReview()" (click)="submitReview()">
+          {{ submittingReview() ? 'Submitting...' : 'Submit Review' }}
+        </button>
       </div>
     </section>
-  </ng-container>
-  <ng-template #loadingTpl>
-    <div class="text-slate-600 dark:text-slate-400">Loading product…</div>
-  </ng-template>
-</div>
 
+    <!-- Related Products -->
+    @if (related().length > 0) {
+      <section class="mt-12">
+        <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Related products</h2>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-6">
+          @for (p of related(); track p.uuid) {
+            <a [routerLink]="['/product', p.uuid]" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-3 hover:shadow-brand transition">
+              <div class="aspect-4/3 rounded-lg bg-blue-100 dark:bg-slate-900 overflow-hidden mb-3">
+                @if (p.imageUrl) {
+                  <img [src]="p.imageUrl" [attr.alt]="p.title || 'Product image'" class="w-full h-full object-cover" loading="lazy" />
+                }
+              </div>
+              <div class="text-sm font-medium text-blue-900 dark:text-white truncate">{{ p.title }}</div>
+              <div class="text-xs text-slate-700 dark:text-slate-200">{{ (p.priceCents/100) | number:'1.2-2' }} {{ p.currency }}</div>
+            </a>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Recently Viewed -->
+    @if (recentItems().length > 0) {
+      <section class="mt-12">
+        <h2 class="text-lg font-semibold text-blue-900 dark:text-white mb-4">Recently viewed</h2>
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4">
+          @for (item of recentItems(); track item.uuid) {
+            <a [routerLink]="['/product', item.uuid]" class="rounded-xl border border-blue-900/20 dark:border-slate-800 bg-white/80 dark:bg-slate-950/70 p-3 hover:shadow-brand transition">
+              <div class="aspect-square rounded-lg bg-blue-100 dark:bg-slate-900 overflow-hidden mb-2">
+                @if (item.imageUrl) {
+                  <img [src]="item.imageUrl" [attr.alt]="item.title" class="w-full h-full object-cover" loading="lazy" />
+                }
+              </div>
+              <div class="text-sm font-medium text-blue-900 dark:text-white truncate">{{ item.title }}</div>
+              <div class="text-xs text-slate-700 dark:text-slate-200">{{ (item.priceCents/100) | number:'1.2-2' }} {{ item.currency }}</div>
+            </a>
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Image Lightbox -->
+    <app-image-lightbox
+      [images]="allImages"
+      [open]="lightboxOpen()"
+      [startIndex]="lightboxIndex()"
+      [alt]="product()?.title || ''"
+      (close)="lightboxOpen.set(false)">
+    </app-image-lightbox>
+  } @else {
+    <!-- Loading skeleton -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <app-skeleton type="image"></app-skeleton>
+      <div class="space-y-4">
+        <app-skeleton type="line" width="40%"></app-skeleton>
+        <app-skeleton type="line" width="70%" height="2rem"></app-skeleton>
+        <app-skeleton type="line" width="30%"></app-skeleton>
+        <app-skeleton type="text"></app-skeleton>
+      </div>
+    </div>
+  }
+</div>

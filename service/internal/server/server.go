@@ -10,22 +10,31 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
 	fiberrecover "github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 
 	srvAuth "github.com/berjistech/berjis-ecosystem/marketplace/service/internal/auth"
+	"github.com/berjistech/berjis-ecosystem/marketplace/service/internal/email"
+	stripeClient "github.com/berjistech/berjis-ecosystem/marketplace/service/internal/stripe"
+	"github.com/berjistech/berjis-ecosystem/marketplace/service/internal/webhook"
 	coreauth "github.com/berjistech/berjis-ecosystem/shared/coreauth"
 )
 
 type Options struct {
-	AllowedOrigins    string
-	CoreAPIBase       string
-	DB                *sqlx.DB
-	UploadsPublicBase string
-	TaxRatePercent    float64
-	ShippingFlatCents int64
-	MaxShopsPerUser   int
+	AllowedOrigins       string
+	CoreAPIBase          string
+	DB                   *sqlx.DB
+	UploadsPublicBase    string
+	TaxRatePercent       float64
+	ShippingFlatCents    int64
+	MaxShopsPerUser      int
+	StripeClient         *stripeClient.Client
+	StripeWebhookSecret  string
+	StripePublishableKey string
+	WebhookDispatcher    *webhook.Dispatcher
+	EmailSender          email.Sender
 }
 
 func New(opts Options) *fiber.App {
@@ -36,6 +45,11 @@ func New(opts Options) *fiber.App {
 		AllowMethods:     "GET,POST,PUT,PATCH,DELETE,OPTIONS",
 		AllowHeaders:     "Authorization,Content-Type,Accept",
 		AllowCredentials: true,
+	}))
+	app.Use(limiter.New(limiter.Config{
+		Max:               60,
+		Expiration:        1 * time.Minute,
+		LimiterMiddleware: limiter.SlidingWindow{},
 	}))
 
 	app.Use(func(c *fiber.Ctx) error {
@@ -88,6 +102,7 @@ func New(opts Options) *fiber.App {
 	app.Static("/uploads", "/data/uploads")
 
 	registerPublicRoutes(app, opts)
+	registerPaymentRoutes(app, opts)
 
 	httpClientAuth := &http.Client{Timeout: 8 * time.Second}
 	var authVerifier *coreauth.Verifier
@@ -108,6 +123,8 @@ func New(opts Options) *fiber.App {
 		Verifier:    authVerifier,
 	})
 
+	registerPaymentSettingsRoutes(app, opts, requireAuth)
+	registerShippingRoutes(app, opts, requireAuth)
 	registerShopProductRoutes(app, opts, requireAuth)
 	registerInventoryRoutes(app, opts, requireAuth)
 	registerCollectionRoutes(app, opts, requireAuth)
@@ -120,6 +137,11 @@ func New(opts Options) *fiber.App {
 	registerSearchRoutes(app, opts, requireAuth)
 	registerProfileRoutes(app, opts, requireAuth)
 	registerMarketingRoutes(app, opts, requireAuth)
+	registerReviewRoutes(app, opts, requireAuth)
+	registerAnalyticsRoutes(app, opts, requireAuth)
+	registerWebhookRoutes(app, opts, requireAuth)
+	registerTaxRoutes(app, opts, requireAuth)
+	registerNotificationRoutes(app, opts, requireAuth)
 
 	return app
 }

@@ -3,7 +3,7 @@
     <span class="material-symbols-outlined text-[18px] align-middle">favorite</span>
   </button>
   <div class="aspect-4/3 rounded-lg bg-blue-100 dark:bg-slate-900 mb-3 overflow-hidden">
-    <img *ngIf="product?.imageUrl" [src]="product.imageUrl" alt="" class="w-full h-full object-cover" />
+    <img *ngIf="product?.imageUrl" [src]="product.imageUrl" alt="" class="w-full h-full object-cover" loading="lazy" />
   </div>
   <div *ngIf="showShop" class="text-sm text-slate-600 dark:text-slate-400 mb-1">
     <a [routerLink]="['/shop', product?.shopSlug]" class="rounded-full px-2 py-0.5 border border-blue-900/25 dark:border-slate-700 bg-blue-50 dark:bg-slate-900/60">{{ product?.shopName }}</a>
@@ -11,5 +11,9 @@
   <h3 class="text-base font-semibold text-blue-900 dark:text-white">
     <a [routerLink]="['/product', product?.uuid]">{{ product?.title }}</a>
   </h3>
+  <div *ngIf="product?.reviewCount" class="mt-1 flex items-center gap-1">
+    <app-star-rating [rating]="product.avgRating || 0" [interactive]="false"></app-star-rating>
+    <span class="text-xs text-slate-400">({{ product.reviewCount }})</span>
+  </div>
   <div class="mt-2 text-sm text-slate-700 dark:text-slate-200">{{ (product?.priceCents/100) | number:'1.2-2' }} {{ product?.currency }}</div>
 </article>

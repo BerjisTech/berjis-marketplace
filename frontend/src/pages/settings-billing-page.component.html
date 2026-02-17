@@ -1,3 +1,75 @@
-<h1 class="text-xl font-semibold text-blue-900 dark:text-white mb-4">Billing</h1>
-<p class="text-sm text-slate-600 dark:text-slate-300">Invoices, payment methods, and billing history.</p>
+<div class="py-4 space-y-6 max-w-3xl">
+  <h1 class="text-xl font-semibold text-blue-900 dark:text-white">Billing</h1>
+  <p class="text-sm text-slate-600 dark:text-slate-300">View your billing plan and recent invoices.</p>
 
+  @if (error()) {
+    <p class="text-sm text-red-500">{{ error() }}</p>
+  }
+
+  @if (loading()) {
+    <div class="space-y-4">
+      @for (i of [1,2,3]; track i) {
+        <div class="h-12 animate-pulse rounded-lg bg-slate-200 dark:bg-slate-800"></div>
+      }
+    </div>
+  } @else {
+    <!-- Plan info -->
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 space-y-2">
+      <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Current plan</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+        <div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Plan</p>
+          <p class="font-medium text-slate-900 dark:text-white">{{ planName() }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Billing cycle</p>
+          <p class="font-medium text-slate-900 dark:text-white">{{ billingCycle() }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Next billing date</p>
+          <p class="font-medium text-slate-900 dark:text-white">{{ nextBillingDate() || 'N/A' }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Invoices -->
+    <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <h2 class="text-sm font-semibold text-blue-900 dark:text-white">Recent invoices</h2>
+      </div>
+      @if (invoices().length > 0) {
+        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700 text-sm">
+          <thead class="bg-slate-50 dark:bg-slate-800">
+            <tr class="text-left text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              <th class="px-4 py-3">Date</th>
+              <th class="px-4 py-3">Amount</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3 text-right">Download</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+            @for (invoice of invoices(); track invoice.id) {
+              <tr class="text-slate-700 dark:text-slate-200">
+                <td class="px-4 py-3">{{ invoice.date }}</td>
+                <td class="px-4 py-3 font-medium">{{ invoice.amount }}</td>
+                <td class="px-4 py-3">
+                  <span class="rounded-full px-2 py-1 text-xs font-medium" [ngClass]="statusClass(invoice.status)">
+                    {{ invoice.status }}
+                  </span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <a [href]="invoice.downloadUrl" target="_blank"
+                    class="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400 transition">
+                    Download
+                  </a>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      } @else {
+        <p class="px-4 py-6 text-sm text-slate-500 dark:text-slate-400">No invoices yet.</p>
+      }
+    </div>
+  }
+</div>
